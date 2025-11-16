@@ -27,7 +27,7 @@ const AdminSidebar = () => {
   const { logout } = useAuth();
 
   return (
-    <div className="w-64 bg-white dark:bg-gray-800 shadow-lg min-h-screen fixed left-0 top-0 pt-16">
+    <div className="w-64 bg-white dark:bg-gray-800 shadow-lg h-[calc(100vh-4rem)] fixed left-0 top-16 overflow-y-auto">
       <div className="p-4">
         <nav className="space-y-2">
           {adminMenuItems.map((item) => {

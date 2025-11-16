@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaSearch, FaDownload, FaEye, FaFileExport, FaFilePdf, FaEnvelope, FaTrash } from 'react-icons/fa';
+import { FaSearch, FaDownload, FaEye, FaFileExport, FaFilePdf, FaEnvelope, FaTrash, FaExclamationTriangle, FaTimes } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import StudentDetailModal from '../../components/StudentDetailModal';
@@ -19,6 +19,12 @@ const Students = () => {
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState({
+    isOpen: false,
+    studentId: null,
+    studentName: '',
+    step: 1 // 1 = first confirmation, 2 = final warning
+  });
 
   useEffect(() => {
     fetchStudents();
@@ -212,34 +218,60 @@ const Students = () => {
     }
   };
 
-  const handleDeleteStudent = async (studentId, studentName) => {
-    // Confirm deletion
-    const confirmMessage = `Are you sure you want to delete ${studentName}?\n\nThis will permanently delete:\n- Student account and all data\n- User login credentials\n- All uploaded files (resumes, certificates, photos)\n- All notifications\n\nThis action CANNOT be undone!`;
-    
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
+  const handleDeleteClick = (studentId, studentName) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      studentId,
+      studentName,
+      step: 1
+    });
+  };
 
-    // Double confirmation for safety
-    const doubleConfirm = window.confirm('⚠️ FINAL WARNING: This will permanently delete all student data. Are you absolutely sure?');
-    if (!doubleConfirm) {
-      return;
+  const handleConfirmDelete = () => {
+    if (deleteConfirmation.step === 1) {
+      // Move to final warning step
+      setDeleteConfirmation({
+        ...deleteConfirmation,
+        step: 2
+      });
+    } else {
+      // Final confirmation - proceed with deletion
+      performDelete();
     }
+  };
 
+  const performDelete = async () => {
     try {
       setLoading(true);
-      await api.delete(`/admin/students/${studentId}`);
+      await api.delete(`/admin/students/${deleteConfirmation.studentId}`);
       toast.success('Student account and all data deleted successfully');
       
       // Remove student from list
-      setStudents(students.filter(student => student._id !== studentId));
-      setFilteredStudents(filteredStudents.filter(student => student._id !== studentId));
+      setStudents(students.filter(student => student._id !== deleteConfirmation.studentId));
+      setFilteredStudents(filteredStudents.filter(student => student._id !== deleteConfirmation.studentId));
+      
+      // Close confirmation modal
+      setDeleteConfirmation({
+        isOpen: false,
+        studentId: null,
+        studentName: '',
+        step: 1
+      });
     } catch (error) {
       console.error('Error deleting student:', error);
       toast.error(error.response?.data?.message || 'Failed to delete student account');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteConfirmation({
+      isOpen: false,
+      studentId: null,
+      studentName: '',
+      step: 1
+    });
   };
 
   if (loading) {
@@ -456,7 +488,7 @@ const Students = () => {
                       <FaDownload />
                     </button>
                     <button
-                      onClick={() => handleDeleteStudent(
+                      onClick={() => handleDeleteClick(
                         student._id, 
                         `${student.personalInfo?.firstName || ''} ${student.personalInfo?.lastName || ''}`.trim() || 'this student'
                       )}
@@ -502,6 +534,90 @@ const Students = () => {
         }}
         onDownloadResume={handleDownloadResume}
       />
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmation.isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleCancelDelete}
+        >
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-full">
+                    <FaExclamationTriangle className="text-red-600 dark:text-red-400 text-2xl" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-white">
+                    {deleteConfirmation.step === 1 ? 'Confirm Deletion' : 'Final Warning'}
+                  </h3>
+                </div>
+                <button
+                  onClick={handleCancelDelete}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <FaTimes className="text-xl" />
+                </button>
+              </div>
+
+              {deleteConfirmation.step === 1 ? (
+                <>
+                  <p className="text-gray-700 dark:text-gray-300 mb-4">
+                    Are you sure you want to delete <strong>{deleteConfirmation.studentName}</strong>?
+                  </p>
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+                    <p className="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">
+                      This will permanently delete:
+                    </p>
+                    <ul className="text-sm text-red-700 dark:text-red-400 space-y-1 list-disc list-inside">
+                      <li>Student account and all data</li>
+                      <li>User login credentials (student cannot login)</li>
+                      <li>All uploaded files (resumes, certificates, photos)</li>
+                      <li>All notifications</li>
+                    </ul>
+                    <p className="text-sm font-bold text-red-800 dark:text-red-300 mt-2">
+                      ⚠️ This action CANNOT be undone!
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-600 rounded-lg p-4 mb-4">
+                    <p className="text-lg font-bold text-red-800 dark:text-red-300 mb-2 flex items-center">
+                      <FaExclamationTriangle className="mr-2" />
+                      FINAL WARNING
+                    </p>
+                    <p className="text-sm text-red-700 dark:text-red-400">
+                      You are about to permanently delete <strong>{deleteConfirmation.studentName}</strong> and all associated data.
+                    </p>
+                    <p className="text-sm font-bold text-red-800 dark:text-red-300 mt-2">
+                      Are you absolutely sure you want to proceed?
+                    </p>
+                  </div>
+                </>
+              )}
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={handleCancelDelete}
+                  className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                >
+                  {deleteConfirmation.step === 1 ? 'Continue' : 'Yes, Delete Permanently'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

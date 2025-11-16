@@ -27,8 +27,8 @@ const AdminSidebar = () => {
   const { logout } = useAuth();
 
   return (
-    <div className="w-64 bg-white dark:bg-gray-800 shadow-lg h-[calc(100vh-4rem)] fixed left-0 top-16 overflow-y-auto">
-      <div className="p-4">
+    <div className="sidebar-scroll w-64 bg-white dark:bg-gray-800 shadow-lg h-[calc(100vh-4rem)] fixed left-0 top-16 overflow-y-auto overflow-x-hidden">
+      <div className="p-4 pb-6">
         <nav className="space-y-2">
           {adminMenuItems.map((item) => {
             const Icon = item.icon;
@@ -43,18 +43,20 @@ const AdminSidebar = () => {
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
-                <Icon className="text-lg" />
+                <Icon className="text-lg flex-shrink-0" />
                 <span className="font-medium">{item.label}</span>
               </Link>
             );
           })}
-          <button
-            onClick={logout}
-            className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-          >
-            <FaSignOutAlt className="text-lg" />
-            <span className="font-medium">Logout</span>
-          </button>
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
+            <button
+              onClick={logout}
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+            >
+              <FaSignOutAlt className="text-lg flex-shrink-0" />
+              <span className="font-medium">Logout</span>
+            </button>
+          </div>
         </nav>
       </div>
     </div>

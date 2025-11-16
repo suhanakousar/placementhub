@@ -4,8 +4,8 @@ services:
     runtime: node
     plan: free
     rootDir: server
-    buildCommand: cd server && npm install
-    startCommand: cd server && npm start
+    buildCommand: npm install
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
@@ -27,8 +27,8 @@ services:
     runtime: static
     plan: free
     rootDir: client
-    buildCommand: cd client && npm install && npm run build
-    staticPublishPath: client/build
+    buildCommand: npm install && npm run build
+    staticPublishPath: build
     envVars:
       - key: REACT_APP_API_URL
         sync: false

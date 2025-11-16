@@ -2,9 +2,10 @@ services:
   - type: web
     name: placement-hub-backend
     runtime: node
+    plan: free
     rootDir: server
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
         value: production
@@ -24,9 +25,10 @@ services:
   - type: web
     name: placement-hub-frontend
     runtime: static
+    plan: free
     rootDir: client
-    buildCommand: npm install && npm run build
-    staticPublishPath: build
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: client/build
     envVars:
       - key: REACT_APP_API_URL
         sync: false

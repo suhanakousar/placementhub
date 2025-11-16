@@ -21,7 +21,7 @@ const Login = () => {
 
     console.log('Attempting login with email:', formData.email, 'selected role:', formData.role); // Debug log
 
-    const result = await login(formData.email, formData.password);
+    const result = await login(formData.email, formData.password, formData.role);
 
     console.log('Login result:', result); // Debug log
 

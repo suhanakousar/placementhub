@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { FaUpload, FaFilePdf, FaCheckCircle, FaTimesCircle, FaDownload, FaTrash } from 'react-icons/fa';
 import { useDropzone } from 'react-dropzone';
-import api from '../../utils/api';
+import api, { downloadFile } from '../../utils/api';
 import toast from 'react-hot-toast';
 
 const Resumes = ({ studentData, onUpdate }) => {
@@ -79,22 +79,21 @@ const Resumes = ({ studentData, onUpdate }) => {
         toast.error('Resume ID not found');
         return;
       }
-      const response = await api.get(`/students/resumes/${resumeId}`, {
-        responseType: 'blob'
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
       const resume = studentData?.resumes?.find(r => r._id === resumeId);
       const filename = resume ? `${resume.name}.pdf` : `resume_${resumeId}.pdf`;
-      link.setAttribute('download', filename);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      await downloadFile(`${api.defaults.baseURL}/students/resumes/${resumeId}`, filename);
       toast.success('Resume downloaded successfully');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to download resume');
+      toast.error('Failed to download resume');
+    }
+  };
+
+  const handleDelete = async (resumeId) => {
+    try {
+      await api.delete(`/students/resumes/${resumeId}`);
+      onUpdate();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete resume');
     }
   };
 
@@ -234,14 +233,24 @@ const Resumes = ({ studentData, onUpdate }) => {
             )}
             <div className="mt-4 flex space-x-2">
               {resume._id && (
-                <button
-                  onClick={() => handleDownload(resume._id)}
-                  className="flex items-center space-x-1 px-3 py-1 bg-primary-600 text-white rounded hover:bg-primary-700 text-sm"
-                  title="Download Resume"
-                >
-                  <FaDownload />
-                  <span>Download</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => handleDownload(resume._id)}
+                    className="flex items-center space-x-1 px-3 py-1 bg-primary-600 text-white rounded hover:bg-primary-700 text-sm"
+                    title="Download Resume"
+                  >
+                    <FaDownload />
+                    <span>Download</span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(resume._id)}
+                    className="flex items-center space-x-1 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                    title="Delete Resume"
+                  >
+                    <FaTrash />
+                    <span>Delete</span>
+                  </button>
+                </>
               )}
             </div>
           </div>

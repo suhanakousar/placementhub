@@ -53,9 +53,9 @@ router.post('/register', [
     const user = await User.create({
       firebaseUid,
       email,
-      password, // Only set password for admin users
+      password,
       role,
-      isVerified: role === 'admin' ? true : false // Admin users are pre-verified, students need Firebase verification
+      isVerified: true // All users are now pre-verified
     });
 
     // Create profile based on role

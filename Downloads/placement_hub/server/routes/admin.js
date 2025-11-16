@@ -45,6 +45,36 @@ const router = express.Router();
 router.use(protect);
 router.use(authorize('admin'));
 
+// Debug route for resume downloads
+router.get('/students/:id/resume/:resumeId/debug', async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    const resume = student?.resumes?.find(r => r._id.toString() === req.params.resumeId);
+
+    return res.json({
+      ok: true,
+      hit: true,
+      params: req.params,
+      studentFound: !!student,
+      resumeFound: !!resume,
+      resumeData: resume ? {
+        id: resume._id,
+        name: resume.name,
+        file: resume.file,
+        verified: resume.verified
+      } : null,
+      user: req.user ? { id: req.user._id, role: req.user.role } : null
+    });
+  } catch (error) {
+    return res.json({
+      ok: false,
+      error: error.message,
+      params: req.params,
+      user: req.user ? { id: req.user._id, role: req.user.role } : null
+    });
+  }
+});
+
 // @route   GET /api/admin/statistics
 // @desc    Get dashboard statistics
 // @access  Private (Admin)
@@ -159,11 +189,29 @@ router.get('/students/:id/resume/:resumeId', async (req, res) => {
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
-    const resume = student.resumes.id(req.params.resumeId);
+    const resume = student.resumes.find(r => r._id.toString() === req.params.resumeId);
     if (!resume || !resume.file) {
       return res.status(404).json({ message: 'Resume not found' });
     }
-    const filePath = path.join(__dirname, '..', resume.file);
+
+    // Handle both absolute paths (old) and relative paths (new)
+    let filePath;
+    if (resume.file.startsWith('uploads/')) {
+      // Relative path
+      filePath = path.join(__dirname, '..', resume.file);
+    } else if (resume.file.startsWith('uploads\\')) {
+      // Windows-style relative path - extract filename and join with uploads dir
+      const filename = resume.file.split(/[/\\]/).pop();
+      filePath = path.join(__dirname, '..', 'uploads', filename);
+    } else if (resume.file.includes('uploads')) {
+      // Absolute path containing uploads - this is wrong, convert to relative
+      const filename = resume.file.split(/[/\\]/).pop();
+      filePath = path.join(__dirname, '..', 'uploads', filename);
+    } else {
+      // Fallback
+      filePath = path.join(__dirname, '..', 'uploads', resume.file);
+    }
+
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ message: 'Resume file not found' });
     }
@@ -186,7 +234,24 @@ router.get('/students/:id/resume', async (req, res) => {
     if (!resume || !resume.file) {
       return res.status(404).json({ message: 'No resume found' });
     }
-    const filePath = path.join(__dirname, '..', resume.file);
+
+    // Handle both absolute paths (old) and relative paths (new)
+    let filePath;
+    if (resume.file.startsWith('uploads/')) {
+      // Relative path
+      filePath = path.join(__dirname, '..', resume.file);
+    } else if (resume.file.startsWith('uploads\\')) {
+      // Windows-style relative path
+      filePath = path.join(__dirname, '..', resume.file.replace(/\\/g, '/'));
+    } else if (resume.file.includes('uploads')) {
+      // Absolute path containing uploads - this is wrong, convert to relative
+      const filename = resume.file.split(/[/\\]/).pop();
+      filePath = path.join(__dirname, '..', 'uploads', filename);
+    } else {
+      // Fallback
+      filePath = path.join(__dirname, '..', 'uploads', resume.file);
+    }
+
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ message: 'Resume file not found' });
     }

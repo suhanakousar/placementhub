@@ -96,45 +96,67 @@ const Students = () => {
 
   const handleDownloadResume = async (studentId) => {
     try {
-      const response = await api.get(`/admin/students/${studentId}/resume`, {
-        responseType: 'blob'
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${api.defaults.baseURL}/admin/students/${studentId}/resume`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to download resume');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       const student = students.find(s => s._id === studentId);
-      const filename = student 
+      const filename = student
         ? `${student.personalInfo?.firstName}_${student.personalInfo?.lastName}_Resume.pdf`
         : `resume_${studentId}.pdf`;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
       toast.success('Resume downloaded successfully');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to download resume');
+      toast.error(error.message || 'Failed to download resume');
     }
   };
 
   const handleDownloadResumeById = async (studentId, resumeId) => {
     try {
-      const response = await api.get(`/admin/students/${studentId}/resume/${resumeId}`, {
-        responseType: 'blob'
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${api.defaults.baseURL}/admin/students/${studentId}/resume/${resumeId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to download resume');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       const student = students.find(s => s._id === studentId);
-      const filename = student 
+      const filename = student
         ? `${student.personalInfo?.firstName}_${student.personalInfo?.lastName}_Resume.pdf`
         : `resume_${resumeId}.pdf`;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
       toast.success('Resume downloaded successfully');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to download resume');
+      toast.error(error.message || 'Failed to download resume');
     }
   };
 

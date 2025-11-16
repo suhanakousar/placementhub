@@ -110,13 +110,11 @@ export const AuthProvider = ({ children }) => {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const firebaseUser = userCredential.user;
 
-        // Send email verification
-        await sendEmailVerification(firebaseUser);
-
         // Create user profile in backend
         await axios.post(`${API_URL}/auth/register`, {
           firebaseUid: firebaseUser.uid,
           email,
+          password,
           role,
           firstName,
           lastName,
@@ -125,7 +123,7 @@ export const AuthProvider = ({ children }) => {
           year
         });
 
-        toast.success('Registration successful! Please check your email to verify your account.');
+        toast.success('Registration successful!');
         return { success: true };
       }
     } catch (error) {
@@ -134,9 +132,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password) => {
+  const login = async (email, password, role) => {
     try {
-      console.log('AuthContext login: Starting login for email:', email);
+      console.log('AuthContext login: Starting login for email:', email, 'role:', role);
 
       // Sign out from Firebase to prevent conflicts
       await signOut(auth);
@@ -147,8 +145,10 @@ export const AuthProvider = ({ children }) => {
       setProfile(null);
       console.log('AuthContext login: Cleared previous session');
 
-      // Use backend API for login instead of Firebase directly
-      const response = await axios.post(`${API_URL}/auth/login`, {
+      let response;
+
+      // Use password authentication for both students and admins
+      response = await axios.post(`${API_URL}/auth/login`, {
         email: email.toLowerCase().trim(),
         password
       });

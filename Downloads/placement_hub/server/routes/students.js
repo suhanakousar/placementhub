@@ -155,9 +155,10 @@ router.post('/resumes', authorize('student'), upload.single('resume'), async (re
       ? req.body.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
       : [];
 
+    const relativePath = `uploads/${path.basename(req.file.path)}`;
     student.resumes.push({
       name: req.body.name || 'Resume',
-      file: req.file.path,
+      file: relativePath,
       tags: tags,
       verified: false
     });
@@ -179,7 +180,7 @@ router.get('/resumes/:resumeId', authorize('student'), async (req, res) => {
       return res.status(404).json({ message: 'Student profile not found' });
     }
 
-    const resume = student.resumes.id(req.params.resumeId);
+    const resume = student.resumes.find(r => r._id.toString() === req.params.resumeId);
     if (!resume || !resume.file) {
       return res.status(404).json({ message: 'Resume not found' });
     }
@@ -191,6 +192,44 @@ router.get('/resumes/:resumeId', authorize('student'), async (req, res) => {
 
     res.download(filePath, `${resume.name}.pdf`);
   } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   DELETE /api/students/resumes/:resumeId
+// @desc    Delete own resume
+// @access  Private (Student)
+router.delete('/resumes/:resumeId', authorize('student'), async (req, res) => {
+  try {
+    const student = await Student.findOne({ userId: req.user._id });
+    if (!student) {
+      return res.status(404).json({ message: 'Student profile not found' });
+    }
+
+    const resume = student.resumes.find(r => r._id.toString() === req.params.resumeId);
+    if (!resume) {
+      return res.status(404).json({ message: 'Resume not found' });
+    }
+
+    // Delete file if exists
+    if (resume.file) {
+      const filePath = path.join(__dirname, '..', resume.file);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (fileError) {
+          console.error('Error deleting file:', fileError);
+          // Continue with deletion even if file deletion fails
+        }
+      }
+    }
+
+    // Remove resume from array
+    student.resumes.pull(req.params.resumeId);
+    await student.save();
+    res.json({ message: 'Resume deleted successfully', student });
+  } catch (error) {
+    console.error('Delete resume error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

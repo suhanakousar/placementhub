@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Production
+/build
+/dist
+
+# Misc
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Server
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Client build
+client/build/
+client/.env
+client/.env.local
+
+# Deployment folder (duplicate)
+deployment/
+
+# Test files
+test_download.pdf
+
+# OS
+Thumbs.db

@@ -13,7 +13,8 @@ const Support = () => {
     e.preventDefault();
 
     try {
-      const response = await fetch('http://localhost:5000/api/support/contact', {
+      const apiUrl = process.env.REACT_APP_API_URL || 'https://placementhub-2.onrender.com/api';
+      const response = await fetch(`${apiUrl}/support/contact`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

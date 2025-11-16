@@ -42,7 +42,7 @@ const Posts = () => {
 
   const handleDownloadFile = async (filePath, fileName) => {
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://placementhub-2.onrender.com';
       const token = localStorage.getItem('token');
       
       // Use fetch to download with authentication
@@ -68,7 +68,7 @@ const Posts = () => {
     } catch (error) {
       console.error('Error downloading file:', error);
       // Fallback to opening in new tab
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://placementhub-2.onrender.com';
       window.open(`${apiUrl}/${filePath}`, '_blank');
     }
   };

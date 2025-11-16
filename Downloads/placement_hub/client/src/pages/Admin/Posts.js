@@ -134,7 +134,7 @@ const Posts = () => {
 
   const handleDownloadFile = async (filePath, fileName) => {
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://placementhub-2.onrender.com';
       const token = localStorage.getItem('token');
       
       console.log('Downloading file:', filePath);
@@ -165,7 +165,7 @@ const Posts = () => {
       console.error('File path:', filePath);
       toast.error(`Failed to download file: ${error.message}`);
       // Fallback to opening in new tab
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://placementhub-2.onrender.com';
       window.open(`${apiUrl}/${filePath}`, '_blank');
     }
   };

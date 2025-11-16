@@ -857,4 +857,80 @@ router.delete('/posts/:id', async (req, res) => {
   }
 });
 
+// @route   DELETE /api/admin/students/:id
+// @desc    Delete a student account and all associated data
+// @access  Private (Admin)
+router.delete('/students/:id', async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id).populate('userId');
+    
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    // Delete all uploaded files
+    const filesToDelete = [];
+    
+    // Collect resume files
+    if (student.resumes && student.resumes.length > 0) {
+      student.resumes.forEach(resume => {
+        if (resume.file) {
+          filesToDelete.push(path.join(__dirname, '..', resume.file));
+        }
+      });
+    }
+
+    // Collect certification files
+    if (student.certifications && student.certifications.length > 0) {
+      student.certifications.forEach(cert => {
+        if (cert.file) {
+          filesToDelete.push(path.join(__dirname, '..', cert.file));
+        }
+      });
+    }
+
+    // Collect profile photo and cover banner
+    if (student.personalInfo?.profilePhoto) {
+      filesToDelete.push(path.join(__dirname, '..', student.personalInfo.profilePhoto));
+    }
+    if (student.personalInfo?.coverBanner) {
+      filesToDelete.push(path.join(__dirname, '..', student.personalInfo.coverBanner));
+    }
+
+    // Delete all files
+    filesToDelete.forEach(filePath => {
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+          console.log('Deleted file:', filePath);
+        } catch (fileError) {
+          console.error('Error deleting file:', filePath, fileError);
+        }
+      }
+    });
+
+    // Delete associated notifications
+    await Notification.deleteMany({ 
+      recipientId: student._id, 
+      recipientType: 'Student' 
+    });
+
+    // Delete user account
+    if (student.userId) {
+      await User.findByIdAndDelete(student.userId._id);
+    }
+
+    // Delete student profile
+    await Student.findByIdAndDelete(req.params.id);
+
+    res.json({ 
+      success: true,
+      message: 'Student account and all associated data deleted successfully' 
+    });
+  } catch (error) {
+    console.error('Error deleting student:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;

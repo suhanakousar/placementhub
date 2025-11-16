@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaSearch, FaDownload, FaEye, FaFileExport, FaFilePdf, FaEnvelope } from 'react-icons/fa';
+import { FaSearch, FaDownload, FaEye, FaFileExport, FaFilePdf, FaEnvelope, FaTrash } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import StudentDetailModal from '../../components/StudentDetailModal';
@@ -212,6 +212,36 @@ const Students = () => {
     }
   };
 
+  const handleDeleteStudent = async (studentId, studentName) => {
+    // Confirm deletion
+    const confirmMessage = `Are you sure you want to delete ${studentName}?\n\nThis will permanently delete:\n- Student account and all data\n- User login credentials\n- All uploaded files (resumes, certificates, photos)\n- All notifications\n\nThis action CANNOT be undone!`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    // Double confirmation for safety
+    const doubleConfirm = window.confirm('⚠️ FINAL WARNING: This will permanently delete all student data. Are you absolutely sure?');
+    if (!doubleConfirm) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await api.delete(`/admin/students/${studentId}`);
+      toast.success('Student account and all data deleted successfully');
+      
+      // Remove student from list
+      setStudents(students.filter(student => student._id !== studentId));
+      setFilteredStudents(filteredStudents.filter(student => student._id !== studentId));
+    } catch (error) {
+      console.error('Error deleting student:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete student account');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -408,22 +438,32 @@ const Students = () => {
                   <div className="flex space-x-2">
                     <button
                       onClick={() => handleViewStudent(student._id)}
-                      className="p-2 text-primary-600 hover:bg-primary-50 rounded"
+                      className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition"
                       title="View Details"
                     >
                       <FaEye />
                     </button>
                     <button
                       onClick={() => handleDownloadResume(student._id)}
-                      className={`p-2 rounded ${
+                      className={`p-2 rounded transition ${
                         !student.resumes || student.resumes.length === 0
                           ? 'text-gray-400 cursor-not-allowed'
-                          : 'text-green-600 hover:bg-green-50'
+                          : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
                       }`}
                       title="Download Latest Resume"
                       disabled={!student.resumes || student.resumes.length === 0}
                     >
                       <FaDownload />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteStudent(
+                        student._id, 
+                        `${student.personalInfo?.firstName || ''} ${student.personalInfo?.lastName || ''}`.trim() || 'this student'
+                      )}
+                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
+                      title="Delete Student Account"
+                    >
+                      <FaTrash />
                     </button>
                   </div>
                 </td>

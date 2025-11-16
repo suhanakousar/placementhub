@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { FaProjectDiagram, FaBriefcase, FaTrophy, FaCheckCircle, FaUpload, FaLock, FaBell, FaBullhorn, FaCalendar } from 'react-icons/fa';
+import { FaProjectDiagram, FaBriefcase, FaTrophy, FaCheckCircle, FaUpload, FaLock, FaBell, FaBullhorn, FaCalendar, FaCertificate, FaFileAlt, FaAward } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 
 const DashboardHome = ({ studentData }) => {
   const [analytics, setAnalytics] = useState(null);
-  const [progressData, setProgressData] = useState([]);
   const [recentNotifications, setRecentNotifications] = useState([]);
   const [recentDrives, setRecentDrives] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,56 +49,115 @@ const DashboardHome = ({ studentData }) => {
         console.error('Error fetching drives:', error);
       }
 
-      // Generate progress data based on actual student data and dates
-      generateProgressData(analyticsResponse.data);
+      // Generate recent activities from student data
+      generateRecentActivities(analyticsResponse.data);
     } catch (error) {
       console.error('Error fetching analytics:', error);
-      // Set default progress data if API fails
-      generateProgressData(null);
+      generateRecentActivities(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const generateProgressData = (analyticsData) => {
-    // Get last 6 months
-    const months = [];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const now = new Date();
+  const generateRecentActivities = (analyticsData) => {
+    const activities = [];
     
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      months.push({
-        name: monthNames[date.getMonth()],
-        monthIndex: date.getMonth(),
-        year: date.getFullYear()
-      });
+    // Get recent projects
+    if (studentData?.projects && studentData.projects.length > 0) {
+      const recentProjects = studentData.projects
+        .slice()
+        .sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0))
+        .slice(0, 3)
+        .map(project => ({
+          type: 'project',
+          title: project.name || project.title,
+          description: project.description || 'Project added',
+          date: project.date || project.createdAt,
+          icon: FaProjectDiagram,
+          color: 'text-blue-600',
+          bgColor: 'bg-blue-50 dark:bg-blue-900/20'
+        }));
+      activities.push(...recentProjects);
     }
 
-    // Calculate progress based on actual data
-    const baseCompletion = analyticsData?.profileCompletion || studentData?.profileCompletion?.percentage || 0;
-    const currentMonth = now.getMonth();
-    
-    const progress = months.map((month, index) => {
-      // Simulate gradual progress over months (more realistic)
-      const monthsAgo = 5 - index;
-      const progressFactor = Math.max(0, 1 - (monthsAgo * 0.15)); // Decrease progress as we go back
-      const completion = Math.min(100, Math.max(0, baseCompletion * progressFactor));
-      
-      // Calculate milestones based on projects/internships/hackathons
-      const totalAchievements = (analyticsData?.projectsCount || 0) + 
-                                (analyticsData?.internshipsCount || 0) + 
-                                (analyticsData?.hackathonsCount || 0);
-      const milestones = Math.min(100, (totalAchievements * 10 * progressFactor));
-      
-      return {
-        month: month.name,
-        completion: Math.round(completion),
-        milestones: Math.round(milestones)
-      };
-    });
+    // Get recent internships
+    if (studentData?.internships && studentData.internships.length > 0) {
+      const recentInternships = studentData.internships
+        .slice()
+        .sort((a, b) => new Date(b.startDate || b.createdAt || 0) - new Date(a.startDate || a.createdAt || 0))
+        .slice(0, 2)
+        .map(internship => ({
+          type: 'internship',
+          title: internship.company || internship.title,
+          description: internship.role || 'Internship added',
+          date: internship.startDate || internship.createdAt,
+          icon: FaBriefcase,
+          color: 'text-green-600',
+          bgColor: 'bg-green-50 dark:bg-green-900/20'
+        }));
+      activities.push(...recentInternships);
+    }
 
-    setProgressData(progress);
+    // Get recent certifications
+    if (studentData?.certifications && studentData.certifications.length > 0) {
+      const recentCerts = studentData.certifications
+        .slice()
+        .sort((a, b) => new Date(b.issueDate || b.uploadedAt || 0) - new Date(a.issueDate || a.uploadedAt || 0))
+        .slice(0, 2)
+        .map(cert => ({
+          type: 'certification',
+          title: cert.name,
+          description: cert.issuer || 'Certification added',
+          date: cert.issueDate || cert.uploadedAt,
+          icon: FaCertificate,
+          color: 'text-purple-600',
+          bgColor: 'bg-purple-50 dark:bg-purple-900/20'
+        }));
+      activities.push(...recentCerts);
+    }
+
+    // Get recent hackathons
+    if (studentData?.hackathons && studentData.hackathons.length > 0) {
+      const recentHackathons = studentData.hackathons
+        .slice()
+        .sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0))
+        .slice(0, 2)
+        .map(hackathon => ({
+          type: 'hackathon',
+          title: hackathon.name,
+          description: hackathon.platform || 'Hackathon participated',
+          date: hackathon.date || hackathon.createdAt,
+          icon: FaTrophy,
+          color: 'text-yellow-600',
+          bgColor: 'bg-yellow-50 dark:bg-yellow-900/20'
+        }));
+      activities.push(...recentHackathons);
+    }
+
+    // Get recent resumes
+    if (studentData?.resumes && studentData.resumes.length > 0) {
+      const recentResumes = studentData.resumes
+        .slice()
+        .sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0))
+        .slice(0, 1)
+        .map(resume => ({
+          type: 'resume',
+          title: resume.name || 'Resume',
+          description: resume.verified ? 'Resume verified' : 'Resume uploaded',
+          date: resume.uploadedAt,
+          icon: FaFileAlt,
+          color: 'text-indigo-600',
+          bgColor: 'bg-indigo-50 dark:bg-indigo-900/20'
+        }));
+      activities.push(...recentResumes);
+    }
+
+    // Sort all activities by date and get most recent 5
+    const sortedActivities = activities
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+      .slice(0, 5);
+
+    setRecentActivities(sortedActivities);
   };
 
   const calculatePlacementReadiness = () => {
@@ -206,21 +265,64 @@ const DashboardHome = ({ studentData }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Activities */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">My Progress Over Time</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={progressData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="completion" stroke="#3b82f6" name="Profile Completion" />
-              <Line type="monotone" dataKey="milestones" stroke="#10b981" name="Placement Milestones" />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center">
+              <FaAward className="mr-2" />
+              Recent Activities
+            </h3>
+            <Link to="/student/profile" className="text-primary-600 hover:text-primary-700 text-sm">
+              View All
+            </Link>
+          </div>
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+            </div>
+          ) : recentActivities.length > 0 ? (
+            <div className="space-y-3">
+              {recentActivities.map((activity, index) => {
+                const Icon = activity.icon;
+                return (
+                  <div
+                    key={index}
+                    className={`p-3 rounded-lg border ${activity.bgColor} border-gray-200 dark:border-gray-700`}
+                  >
+                    <div className="flex items-start space-x-3">
+                      <div className={`${activity.color} mt-1`}>
+                        <Icon className="text-lg" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-800 dark:text-white text-sm">
+                          {activity.title}
+                        </p>
+                        <p className="text-gray-600 dark:text-gray-400 text-xs mt-1">
+                          {activity.description}
+                        </p>
+                        {activity.date && (
+                          <p className="text-gray-500 dark:text-gray-500 text-xs mt-1 flex items-center">
+                            <FaCalendar className="mr-1" />
+                            {new Date(activity.date).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500 dark:text-gray-400 mb-2">No recent activities</p>
+              <p className="text-gray-400 dark:text-gray-500 text-sm">
+                Start adding projects, internships, or certifications to see your activities here
+              </p>
+            </div>
+          )}
         </div>
 
+        {/* Skills Distribution */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Skills Distribution</h3>
           <ResponsiveContainer width="100%" height={300}>

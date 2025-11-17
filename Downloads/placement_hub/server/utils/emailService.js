@@ -325,6 +325,18 @@ const sendVerificationEmail = async (email, verificationUrl) => {
 
 const sendSupportEmail = async ({ from, subject, message, userName, userRole }) => {
   try {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📧 DEVELOPMENT MODE - Support Email');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`From: ${userName} (${userRole}) - ${from}`);
+      console.log(`Subject: ${subject}`);
+      console.log('Message:');
+      console.log(message);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      return { success: true, messageId: 'dev-mode', mode: 'development' };
+    }
+
     const transporter = createTransporter();
 
     const html = `

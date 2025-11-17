@@ -162,9 +162,9 @@ const sendPasswordResetEmail = async (email, resetToken) => {
       text: `Click this link to reset your password: ${resetUrl}. This link will expire in 1 hour.`
     };
 
-    // Set timeout for email sending (30 seconds)
+    // Set timeout for email sending (15 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Connection timeout')), 30000);
+      setTimeout(() => reject(new Error('Connection timeout')), 15000);
     });
 
     const sendPromise = transporter.sendMail(mailOptions);
@@ -174,8 +174,7 @@ const sendPasswordResetEmail = async (email, resetToken) => {
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Error sending password reset email:', error);
-    // Return success to prevent API errors, but log the failure
-    return { success: false, error: error.message, messageId: 'error-mode', mode: 'error' };
+    throw error;
   }
 };
 

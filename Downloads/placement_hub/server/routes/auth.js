@@ -314,23 +314,21 @@ router.post('/forgot-password', [
     await user.save();
 
     // Send reset email
-    const emailResult = await sendPasswordResetEmail(email, resetToken);
-    if (emailResult.success) {
+    try {
+      await sendPasswordResetEmail(email, resetToken);
       res.json({
         success: true,
         message: 'Password reset email sent'
       });
-    } else {
-      console.error('Password reset email error:', emailResult.error);
-      // Don't clear the token on email failure - allow retry
-      // user.resetPasswordToken = undefined;
-      // user.resetPasswordExpire = undefined;
-      // await user.save();
+    } catch (emailError) {
+      console.error('Password reset email error:', emailError);
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save();
 
-      // Return success even on email failure to prevent user confusion
-      res.json({
-        success: true,
-        message: 'Password reset email sent. If you don\'t receive it, please check your spam folder or try again later.'
+      res.status(500).json({
+        message: 'Failed to send password reset email. Please try again later.',
+        error: process.env.NODE_ENV === 'development' ? emailError.message : undefined
       });
     }
   } catch (error) {

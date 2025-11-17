@@ -37,7 +37,7 @@ const StudentDashboard = () => {
   };
 
   const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
+    setIsMenuOpen(prev => !prev);
   };
 
   const closeMenu = () => {

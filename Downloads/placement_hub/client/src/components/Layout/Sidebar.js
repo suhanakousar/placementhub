@@ -41,26 +41,35 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
 
   // Close sidebar when clicking outside on mobile
   useEffect(() => {
+    if (!isOpen) {
+      document.body.style.overflow = '';
+      return;
+    }
+
+    document.body.style.overflow = 'hidden';
+
     const handleClickOutside = (event) => {
-      if (isOpen && window.innerWidth < 1024) {
+      if (window.innerWidth < 1024 && isOpen) {
         const sidebar = document.querySelector('.sidebar-mobile');
         const menuButton = event.target.closest('.menu-toggle') || event.target.closest('button[aria-label="Toggle menu"]');
-        if (sidebar && !sidebar.contains(event.target) && !menuButton) {
+        const overlay = event.target.closest('[class*="bg-black"]');
+        
+        // Don't close if clicking on sidebar, menu button, or overlay (overlay has its own handler)
+        if (sidebar && !sidebar.contains(event.target) && !menuButton && !overlay) {
           onClose();
         }
       }
     };
 
-    if (isOpen) {
+    // Small delay to prevent immediate closing when opening
+    const timeoutId = setTimeout(() => {
       // Use both mousedown and touchstart for better mobile support
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside);
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    }, 100);
 
     return () => {
+      clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
       document.body.style.overflow = '';
@@ -79,9 +88,9 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
       )}
       {/* Sidebar */}
       <div
-        className={`sidebar-scroll sidebar-mobile w-64 bg-white dark:bg-gray-800 shadow-lg h-[calc(100vh-4rem)] fixed left-0 top-16 overflow-y-auto overflow-x-hidden z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`sidebar-scroll sidebar-mobile w-64 bg-white dark:bg-gray-800 shadow-lg h-[calc(100vh-4rem)] fixed left-0 top-16 overflow-y-auto overflow-x-hidden z-50 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } lg:translate-x-0`}
       >
         <div className="p-4 pb-6">
           <nav className="space-y-2">

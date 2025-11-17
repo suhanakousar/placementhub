@@ -47,7 +47,8 @@ const AdminSidebar = ({ isOpen, onClose }) => {
     if (isOpen && window.innerWidth < 1024) {
       onClose();
     }
-  }, [location.pathname, isOpen, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   // Close sidebar when clicking outside on mobile
   useEffect(() => {
@@ -58,8 +59,9 @@ const AdminSidebar = ({ isOpen, onClose }) => {
 
     document.body.style.overflow = 'hidden';
 
+    let timeoutId;
     const handleClickOutside = (event) => {
-      if (window.innerWidth < 1024 && isOpen) {
+      if (window.innerWidth < 1024) {
         const sidebar = document.querySelector('.admin-sidebar-mobile');
         const menuButton = event.target.closest('.menu-toggle') || event.target.closest('button[aria-label="Toggle menu"]');
         const overlay = event.target.closest('[class*="bg-black"]');
@@ -72,19 +74,20 @@ const AdminSidebar = ({ isOpen, onClose }) => {
     };
 
     // Small delay to prevent immediate closing when opening
-    const timeoutId = setTimeout(() => {
+    timeoutId = setTimeout(() => {
       // Use both mousedown and touchstart for better mobile support
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside);
-    }, 100);
+    }, 300);
 
     return () => {
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
       document.body.style.overflow = '';
     };
-  }, [isOpen, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   return (
     <>

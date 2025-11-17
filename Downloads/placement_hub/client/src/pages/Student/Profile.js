@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { FaLinkedin, FaGithub, FaGlobe, FaSave, FaPhone, FaCode, FaGraduationCap } from 'react-icons/fa';
+import { FaLinkedin, FaGithub, FaGlobe, FaSave, FaPhone, FaCode, FaGraduationCap, FaUser, FaCamera, FaTimes } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 
 const Profile = ({ studentData, onUpdate }) => {
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [formData, setFormData] = useState({
     personalInfo: {
       firstName: studentData?.personalInfo?.firstName || '',
@@ -51,6 +52,55 @@ const Profile = ({ studentData, onUpdate }) => {
     }
   };
 
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('profilePhoto', file);
+
+    setUploadingPhoto(true);
+    try {
+      await api.post('/students/profile-photo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      toast.success('Profile photo uploaded successfully');
+      onUpdate();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to upload profile photo');
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = ''; // Reset file input
+    }
+  };
+
+  const getProfilePhotoUrl = () => {
+    if (studentData?.personalInfo?.profilePhoto) {
+      // If it's already a full URL, return it
+      if (studentData.personalInfo.profilePhoto.startsWith('http')) {
+        return studentData.personalInfo.profilePhoto;
+      }
+      // Otherwise, construct the URL
+      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      return `${baseUrl}/${studentData.personalInfo.profilePhoto}`;
+    }
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -68,6 +118,56 @@ const Profile = ({ studentData, onUpdate }) => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
       <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">Profile Management</h2>
+
+      {/* Profile Photo Section */}
+      <div className="mb-8 pb-8 border-b border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center">
+          <FaUser className="mr-2" />
+          Profile Photo
+        </h3>
+        <div className="flex items-center space-x-6">
+          <div className="relative">
+            {getProfilePhotoUrl() ? (
+              <img
+                src={getProfilePhotoUrl()}
+                alt="Profile"
+                className="w-32 h-32 rounded-full object-cover border-4 border-primary-500"
+              />
+            ) : (
+              <div className="w-32 h-32 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-4 border-primary-500">
+                <FaUser className="text-4xl text-gray-400" />
+              </div>
+            )}
+            {uploadingPhoto && (
+              <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+              </div>
+            )}
+          </div>
+          <div className="flex-1">
+            <label className="block">
+              <span className="sr-only">Choose profile photo</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                disabled={uploadingPhoto}
+                className="block w-full text-sm text-gray-500 dark:text-gray-400
+                  file:mr-4 file:py-2 file:px-4
+                  file:rounded-lg file:border-0
+                  file:text-sm file:font-semibold
+                  file:bg-primary-600 file:text-white
+                  hover:file:bg-primary-700
+                  file:cursor-pointer
+                  disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </label>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Upload a profile photo (JPG, PNG, max 5MB)
+            </p>
+          </div>
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

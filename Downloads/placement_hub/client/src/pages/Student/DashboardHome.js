@@ -1,11 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { FaProjectDiagram, FaBriefcase, FaTrophy, FaCheckCircle, FaUpload, FaLock, FaBell, FaBullhorn, FaCalendar, FaCertificate, FaFileAlt, FaAward } from 'react-icons/fa';
+import { FaProjectDiagram, FaBriefcase, FaTrophy, FaCheckCircle, FaUpload, FaLock, FaBell, FaBullhorn, FaCalendar, FaCertificate, FaFileAlt, FaAward, FaUser } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 
 const DashboardHome = ({ studentData }) => {
+  const getProfilePhotoUrl = () => {
+    if (studentData?.personalInfo?.profilePhoto) {
+      // If it's already a full URL, return it
+      if (studentData.personalInfo.profilePhoto.startsWith('http')) {
+        return studentData.personalInfo.profilePhoto;
+      }
+      // Otherwise, construct the URL
+      const baseUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://placementhub-2.onrender.com';
+      return `${baseUrl}/${studentData.personalInfo.profilePhoto}`;
+    }
+    return null;
+  };
   const [analytics, setAnalytics] = useState(null);
   const [recentNotifications, setRecentNotifications] = useState([]);
   const [recentDrives, setRecentDrives] = useState([]);
@@ -227,6 +239,40 @@ const DashboardHome = ({ studentData }) => {
 
   return (
     <div className="space-y-6">
+      {/* Welcome Section with Profile Photo */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="flex items-center space-x-6">
+          <div className="relative">
+            {getProfilePhotoUrl() ? (
+              <img
+                src={getProfilePhotoUrl()}
+                alt={`${studentData?.personalInfo?.firstName} ${studentData?.personalInfo?.lastName}`}
+                className="w-20 h-20 rounded-full object-cover border-4 border-primary-500"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+              <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-4 border-primary-500 hidden">
+                <FaUser className="text-2xl text-gray-400" />
+              </div>
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-4 border-primary-500">
+                <FaUser className="text-2xl text-gray-400" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
+              Welcome back, {studentData?.personalInfo?.firstName || 'Student'}!
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              {studentData?.academicInfo?.department || 'Department'} • Year {studentData?.academicInfo?.year || 'N/A'} • Roll No: {studentData?.academicInfo?.rollNumber || 'N/A'}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Placement Readiness</h2>
         <div className="flex items-center space-x-4">

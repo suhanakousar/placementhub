@@ -1,10 +1,23 @@
 import React from 'react';
-import { FaTimes, FaGraduationCap, FaProjectDiagram, FaBriefcase, FaTrophy, FaFilePdf, FaDownload, FaLinkedin, FaGithub, FaGlobe, FaPhone, FaEnvelope } from 'react-icons/fa';
+import { FaTimes, FaGraduationCap, FaProjectDiagram, FaBriefcase, FaTrophy, FaFilePdf, FaDownload, FaLinkedin, FaGithub, FaGlobe, FaPhone, FaEnvelope, FaUser } from 'react-icons/fa';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
 const StudentDetailModal = ({ student, isOpen, onClose, onDownloadResume }) => {
   if (!isOpen || !student) return null;
+
+  const getProfilePhotoUrl = () => {
+    if (student.personalInfo?.profilePhoto) {
+      // If it's already a full URL, return it
+      if (student.personalInfo.profilePhoto.startsWith('http')) {
+        return student.personalInfo.profilePhoto;
+      }
+      // Otherwise, construct the URL
+      const baseUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://placementhub-2.onrender.com';
+      return `${baseUrl}/${student.personalInfo.profilePhoto}`;
+    }
+    return null;
+  };
 
   const handleDownloadResume = async (resumeId) => {
     try {
@@ -54,6 +67,24 @@ const StudentDetailModal = ({ student, isOpen, onClose, onDownloadResume }) => {
         </div>
 
         <div className="p-6 space-y-6">
+          {/* Profile Photo Section */}
+          {getProfilePhotoUrl() && (
+            <div className="flex justify-center mb-6">
+              <img
+                src={getProfilePhotoUrl()}
+                alt={`${student.personalInfo?.firstName} ${student.personalInfo?.lastName}`}
+                className="w-32 h-32 rounded-full object-cover border-4 border-primary-500 shadow-lg"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+              <div className="w-32 h-32 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-4 border-primary-500 shadow-lg hidden">
+                <FaUser className="text-4xl text-gray-400" />
+              </div>
+            </div>
+          )}
+
           {/* Personal Information */}
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center">

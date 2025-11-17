@@ -38,7 +38,7 @@ const AdminSidebar = ({ isOpen, onClose }) => {
     const handleClickOutside = (event) => {
       if (isOpen && window.innerWidth < 1024) {
         const sidebar = document.querySelector('.admin-sidebar-mobile');
-        const menuButton = event.target.closest('button[aria-label="Toggle menu"]');
+        const menuButton = event.target.closest('.menu-toggle') || event.target.closest('button[aria-label="Toggle menu"]');
         if (sidebar && !sidebar.contains(event.target) && !menuButton) {
           onClose();
         }
@@ -46,7 +46,9 @@ const AdminSidebar = ({ isOpen, onClose }) => {
     };
 
     if (isOpen) {
+      // Use both mousedown and touchstart for better mobile support
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -54,6 +56,7 @@ const AdminSidebar = ({ isOpen, onClose }) => {
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
       document.body.style.overflow = '';
     };
   }, [isOpen, onClose]);
@@ -65,13 +68,14 @@ const AdminSidebar = ({ isOpen, onClose }) => {
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={onClose}
+          style={{ top: '4rem' }}
         />
       )}
       {/* Sidebar */}
       <div
-        className={`sidebar-scroll admin-sidebar-mobile w-64 bg-white dark:bg-gray-800 shadow-lg h-[calc(100vh-4rem)] fixed left-0 top-16 overflow-y-auto overflow-x-hidden z-40 transform transition-transform duration-300 ease-in-out ${
+        className={`sidebar-scroll admin-sidebar-mobile w-64 bg-white dark:bg-gray-800 shadow-lg h-[calc(100vh-4rem)] fixed left-0 top-16 overflow-y-auto overflow-x-hidden z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0`}
+        }`}
       >
         <div className="p-4 pb-6">
           <nav className="space-y-2">

@@ -11,9 +11,13 @@ const Header = ({ title, user, onMenuToggle, isMenuOpen }) => {
         <div className="flex items-center space-x-3">
           {onMenuToggle && (
             <button
-              onClick={onMenuToggle}
-              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMenuToggle();
+              }}
+              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 menu-toggle"
               aria-label="Toggle menu"
+              type="button"
             >
               {isMenuOpen ? <FaTimes className="text-xl" /> : <FaBars className="text-xl" />}
             </button>

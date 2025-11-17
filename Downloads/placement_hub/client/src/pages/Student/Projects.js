@@ -84,6 +84,18 @@ const Projects = ({ studentData, onUpdate }) => {
     }
   };
 
+  const handleDeleteInternship = async (internshipId) => {
+    if (window.confirm('Are you sure you want to delete this internship?')) {
+      try {
+        await api.delete(`/students/internships/${internshipId}`);
+        toast.success('Internship deleted successfully');
+        onUpdate();
+      } catch (error) {
+        toast.error('Failed to delete internship');
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Projects Section */}
@@ -318,14 +330,24 @@ const Projects = ({ studentData, onUpdate }) => {
         <div className="space-y-4">
           {studentData?.internships?.map((internship, index) => (
             <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-              <h3 className="text-xl font-semibold text-gray-800 dark:text-white">{internship.companyName}</h3>
-              <p className="text-gray-600 dark:text-gray-400">{internship.role}</p>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">{internship.description}</p>
-              {internship.startDate && internship.endDate && (
-                <p className="text-sm text-gray-500 mt-2">
-                  {new Date(internship.startDate).toLocaleDateString()} - {new Date(internship.endDate).toLocaleDateString()}
-                </p>
-              )}
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white">{internship.companyName}</h3>
+                  <p className="text-gray-600 dark:text-gray-400">{internship.role}</p>
+                  <p className="text-gray-600 dark:text-gray-400 mt-2">{internship.description}</p>
+                  {internship.startDate && internship.endDate && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      {new Date(internship.startDate).toLocaleDateString()} - {new Date(internship.endDate).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDeleteInternship(internship._id)}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded"
+                >
+                  <FaTrash />
+                </button>
+              </div>
             </div>
           ))}
           {(!studentData?.internships || studentData.internships.length === 0) && (

@@ -122,6 +122,20 @@ router.post('/internships', authorize('student'), async (req, res) => {
   }
 });
 
+// @route   DELETE /api/students/internships/:internshipId
+// @desc    Delete an internship
+// @access  Private (Student)
+router.delete('/internships/:internshipId', authorize('student'), async (req, res) => {
+  try {
+    const student = await Student.findOne({ userId: req.user._id });
+    student.internships.id(req.params.internshipId).remove();
+    await student.save();
+    res.json(student);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // @route   POST /api/students/hackathons
 // @desc    Add a hackathon
 // @access  Private (Student)
@@ -129,6 +143,20 @@ router.post('/hackathons', authorize('student'), async (req, res) => {
   try {
     const student = await Student.findOne({ userId: req.user._id });
     student.hackathons.push(req.body);
+    await student.save();
+    res.json(student);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   DELETE /api/students/hackathons/:hackathonId
+// @desc    Delete a hackathon
+// @access  Private (Student)
+router.delete('/hackathons/:hackathonId', authorize('student'), async (req, res) => {
+  try {
+    const student = await Student.findOne({ userId: req.user._id });
+    student.hackathons.id(req.params.hackathonId).remove();
     await student.save();
     res.json(student);
   } catch (error) {

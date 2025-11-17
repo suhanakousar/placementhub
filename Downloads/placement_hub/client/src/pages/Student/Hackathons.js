@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaPlus, FaTrophy } from 'react-icons/fa';
+import { FaPlus, FaTrophy, FaTrash } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 
@@ -33,6 +33,18 @@ const Hackathons = ({ studentData, onUpdate }) => {
       onUpdate();
     } catch (error) {
       toast.error('Failed to add hackathon');
+    }
+  };
+
+  const handleDeleteHackathon = async (hackathonId) => {
+    if (window.confirm('Are you sure you want to delete this hackathon?')) {
+      try {
+        await api.delete(`/students/hackathons/${hackathonId}`);
+        toast.success('Hackathon deleted successfully');
+        onUpdate();
+      } catch (error) {
+        toast.error('Failed to delete hackathon');
+      }
     }
   };
 
@@ -178,6 +190,12 @@ const Hackathons = ({ studentData, onUpdate }) => {
                   </a>
                 )}
               </div>
+              <button
+                onClick={() => handleDeleteHackathon(hackathon._id)}
+                className="p-2 text-red-600 hover:bg-red-50 rounded"
+              >
+                <FaTrash />
+              </button>
             </div>
           </div>
         ))}

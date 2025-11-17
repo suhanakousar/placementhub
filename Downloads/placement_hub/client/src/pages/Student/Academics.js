@@ -3,6 +3,7 @@ import { FaPlus, FaGraduationCap, FaChartLine } from 'react-icons/fa';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
+import { getDepartmentName } from '../../utils/departmentNames';
 
 const Academics = ({ studentData, onUpdate }) => {
   const [showAddSemester, setShowAddSemester] = useState(false);
@@ -139,7 +140,7 @@ const Academics = ({ studentData, onUpdate }) => {
           <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
             <p className="text-gray-600 dark:text-gray-400">Department</p>
             <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {studentData?.academicInfo?.department || 'N/A'}
+              {getDepartmentName(studentData?.academicInfo?.department)}
             </p>
           </div>
           <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">

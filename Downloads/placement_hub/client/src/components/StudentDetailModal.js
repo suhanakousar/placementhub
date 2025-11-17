@@ -2,6 +2,7 @@ import React from 'react';
 import { FaTimes, FaGraduationCap, FaProjectDiagram, FaBriefcase, FaTrophy, FaFilePdf, FaDownload, FaLinkedin, FaGithub, FaGlobe, FaPhone, FaEnvelope, FaUser } from 'react-icons/fa';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
+import { getDepartmentName } from '../utils/departmentNames';
 
 const StudentDetailModal = ({ student, isOpen, onClose, onDownloadResume }) => {
   if (!isOpen || !student) return null;
@@ -130,7 +131,7 @@ const StudentDetailModal = ({ student, isOpen, onClose, onDownloadResume }) => {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Department</p>
                 <p className="font-medium text-gray-800 dark:text-white">
-                  {student.academicInfo?.department || 'N/A'}
+                  {getDepartmentName(student.academicInfo?.department)}
                 </p>
               </div>
               <div>

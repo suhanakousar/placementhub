@@ -3,6 +3,7 @@ import { FaSearch, FaDownload, FaEye, FaFileExport, FaFilePdf, FaEnvelope, FaTra
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import StudentDetailModal from '../../components/StudentDetailModal';
+import { getDepartmentName } from '../../utils/departmentNames';
 
 const Students = () => {
   const [students, setStudents] = useState([]);
@@ -423,7 +424,7 @@ const Students = () => {
                   {student.academicInfo?.rollNumber}
                 </td>
                 <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
-                  {student.academicInfo?.department}
+                  {getDepartmentName(student.academicInfo?.department)}
                 </td>
                 <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
                   {student.academicInfo?.year}
@@ -512,7 +513,7 @@ const Students = () => {
         <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
           <p className="text-sm text-gray-700 dark:text-gray-300">
             <strong>Total Students:</strong> {filteredStudents.length} student(s) found
-            {filters.department && ` in ${filters.department} department`}
+            {filters.department && ` in ${getDepartmentName(filters.department)} department`}
             {filters.year && ` in Year ${filters.year}`}
             {filters.verified && ` with ${filters.verified} status`}
             {filters.hasProjects && ` with ${filters.hasProjects === 'yes' ? 'projects' : 'no projects'}`}

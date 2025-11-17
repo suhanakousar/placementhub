@@ -3,7 +3,7 @@ import { FaProjectDiagram, FaBriefcase, FaTrophy, FaCheckCircle, FaUpload, FaLoc
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import api from '../../utils/api';
-import toast from 'react-hot-toast';
+import { getDepartmentName } from '../../utils/departmentNames';
 
 const DashboardHome = ({ studentData }) => {
   const getProfilePhotoUrl = () => {
@@ -269,7 +269,7 @@ const DashboardHome = ({ studentData }) => {
               Welcome back, {studentData?.personalInfo?.firstName || 'Student'}!
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
-              {studentData?.academicInfo?.department || 'Department'} • Year {studentData?.academicInfo?.year || 'N/A'} • Roll No: {studentData?.academicInfo?.rollNumber || 'N/A'}
+              {getDepartmentName(studentData?.academicInfo?.department)} • Year {studentData?.academicInfo?.year || 'N/A'} • Roll No: {studentData?.academicInfo?.rollNumber || 'N/A'}
             </p>
           </div>
         </div>

@@ -100,6 +100,16 @@ router.post('/register', [
     });
   } catch (error) {
     console.error('Registration error:', error);
+
+    // Handle duplicate key errors gracefully
+    if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyValue || {})[0];
+      const fieldLabel = duplicateField === 'academicInfo.rollNumber' ? 'Roll number' : 'Email';
+      return res.status(400).json({
+        message: `${fieldLabel} already exists. Please use a different one.`
+      });
+    }
+
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

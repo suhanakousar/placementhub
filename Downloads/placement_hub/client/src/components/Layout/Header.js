@@ -12,10 +12,11 @@ const Header = ({ title, user, onMenuToggle, isMenuOpen }) => {
           {onMenuToggle && (
             <button
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onMenuToggle();
               }}
-              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 menu-toggle"
+              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 menu-toggle z-50 relative"
               aria-label="Toggle menu"
               type="button"
             >

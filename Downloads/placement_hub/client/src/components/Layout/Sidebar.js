@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   FaHome,
@@ -31,6 +31,15 @@ const studentMenuItems = [
 const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
   const location = useLocation();
   const { logout } = useAuth();
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Close sidebar when route changes on mobile
   useEffect(() => {
@@ -88,9 +97,10 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
       )}
       {/* Sidebar */}
       <div
-        className={`sidebar-scroll sidebar-mobile w-64 bg-white dark:bg-gray-800 shadow-lg h-[calc(100vh-4rem)] fixed left-0 top-16 overflow-y-auto overflow-x-hidden z-50 transform transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0`}
+        className="sidebar-scroll sidebar-mobile w-64 bg-white dark:bg-gray-800 shadow-lg h-[calc(100vh-4rem)] fixed left-0 top-16 overflow-y-auto overflow-x-hidden z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0"
+        style={{
+          transform: !isMobile ? 'translateX(0)' : (isOpen ? 'translateX(0)' : 'translateX(-100%)')
+        }}
       >
         <div className="p-4 pb-6">
           <nav className="space-y-2">

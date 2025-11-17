@@ -97,22 +97,22 @@ const sendOTPEmail = async (email, otp, purpose = 'verification') => {
 
 // Send password reset email
 const sendPasswordResetEmail = async (email, resetToken) => {
+  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+
+  // Development mode or missing SMTP config: Log reset link to console instead of sending email
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📧 DEVELOPMENT MODE - Password Reset Email');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`To: ${email}`);
+    console.log(`Reset URL: ${resetUrl}`);
+    console.log(`Token: ${resetToken}`);
+    console.log(`Expires: 1 hour`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    return { success: true, messageId: 'dev-mode', mode: 'development' };
+  }
+
   try {
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
-
-    // Development mode: Log reset link to console instead of sending email
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
-      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('📧 DEVELOPMENT MODE - Password Reset Email');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`To: ${email}`);
-      console.log(`Reset URL: ${resetUrl}`);
-      console.log(`Token: ${resetToken}`);
-      console.log(`Expires: 1 hour`);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-      return { success: true, messageId: 'dev-mode', mode: 'development' };
-    }
-
     const transporter = createTransporter();
 
     const html = `
@@ -162,12 +162,20 @@ const sendPasswordResetEmail = async (email, resetToken) => {
       text: `Click this link to reset your password: ${resetUrl}. This link will expire in 1 hour.`
     };
 
-    const info = await transporter.sendMail(mailOptions);
+    // Set timeout for email sending (30 seconds)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Connection timeout')), 30000);
+    });
+
+    const sendPromise = transporter.sendMail(mailOptions);
+    const info = await Promise.race([sendPromise, timeoutPromise]);
+
     console.log('Password reset email sent:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Error sending password reset email:', error);
-    throw error;
+    // Return success to prevent API errors, but log the failure
+    return { success: false, error: error.message, messageId: 'error-mode', mode: 'error' };
   }
 };
 

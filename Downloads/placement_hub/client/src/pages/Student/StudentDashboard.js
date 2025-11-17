@@ -19,6 +19,7 @@ const StudentDashboard = () => {
   const { user, profile } = useAuth();
   const [studentData, setStudentData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     fetchStudentData();
@@ -35,6 +36,14 @@ const StudentDashboard = () => {
     }
   };
 
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -45,9 +54,14 @@ const StudentDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Header title="Student Dashboard" user={user} />
-      <Sidebar />
-      <main className="ml-64 pt-16 p-6">
+      <Header 
+        title="Student Dashboard" 
+        user={user} 
+        onMenuToggle={toggleMenu}
+        isMenuOpen={isMenuOpen}
+      />
+      <Sidebar isOpen={isMenuOpen} onClose={closeMenu} />
+      <main className="lg:ml-64 pt-16 p-4 md:p-6">
         <Routes>
           <Route index element={<DashboardHome studentData={studentData} />} />
           <Route path="dashboard" element={<DashboardHome studentData={studentData} />} />

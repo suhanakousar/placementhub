@@ -16,6 +16,7 @@ const AdminDashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -32,6 +33,14 @@ const AdminDashboard = () => {
     }
   };
 
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -42,9 +51,14 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Header title="Admin Dashboard" user={user} />
-      <AdminSidebar />
-      <main className="ml-64 pt-16 p-6">
+      <Header 
+        title="Admin Dashboard" 
+        user={user} 
+        onMenuToggle={toggleMenu}
+        isMenuOpen={isMenuOpen}
+      />
+      <AdminSidebar isOpen={isMenuOpen} onClose={closeMenu} />
+      <main className="lg:ml-64 pt-16 p-4 md:p-6">
         <Routes>
           <Route index element={<DashboardHome stats={stats} />} />
           <Route path="dashboard" element={<DashboardHome stats={stats} />} />

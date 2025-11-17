@@ -1,4 +1,83 @@
 const nodemailer = require('nodemailer');
+const https = require('https');
+
+// Send email via SendGrid API (more reliable than SMTP)
+const sendEmailViaSendGridAPI = async (to, subject, html, text, fromEmail, fromName = 'Placement Hub') => {
+  return new Promise((resolve, reject) => {
+    const apiKey = process.env.SENDGRID_API_KEY || process.env.SMTP_PASSWORD;
+    
+    if (!apiKey) {
+      return reject(new Error('SendGrid API key not configured'));
+    }
+
+    const postData = JSON.stringify({
+      personalizations: [{
+        to: [{ email: to }],
+        subject: subject
+      }],
+      from: {
+        email: fromEmail,
+        name: fromName
+      },
+      content: [
+        {
+          type: 'text/plain',
+          value: text
+        },
+        {
+          type: 'text/html',
+          value: html
+        }
+      ]
+    });
+
+    const options = {
+      hostname: 'api.sendgrid.com',
+      port: 443,
+      path: '/v3/mail/send',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      },
+      timeout: 15000 // 15 seconds timeout
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          console.log('SendGrid API: Email sent successfully');
+          resolve({ success: true, messageId: res.headers['x-message-id'] || 'sent' });
+        } else {
+          const error = new Error(`SendGrid API error: ${res.statusCode} - ${data}`);
+          error.statusCode = res.statusCode;
+          error.response = data;
+          reject(error);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('SendGrid API request error:', error);
+      reject(error);
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('SendGrid API request timeout'));
+    });
+
+    req.write(postData);
+    req.end();
+  });
+};
 
 // Create reusable transporter object using SMTP transport
 const createTransporter = () => {
@@ -125,18 +204,9 @@ const sendPasswordResetEmail = async (email, resetToken) => {
   }
 
   try {
-    // Validate SMTP configuration
-    if (!process.env.SMTP_HOST) {
-      throw new Error('SMTP_HOST is not configured');
-    }
+    // Use FROM_EMAIL if set, otherwise use SMTP_USER (for Gmail) or default
+    const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'placementhub722@gmail.com';
     
-    const transporter = createTransporter();
-    
-    // Verify transporter is created successfully
-    if (!transporter) {
-      throw new Error('Failed to create email transporter');
-    }
-
     const html = `
       <!DOCTYPE html>
       <html>
@@ -176,23 +246,48 @@ const sendPasswordResetEmail = async (email, resetToken) => {
       </html>
     `;
 
-    // Use FROM_EMAIL if set, otherwise use SMTP_USER (for Gmail) or default
-    const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'placementhub722@gmail.com';
+    const subject = 'Password Reset Request - Placement Hub';
+    const text = `Click this link to reset your password: ${resetUrl}. This link will expire in 1 hour.`;
+
+    console.log(`Attempting to send password reset email to: ${email}`);
+    console.log(`From email: ${fromEmail}`);
+
+    // Try SendGrid API first (more reliable), fall back to SMTP
+    const apiKey = process.env.SENDGRID_API_KEY || process.env.SMTP_PASSWORD;
+    if (apiKey && process.env.SMTP_HOST === 'smtp.sendgrid.net') {
+      console.log('Using SendGrid API');
+      try {
+        const result = await sendEmailViaSendGridAPI(email, subject, html, text, fromEmail, 'Placement Hub');
+        console.log('Password reset email sent successfully via SendGrid API');
+        return result;
+      } catch (apiError) {
+        console.error('SendGrid API failed, falling back to SMTP:', apiError.message);
+        // Fall through to SMTP
+      }
+    }
+
+    // Fall back to SMTP
+    console.log('Using SMTP transport');
+    if (!process.env.SMTP_HOST) {
+      throw new Error('SMTP_HOST is not configured');
+    }
+    
+    const transporter = createTransporter();
+    if (!transporter) {
+      throw new Error('Failed to create email transporter');
+    }
     
     const mailOptions = {
       from: `"Placement Hub" <${fromEmail}>`,
       to: email,
-      subject: 'Password Reset Request - Placement Hub',
+      subject: subject,
       html: html,
-      text: `Click this link to reset your password: ${resetUrl}. This link will expire in 1 hour.`
+      text: text
     };
 
-    console.log(`Attempting to send password reset email to: ${email}`);
     console.log(`Using SMTP: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`);
-    console.log(`From email: ${fromEmail}`);
-    
     const info = await transporter.sendMail(mailOptions);
-    console.log('Password reset email sent successfully:', info.messageId);
+    console.log('Password reset email sent successfully via SMTP:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Error sending password reset email:', error);

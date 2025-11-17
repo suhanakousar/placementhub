@@ -1,13 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { auth } from '../firebase';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  sendEmailVerification,
-  sendPasswordResetEmail
-} from 'firebase/auth';
+import { signOut, sendPasswordResetEmail } from 'firebase/auth';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -92,43 +85,24 @@ export const AuthProvider = ({ children }) => {
     try {
       const { email, password, role, firstName, lastName, rollNumber, department, year } = userData;
 
-      if (role === 'admin') {
-        // For admin registration, create directly in backend without Firebase
-        await axios.post(`${API_URL}/auth/register`, {
-          email,
-          password,
-          role,
-          firstName,
-          lastName
-        });
+      // Register via backend
+      await axios.post(`${API_URL}/auth/register`, {
+        email,
+        password,
+        role,
+        firstName,
+        lastName,
+        rollNumber,
+        department,
+        year
+      });
 
-        toast.success('Admin registration successful! You can now login.');
-        return { success: true };
-      } else {
-        // For student registration, use Firebase
-        // Create Firebase user
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const firebaseUser = userCredential.user;
-
-        // Create user profile in backend
-        await axios.post(`${API_URL}/auth/register`, {
-          firebaseUid: firebaseUser.uid,
-          email,
-          password,
-          role,
-          firstName,
-          lastName,
-          rollNumber,
-          department,
-          year
-        });
-
-        toast.success('Registration successful!');
-        return { success: true };
-      }
+      toast.success(role === 'admin' ? 'Admin registration successful! You can now login.' : 'Registration successful!');
+      return { success: true };
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Registration failed');
-      return { success: false };
+      const message = error.response?.data?.message || error.message || 'Registration failed';
+      toast.error(message);
+      return { success: false, message };
     }
   };
 

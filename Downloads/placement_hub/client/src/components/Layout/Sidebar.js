@@ -130,7 +130,7 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
       )}
       {/* Sidebar */}
       <div
-        className="sidebar-scroll sidebar-mobile w-64 bg-white dark:bg-gray-800 shadow-lg h-[calc(100vh-4rem)] fixed left-0 top-16 overflow-y-auto overflow-x-hidden z-50"
+        className="sidebar-scroll sidebar-mobile w-64 bg-white dark:bg-gray-800 shadow-lg lg:h-[calc(100vh-4rem)] h-screen lg:fixed lg:left-0 lg:top-16 overflow-y-auto overflow-x-hidden z-50"
         style={{
           transform: !isMobile ? 'translateX(0)' : (isOpen ? 'translateX(0)' : 'translateX(-100%)'),
           WebkitTransform: !isMobile ? 'translateX(0)' : (isOpen ? 'translateX(0)' : 'translateX(-100%)'),

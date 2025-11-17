@@ -19,6 +19,7 @@ const Header = ({ title, user, onMenuToggle, isMenuOpen }) => {
               className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 menu-toggle z-50 relative"
               aria-label="Toggle menu"
               type="button"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               {isMenuOpen ? <FaTimes className="text-xl" /> : <FaBars className="text-xl" />}
             </button>

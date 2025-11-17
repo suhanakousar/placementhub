@@ -34,12 +34,7 @@ const AdminDashboard = () => {
   };
 
   const toggleMenu = () => {
-    console.log('Toggle menu called, current state:', isMenuOpen);
-    setIsMenuOpen(prev => {
-      const newState = !prev;
-      console.log('Setting menu state to:', newState);
-      return newState;
-    });
+    setIsMenuOpen(prev => !prev);
   };
 
   const closeMenu = () => {

@@ -33,10 +33,6 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
   const { logout } = useAuth();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('Sidebar - isOpen:', isOpen, 'isMobile:', isMobile, 'transform will be:', !isMobile ? 'translateX(0)' : (isOpen ? 'translateX(0)' : 'translateX(-100%)'));
-  }, [isOpen, isMobile]);
 
   useEffect(() => {
     const handleResize = () => {

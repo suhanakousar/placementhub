@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { FaGraduationCap } from 'react-icons/fa';
+import { FaGraduationCap, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 
 const StudentRegister = () => {
   const [formData, setFormData] = useState({
@@ -16,27 +16,49 @@ const StudentRegister = () => {
     year: 1
   });
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState('');
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
+    if (!passwordIsStrong) {
+      setFormError('Please create a stronger password that meets all requirements.');
       return;
     }
 
+    if (formData.password !== formData.confirmPassword) {
+      setFormError('Passwords do not match.');
+      return;
+    }
+
+    setFormError('');
+
     setLoading(true);
 
-    const result = await register(formData);
+    const result = await register({
+      ...formData,
+      year: Number(formData.year)
+    });
 
     if (result.success) {
-      navigate('/login');
+      navigate('/login', { replace: true });
     }
 
     setLoading(false);
   };
+
+  const passwordChecks = {
+    length: formData.password.length >= 8,
+    uppercase: /[A-Z]/.test(formData.password),
+    lowercase: /[a-z]/.test(formData.password),
+    number: /[0-9]/.test(formData.password),
+    special: /[^A-Za-z0-9]/.test(formData.password)
+  };
+
+  const passwordIsStrong = Object.values(passwordChecks).every(Boolean);
+  const passwordsMatch = formData.password && formData.password === formData.confirmPassword;
 
   const handleChange = (e) => {
     setFormData({
@@ -61,6 +83,11 @@ const StudentRegister = () => {
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {formError && (
+            <div className="p-3 rounded-md bg-red-50 text-red-600 text-sm">
+              {formError}
+            </div>
+          )}
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -150,7 +177,7 @@ const StudentRegister = () => {
                   <option value="BT">Biotechnology</option>
                 </select>
               </div>
-              <div>
+            <div>
                 <label htmlFor="year" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Year
                 </label>
@@ -183,6 +210,23 @@ const StudentRegister = () => {
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                 placeholder="Create a password"
               />
+            <div className="mt-3 bg-gray-50 dark:bg-gray-700/50 rounded-md p-3 space-y-2">
+              <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Password must contain:</p>
+              {Object.entries(passwordChecks).map(([key, value]) => (
+                <div key={key} className="flex items-center text-xs text-gray-600 dark:text-gray-300">
+                  {value ? (
+                    <FaCheckCircle className="text-green-500 mr-2" />
+                  ) : (
+                    <FaTimesCircle className="text-red-500 mr-2" />
+                  )}
+                  {key === 'length' && 'At least 8 characters'}
+                  {key === 'uppercase' && 'An uppercase letter'}
+                  {key === 'lowercase' && 'A lowercase letter'}
+                  {key === 'number' && 'A number'}
+                  {key === 'special' && 'A special character'}
+                </div>
+              ))}
+            </div>
             </div>
 
             <div>
@@ -199,6 +243,11 @@ const StudentRegister = () => {
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                 placeholder="Confirm your password"
               />
+            {formData.confirmPassword && (
+              <p className={`mt-2 text-xs font-semibold ${passwordsMatch ? 'text-green-600' : 'text-red-600'}`}>
+                {passwordsMatch ? 'Passwords match' : 'Passwords do not match'}
+              </p>
+            )}
             </div>
           </div>
 

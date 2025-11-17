@@ -90,13 +90,22 @@ const Profile = ({ studentData, onUpdate }) => {
 
   const getProfilePhotoUrl = () => {
     if (studentData?.personalInfo?.profilePhoto) {
+      const photoPath = studentData.personalInfo.profilePhoto;
+      
       // If it's already a full URL, return it
-      if (studentData.personalInfo.profilePhoto.startsWith('http')) {
-        return studentData.personalInfo.profilePhoto;
+      if (photoPath.startsWith('http')) {
+        return photoPath;
       }
-      // Otherwise, construct the URL
-      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      return `${baseUrl}/${studentData.personalInfo.profilePhoto}`;
+      
+      // Construct the URL
+      // Remove /api from the end if present, since uploads are served from root
+      let baseUrl = process.env.REACT_APP_API_URL || 'https://placementhub-2.onrender.com/api';
+      baseUrl = baseUrl.replace(/\/api$/, '');
+      
+      // Ensure photoPath doesn't start with / to avoid double slashes
+      const cleanPath = photoPath.startsWith('/') ? photoPath : `/${photoPath}`;
+      
+      return `${baseUrl}${cleanPath}`;
     }
     return null;
   };
@@ -128,11 +137,22 @@ const Profile = ({ studentData, onUpdate }) => {
         <div className="flex items-center space-x-6">
           <div className="relative">
             {getProfilePhotoUrl() ? (
-              <img
-                src={getProfilePhotoUrl()}
-                alt="Profile"
-                className="w-32 h-32 rounded-full object-cover border-4 border-primary-500"
-              />
+              <>
+                <img
+                  src={getProfilePhotoUrl()}
+                  alt="Profile"
+                  className="w-32 h-32 rounded-full object-cover border-4 border-primary-500"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    if (e.target.nextSibling) {
+                      e.target.nextSibling.style.display = 'flex';
+                    }
+                  }}
+                />
+                <div className="w-32 h-32 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-4 border-primary-500 hidden">
+                  <FaUser className="text-4xl text-gray-400" />
+                </div>
+              </>
             ) : (
               <div className="w-32 h-32 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-4 border-primary-500">
                 <FaUser className="text-4xl text-gray-400" />

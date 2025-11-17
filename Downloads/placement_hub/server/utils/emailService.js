@@ -107,7 +107,9 @@ const sendOTPEmail = async (email, otp, purpose = 'verification') => {
 
 // Send password reset email
 const sendPasswordResetEmail = async (email, resetToken) => {
-  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+  // Remove trailing slash from FRONTEND_URL if present
+  const baseUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
 
   // Development mode or missing SMTP config: Log reset link to console instead of sending email
   if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
@@ -123,7 +125,17 @@ const sendPasswordResetEmail = async (email, resetToken) => {
   }
 
   try {
+    // Validate SMTP configuration
+    if (!process.env.SMTP_HOST) {
+      throw new Error('SMTP_HOST is not configured');
+    }
+    
     const transporter = createTransporter();
+    
+    // Verify transporter is created successfully
+    if (!transporter) {
+      throw new Error('Failed to create email transporter');
+    }
 
     const html = `
       <!DOCTYPE html>
@@ -175,11 +187,25 @@ const sendPasswordResetEmail = async (email, resetToken) => {
       text: `Click this link to reset your password: ${resetUrl}. This link will expire in 1 hour.`
     };
 
+    console.log(`Attempting to send password reset email to: ${email}`);
+    console.log(`Using SMTP: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`);
+    console.log(`From email: ${fromEmail}`);
+    
     const info = await transporter.sendMail(mailOptions);
-    console.log('Password reset email sent:', info.messageId);
+    console.log('Password reset email sent successfully:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Error sending password reset email:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      user: process.env.SMTP_USER ? '***configured***' : 'missing'
+    });
     throw error;
   }
 };

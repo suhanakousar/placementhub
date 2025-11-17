@@ -315,20 +315,40 @@ router.post('/forgot-password', [
 
     // Send reset email
     try {
-      await sendPasswordResetEmail(email, resetToken);
-      res.json({
-        success: true,
-        message: 'Password reset email sent'
-      });
+      const emailResult = await sendPasswordResetEmail(email, resetToken);
+      if (emailResult.success) {
+        res.json({
+          success: true,
+          message: 'Password reset email sent. Please check your inbox.'
+        });
+      } else {
+        throw new Error('Email service returned unsuccessful result');
+      }
     } catch (emailError) {
       console.error('Password reset email error:', emailError);
+      console.error('Full error stack:', emailError.stack);
+      
+      // Rollback the token on email failure
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
       await user.save();
 
+      // Provide helpful error message
+      const errorMessage = emailError.message || 'Unknown error';
+      const isTimeout = errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT');
+      const isConnectionError = errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ENOTFOUND');
+      
+      let userMessage = 'Failed to send password reset email. Please try again later.';
+      if (isTimeout) {
+        userMessage = 'Email service is taking too long to respond. Please try again in a few moments.';
+      } else if (isConnectionError) {
+        userMessage = 'Unable to connect to email service. Please contact support if this persists.';
+      }
+
       res.status(500).json({
-        message: 'Failed to send password reset email. Please try again later.',
-        error: process.env.NODE_ENV === 'development' ? emailError.message : undefined
+        success: false,
+        message: userMessage,
+        error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
       });
     }
   } catch (error) {

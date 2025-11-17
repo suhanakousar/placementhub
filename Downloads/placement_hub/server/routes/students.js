@@ -128,7 +128,16 @@ router.post('/internships', authorize('student'), async (req, res) => {
 router.delete('/internships/:internshipId', authorize('student'), async (req, res) => {
   try {
     const student = await Student.findOne({ userId: req.user._id });
-    student.internships.id(req.params.internshipId).remove();
+    if (!student) {
+      return res.status(404).json({ message: 'Student profile not found' });
+    }
+
+    const internship = student.internships.id(req.params.internshipId);
+    if (!internship) {
+      return res.status(404).json({ message: 'Internship not found' });
+    }
+
+    student.internships.pull(req.params.internshipId);
     await student.save();
     res.json(student);
   } catch (error) {
@@ -156,7 +165,16 @@ router.post('/hackathons', authorize('student'), async (req, res) => {
 router.delete('/hackathons/:hackathonId', authorize('student'), async (req, res) => {
   try {
     const student = await Student.findOne({ userId: req.user._id });
-    student.hackathons.id(req.params.hackathonId).remove();
+    if (!student) {
+      return res.status(404).json({ message: 'Student profile not found' });
+    }
+
+    const hackathon = student.hackathons.id(req.params.hackathonId);
+    if (!hackathon) {
+      return res.status(404).json({ message: 'Hackathon not found' });
+    }
+
+    student.hackathons.pull(req.params.hackathonId);
     await student.save();
     res.json(student);
   } catch (error) {

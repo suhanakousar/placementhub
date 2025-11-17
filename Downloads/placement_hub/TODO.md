@@ -9,5 +9,5 @@
 - [x] Add delete functionality to Hackathons.js
 
 ## Testing
-- [ ] Test delete operations for internships
-- [ ] Test delete operations for hackathons
+- [x] Test delete operations for internships
+- [x] Test delete operations for hackathons

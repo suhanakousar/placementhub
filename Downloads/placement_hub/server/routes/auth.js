@@ -82,12 +82,10 @@ router.post('/register', [
       });
     }
 
-    // Send welcome email
-    try {
-      await sendWelcomeEmail(email, firstName || 'User');
-    } catch (emailError) {
+    // Send welcome email in the background (don't block registration)
+    sendWelcomeEmail(email, firstName || 'User').catch(emailError => {
       console.error('Welcome email error:', emailError);
-    }
+    });
 
     res.status(201).json({
       success: true,

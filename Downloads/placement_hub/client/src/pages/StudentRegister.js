@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { FaGraduationCap, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
@@ -17,6 +17,7 @@ const StudentRegister = () => {
   });
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -37,16 +38,23 @@ const StudentRegister = () => {
 
     setLoading(true);
 
-    const result = await register({
-      ...formData,
-      year: Number(formData.year)
-    });
+    try {
+      const result = await register({
+        ...formData,
+        year: Number(formData.year)
+      });
 
-    if (result.success) {
-      navigate('/login', { replace: true });
+      if (result.success) {
+        setRegistrationSuccess(true);
+      } else {
+        setFormError(result.message || 'Registration failed. Please try again.');
+      }
+    } catch (err) {
+      console.error('Student register error:', err);
+      setFormError('Something went wrong. Please try again later.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const passwordChecks = {
@@ -59,6 +67,16 @@ const StudentRegister = () => {
 
   const passwordIsStrong = Object.values(passwordChecks).every(Boolean);
   const passwordsMatch = formData.password && formData.password === formData.confirmPassword;
+  
+  useEffect(() => {
+    if (registrationSuccess) {
+      const timer = setTimeout(() => {
+        navigate('/login', { replace: true });
+      }, 1200);
+
+      return () => clearTimeout(timer);
+    }
+  }, [registrationSuccess, navigate]);
 
   const handleChange = (e) => {
     setFormData({
@@ -83,7 +101,12 @@ const StudentRegister = () => {
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {formError && (
+          {registrationSuccess && (
+            <div className="p-3 rounded-md bg-green-50 text-green-700 text-sm">
+              Account created successfully! Redirecting you to login...
+            </div>
+          )}
+          {formError && !registrationSuccess && (
             <div className="p-3 rounded-md bg-red-50 text-red-600 text-sm">
               {formError}
             </div>

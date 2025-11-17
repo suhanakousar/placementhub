@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   FaHome,
@@ -48,9 +48,17 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Close sidebar when route changes on mobile
+  // Close sidebar when route changes on mobile (but not immediately after opening)
+  const sidebarOpenedRef = useRef(0);
   useEffect(() => {
-    if (isOpen && window.innerWidth < 1024) {
+    if (isOpen) {
+      sidebarOpenedRef.current = Date.now();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    // Only close if sidebar has been open for at least 100ms
+    if (isOpen && window.innerWidth < 1024 && (Date.now() - sidebarOpenedRef.current > 100)) {
       onClose();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -65,8 +73,17 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
 
     document.body.style.overflow = 'hidden';
 
+    // Track when sidebar was opened to prevent immediate closing
+    const openedAt = Date.now();
+    const MIN_OPEN_TIME = 500; // Minimum time sidebar must stay open (ms)
+
     let timeoutId;
     const handleClickOutside = (event) => {
+      // Don't close if sidebar was just opened
+      if (Date.now() - openedAt < MIN_OPEN_TIME) {
+        return;
+      }
+
       if (window.innerWidth < 1024) {
         const sidebar = document.querySelector('.sidebar-mobile');
         const menuButton = event.target.closest('.menu-toggle') || event.target.closest('button[aria-label="Toggle menu"]');
@@ -79,12 +96,12 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
       }
     };
 
-    // Small delay to prevent immediate closing when opening
+    // Longer delay to prevent immediate closing when opening
     timeoutId = setTimeout(() => {
       // Use both mousedown and touchstart for better mobile support
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside);
-    }, 300);
+    }, 500);
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
@@ -101,7 +118,13 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
       {isOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={onClose}
+          onClick={(e) => {
+            // Prevent immediate closing
+            const timeSinceOpen = Date.now() - sidebarOpenedRef.current;
+            if (timeSinceOpen > 300) {
+              onClose();
+            }
+          }}
           style={{ top: '4rem' }}
         />
       )}

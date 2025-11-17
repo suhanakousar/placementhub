@@ -32,7 +32,7 @@ router.post('/register', [
   body('firstName').optional().isLength({ min: 1 }),
   body('lastName').optional().isLength({ min: 1 }),
   body('rollNumber').optional().isLength({ min: 1 }),
-  body('department').optional().isIn(['CSE', 'ECE', 'EEE', 'ME', 'CE']),
+  body('department').optional().isIn(['CSE', 'ECE', 'EEE', 'ME', 'CE', 'IT', 'CSIT', 'AI', 'BT']),
   body('year').optional().isInt({ min: 1, max: 4 })
 ], async (req, res) => {
   try {

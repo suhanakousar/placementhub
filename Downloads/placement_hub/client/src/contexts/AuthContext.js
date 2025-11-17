@@ -85,7 +85,24 @@ export const AuthProvider = ({ children }) => {
     try {
       const { email, password, role, firstName, lastName, rollNumber, department, year } = userData;
 
+      // Register via backend
+      await axios.post(`${API_URL}/auth/register`, {
+        email,
+        password,
+        role,
+        firstName,
+        lastName,
+        rollNumber,
+        department,
+        year
+      });
 
+      toast.success(role === 'admin' ? 'Admin registration successful! You can now login.' : 'Registration successful!');
+      return { success: true };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Registration failed';
+      toast.error(message);
+      return { success: false, message };
     }
   };
 

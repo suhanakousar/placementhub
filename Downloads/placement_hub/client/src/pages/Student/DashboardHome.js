@@ -244,18 +244,20 @@ const DashboardHome = ({ studentData }) => {
         <div className="flex items-center space-x-6">
           <div className="relative">
             {getProfilePhotoUrl() ? (
-              <img
-                src={getProfilePhotoUrl()}
-                alt={`${studentData?.personalInfo?.firstName} ${studentData?.personalInfo?.lastName}`}
-                className="w-20 h-20 rounded-full object-cover border-4 border-primary-500"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-              <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-4 border-primary-500 hidden">
-                <FaUser className="text-2xl text-gray-400" />
-              </div>
+              <>
+                <img
+                  src={getProfilePhotoUrl()}
+                  alt={`${studentData?.personalInfo?.firstName} ${studentData?.personalInfo?.lastName}`}
+                  className="w-20 h-20 rounded-full object-cover border-4 border-primary-500"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+                <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-4 border-primary-500 hidden">
+                  <FaUser className="text-2xl text-gray-400" />
+                </div>
+              </>
             ) : (
               <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-4 border-primary-500">
                 <FaUser className="text-2xl text-gray-400" />

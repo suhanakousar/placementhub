@@ -2,17 +2,24 @@ const nodemailer = require('nodemailer');
 
 // Create reusable transporter object using SMTP transport
 const createTransporter = () => {
-  // For development, you can use Gmail with App Password
-  // For production, use a service like SendGrid, Mailgun, or AWS SES
+  const port = Number(process.env.SMTP_PORT) || 587;
+  const isSecure = port === 465;
   
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: process.env.SMTP_PORT || 587,
-    secure: false, // true for 465, false for other ports
+    port: port,
+    secure: isSecure, // true for 465, false for other ports
+    requireTLS: !isSecure, // Require TLS for non-SSL ports
     auth: {
-      user: process.env.SMTP_USER, // Your email
-      pass: process.env.SMTP_PASSWORD, // Your app password or SMTP password
+      user: process.env.SMTP_USER, // For SendGrid: "apikey", for Gmail: your email
+      pass: process.env.SMTP_PASSWORD, // API key or app password
     },
+    connectionTimeout: 10000, // 10 seconds connection timeout
+    greetingTimeout: 10000, // 10 seconds greeting timeout
+    socketTimeout: 10000, // 10 seconds socket timeout
+    pool: true, // Use connection pooling for better performance
+    maxConnections: 1,
+    maxMessages: 3,
   });
 };
 
@@ -78,8 +85,11 @@ const sendOTPEmail = async (email, otp, purpose = 'verification') => {
       </html>
     `;
 
+    // Use FROM_EMAIL if set, otherwise use SMTP_USER (for Gmail) or default
+    const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'placementhub722@gmail.com';
+    
     const mailOptions = {
-      from: `"Placement Hub" <${process.env.SMTP_USER}>`,
+      from: `"Placement Hub" <${fromEmail}>`,
       to: email,
       subject: subject,
       html: html,
@@ -154,22 +164,18 @@ const sendPasswordResetEmail = async (email, resetToken) => {
       </html>
     `;
 
+    // Use FROM_EMAIL if set, otherwise use SMTP_USER (for Gmail) or default
+    const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'placementhub722@gmail.com';
+    
     const mailOptions = {
-      from: `"Placement Hub" <${process.env.SMTP_USER}>`,
+      from: `"Placement Hub" <${fromEmail}>`,
       to: email,
       subject: 'Password Reset Request - Placement Hub',
       html: html,
       text: `Click this link to reset your password: ${resetUrl}. This link will expire in 1 hour.`
     };
 
-    // Set timeout for email sending (15 seconds)
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Connection timeout')), 15000);
-    });
-
-    const sendPromise = transporter.sendMail(mailOptions);
-    const info = await Promise.race([sendPromise, timeoutPromise]);
-
+    const info = await transporter.sendMail(mailOptions);
     console.log('Password reset email sent:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
@@ -232,8 +238,11 @@ const sendWelcomeEmail = async (email, name) => {
       </html>
     `;
 
+    // Use FROM_EMAIL if set, otherwise use SMTP_USER (for Gmail) or default
+    const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'placementhub722@gmail.com';
+    
     const mailOptions = {
-      from: `"Placement Hub" <${process.env.SMTP_USER}>`,
+      from: `"Placement Hub" <${fromEmail}>`,
       to: email,
       subject: 'Welcome to Placement Hub!',
       html: html,
@@ -305,8 +314,11 @@ const sendVerificationEmail = async (email, verificationUrl) => {
       </html>
     `;
 
+    // Use FROM_EMAIL if set, otherwise use SMTP_USER (for Gmail) or default
+    const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'placementhub722@gmail.com';
+    
     const mailOptions = {
-      from: `"Placement Hub" <${process.env.SMTP_USER}>`,
+      from: `"Placement Hub" <${fromEmail}>`,
       to: email,
       subject: 'Verify Your Email - Placement Hub',
       html: html,
@@ -378,8 +390,11 @@ const sendSupportEmail = async ({ from, subject, message, userName, userRole }) 
       </html>
     `;
 
+    // Use FROM_EMAIL if set, otherwise use SMTP_USER (for Gmail) or default
+    const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'placementhub722@gmail.com';
+    
     const mailOptions = {
-      from: `"Placement Hub Support" <${process.env.SMTP_USER}>`,
+      from: `"Placement Hub Support" <${fromEmail}>`,
       to: 'placementhub722@gmail.com',
       subject: subject,
       html: html,

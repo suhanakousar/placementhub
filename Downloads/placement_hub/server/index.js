@@ -10,11 +10,30 @@ const app = express();
 
 // Middleware
 // CORS configuration - allow all origins in development, specific origins in production
+const normalizeOrigins = (origins) => {
+  return origins
+    .split(',')
+    .map(origin => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+};
+
+const allowedOrigins = process.env.FRONTEND_URL
+  ? normalizeOrigins(process.env.FRONTEND_URL)
+  : null;
+
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.FRONTEND_URL 
-      ? process.env.FRONTEND_URL.split(',')
-      : true // Allow all if not specified (you should set this in production)
+  origin: process.env.NODE_ENV === 'production'
+    ? (origin, callback) => {
+        if (!origin) return callback(null, true); // Allow non-browser tools
+
+        const sanitizedOrigin = origin.replace(/\/$/, '');
+        if (!allowedOrigins || allowedOrigins.includes(sanitizedOrigin)) {
+          return callback(null, true);
+        }
+
+        console.warn(`Blocked CORS origin: ${origin}`);
+        return callback(new Error('Not allowed by CORS'));
+      }
     : true, // Allow all in development
   credentials: true,
   optionsSuccessStatus: 200

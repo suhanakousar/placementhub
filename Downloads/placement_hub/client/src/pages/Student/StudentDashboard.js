@@ -65,7 +65,7 @@ const StudentDashboard = () => {
         isMenuOpen={isMenuOpen}
       />
       <Sidebar isOpen={isMenuOpen} onClose={closeMenu} />
-      <main className="lg:ml-64 lg:pt-16 pt-16 p-4 md:p-6">
+      <main className="lg:ml-64 lg:pt-16 pt-4 p-4 md:p-6">
         <Routes>
           <Route index element={<DashboardHome studentData={studentData} />} />
           <Route path="dashboard" element={<DashboardHome studentData={studentData} />} />

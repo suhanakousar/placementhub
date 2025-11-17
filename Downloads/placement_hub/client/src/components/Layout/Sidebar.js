@@ -48,7 +48,7 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Close sidebar when route changes on mobile (but not immediately after opening)
+  // Close sidebar when route changes on mobile
   const sidebarOpenedRef = useRef(0);
   useEffect(() => {
     if (isOpen) {
@@ -57,16 +57,19 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
   }, [isOpen]);
 
   useEffect(() => {
-    // Only close if sidebar has been open for at least 100ms
-    if (isOpen && window.innerWidth < 1024 && (Date.now() - sidebarOpenedRef.current > 100)) {
-      onClose();
+    // Close sidebar when route changes on mobile (with small delay to allow navigation)
+    if (isOpen && isMobile) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 150);
+      return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
   // Close sidebar when clicking outside on mobile
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || !isMobile) {
       document.body.style.overflow = '';
       return;
     }
@@ -75,53 +78,51 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
 
     // Track when sidebar was opened to prevent immediate closing
     const openedAt = Date.now();
-    const MIN_OPEN_TIME = 500; // Minimum time sidebar must stay open (ms)
+    const MIN_OPEN_TIME = 300; // Minimum time sidebar must stay open (ms)
 
-    let timeoutId;
     const handleClickOutside = (event) => {
       // Don't close if sidebar was just opened
       if (Date.now() - openedAt < MIN_OPEN_TIME) {
         return;
       }
 
-      if (window.innerWidth < 1024) {
-        const sidebar = document.querySelector('.sidebar-mobile');
-        const menuButton = event.target.closest('.menu-toggle') || event.target.closest('button[aria-label="Toggle menu"]');
-        const overlay = event.target.closest('[class*="bg-black"]');
-        
-        // Don't close if clicking on sidebar, menu button, or overlay (overlay has its own handler)
-        if (sidebar && !sidebar.contains(event.target) && !menuButton && !overlay) {
-          onClose();
-        }
+      const sidebar = document.querySelector('.sidebar-mobile');
+      const menuButton = event.target.closest('.menu-toggle') || event.target.closest('button[aria-label="Toggle menu"]');
+      const overlay = event.target.closest('[class*="bg-black"]');
+      
+      // Don't close if clicking on sidebar, menu button, or overlay
+      if (sidebar && !sidebar.contains(event.target) && !menuButton && !overlay) {
+        onClose();
       }
     };
 
-    // Longer delay to prevent immediate closing when opening
-    timeoutId = setTimeout(() => {
-      // Use both mousedown and touchstart for better mobile support
+    // Small delay to prevent immediate closing when opening
+    const timeoutId = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside);
-    }, 500);
+    }, MIN_OPEN_TIME);
 
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
       document.body.style.overflow = '';
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, isMobile]);
 
   return (
     <>
       {/* Mobile overlay */}
-      {isOpen && (
+      {isOpen && isMobile && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
             // Prevent immediate closing
             const timeSinceOpen = Date.now() - sidebarOpenedRef.current;
-            if (timeSinceOpen > 300) {
+            if (timeSinceOpen > 200) {
               onClose();
             }
           }}
@@ -130,13 +131,14 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
       )}
       {/* Sidebar */}
       <div
-        className="sidebar-scroll sidebar-mobile w-64 bg-white dark:bg-gray-800 shadow-lg lg:h-[calc(100vh-4rem)] h-screen lg:fixed lg:left-0 lg:top-16 overflow-y-auto overflow-x-hidden z-50"
+        className="sidebar-scroll sidebar-mobile w-64 bg-white dark:bg-gray-800 shadow-lg lg:h-[calc(100vh-4rem)] h-[calc(100vh-4rem)] lg:fixed lg:left-0 lg:top-16 fixed left-0 top-16 overflow-y-auto overflow-x-hidden z-50"
         style={{
           transform: !isMobile ? 'translateX(0)' : (isOpen ? 'translateX(0)' : 'translateX(-100%)'),
           WebkitTransform: !isMobile ? 'translateX(0)' : (isOpen ? 'translateX(0)' : 'translateX(-100%)'),
           msTransform: !isMobile ? 'translateX(0)' : (isOpen ? 'translateX(0)' : 'translateX(-100%)'),
           transition: 'transform 300ms ease-in-out',
-          willChange: 'transform'
+          willChange: 'transform',
+          pointerEvents: isOpen || !isMobile ? 'auto' : 'none'
         }}
       >
         <div className="p-4 pb-6">
@@ -148,12 +150,16 @@ const Sidebar = ({ menuItems = studentMenuItems, isOpen, onClose }) => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     if (window.innerWidth < 1024) {
-                      onClose();
+                      // Small delay to ensure navigation happens
+                      setTimeout(() => {
+                        onClose();
+                      }, 100);
                     }
                   }}
-                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition ${
+                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition relative z-50 ${
                     isActive
                       ? 'bg-primary-600 text-white'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'

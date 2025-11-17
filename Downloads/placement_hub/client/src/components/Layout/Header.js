@@ -6,7 +6,7 @@ const Header = ({ title, user, onMenuToggle, isMenuOpen }) => {
   const { darkMode, toggleDarkMode } = useTheme();
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm lg:fixed lg:top-0 lg:left-0 lg:right-0 h-16 z-50">
+    <header className="bg-white dark:bg-gray-800 shadow-sm fixed top-0 left-0 right-0 h-16 z-50">
       <div className="flex items-center justify-between px-4 md:px-6 h-full">
         <div className="flex items-center space-x-3">
           {onMenuToggle && (

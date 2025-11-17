@@ -27,6 +27,12 @@ const AdminSidebar = ({ isOpen, onClose }) => {
   const { logout } = useAuth();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
+  // Debug: Log state changes
+  useEffect(() => {
+    const transformValue = !isMobile ? 'translateX(0)' : (isOpen ? 'translateX(0)' : 'translateX(-100%)');
+    console.log('AdminSidebar state - isOpen:', isOpen, 'isMobile:', isMobile, 'transform:', transformValue);
+  }, [isOpen, isMobile]);
+
 
   useEffect(() => {
     const handleResize = () => {
@@ -95,7 +101,10 @@ const AdminSidebar = ({ isOpen, onClose }) => {
         className="sidebar-scroll admin-sidebar-mobile w-64 bg-white dark:bg-gray-800 shadow-lg h-[calc(100vh-4rem)] fixed left-0 top-16 overflow-y-auto overflow-x-hidden z-50"
         style={{
           transform: !isMobile ? 'translateX(0)' : (isOpen ? 'translateX(0)' : 'translateX(-100%)'),
-          transition: 'transform 300ms ease-in-out'
+          WebkitTransform: !isMobile ? 'translateX(0)' : (isOpen ? 'translateX(0)' : 'translateX(-100%)'),
+          msTransform: !isMobile ? 'translateX(0)' : (isOpen ? 'translateX(0)' : 'translateX(-100%)'),
+          transition: 'transform 300ms ease-in-out',
+          willChange: 'transform'
         }}
       >
         <div className="p-4 pb-6">

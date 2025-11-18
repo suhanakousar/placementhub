@@ -44,6 +44,39 @@ const PLATFORM_CONFIG = {
   }
 };
 
+function normalizeHandle(raw, domain) {
+  if (!raw) return null;
+  let value = String(raw).trim();
+  if (!value) return null;
+
+  const tryParseUrl = (input) => {
+    try {
+      const url = new URL(
+        input.startsWith('http') ? input : `https://${input}`
+      );
+      if (domain && !url.hostname.includes(domain)) {
+        return null;
+      }
+      const segments = url.pathname.split('/').filter(Boolean);
+      return segments.pop() || null;
+    } catch (err) {
+      return null;
+    }
+  };
+
+  if (value.startsWith('http') || value.includes(domain || '')) {
+    const parsed = tryParseUrl(value);
+    if (parsed) return parsed;
+  }
+
+  if (value.includes('/')) {
+    const parts = value.split('/').filter(Boolean);
+    return parts.pop();
+  }
+
+  return value;
+}
+
 function buildCodingProfiles(studentDoc, leaderboardProfile) {
   const personalInfo = studentDoc?.personalInfo || {};
   const metadataStats = leaderboardProfile?.metadata?.codingStats || {};
@@ -52,9 +85,13 @@ function buildCodingProfiles(studentDoc, leaderboardProfile) {
 
   return Object.entries(PLATFORM_CONFIG)
     .map(([key, config]) => {
-      const username = personalInfo[key];
+      const domain = new URL(config.baseUrl).hostname;
       const stats = metadataStats[key] || null;
-
+      const statsUsername = stats?.username
+        ? normalizeHandle(stats.username, domain)
+        : null;
+      const username =
+        statsUsername || normalizeHandle(personalInfo[key], domain);
       if (!username && !stats) {
         return null;
       }
@@ -63,10 +100,7 @@ function buildCodingProfiles(studentDoc, leaderboardProfile) {
         key,
         platform: config.label,
         username: username || stats?.username || null,
-        profileUrl:
-          username || stats?.username
-            ? `${config.baseUrl}${username || stats?.username}`
-            : null,
+        profileUrl: username ? `${config.baseUrl}${username}` : null,
         accentColor: config.accent,
         metrics: {
           problemsSolved:
@@ -123,19 +157,19 @@ function collectCodingHandles(studentDoc, leaderboardProfile) {
 
   return {
     leetcode:
-      personal.leetcode ||
+      normalizeHandle(personal.leetcode, 'leetcode.com') ||
       extractHandleFromLinks(links, 'leetcode.com'),
     hackerrank:
-      personal.hackerrank ||
+      normalizeHandle(personal.hackerrank, 'hackerrank.com') ||
       extractHandleFromLinks(links, 'hackerrank.com'),
     codechef:
-      personal.codechef ||
+      normalizeHandle(personal.codechef, 'codechef.com') ||
       extractHandleFromLinks(links, 'codechef.com'),
     codeforces:
-      personal.codeforces ||
+      normalizeHandle(personal.codeforces, 'codeforces.com') ||
       extractHandleFromLinks(links, 'codeforces.com'),
     geeksforgeeks:
-      personal.geeksforgeeks ||
+      normalizeHandle(personal.geeksforgeeks, 'geeksforgeeks.org') ||
       extractHandleFromLinks(links, 'geeksforgeeks.org')
   };
 }

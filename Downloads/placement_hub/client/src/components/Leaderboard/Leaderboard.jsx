@@ -161,12 +161,26 @@ export default function Leaderboard({
                 students.map((student) => {
                   const isActive =
                     selectedStudent?.studentId === student.studentId;
+                  const handleClick = (e) => {
+                    e.preventDefault();
+                    const studentId = student.studentId?.toString() || student.studentId;
+                    if (!studentId) return;
+                    // Always open in new tab
+                    window.open(`/student-profile/${studentId}`, '_blank');
+                    // Also select for current view
+                    onSelectStudent?.(student);
+                  };
                   return (
                     <button
                       key={student.studentId}
                       type="button"
-                      onClick={() => onSelectStudent?.(student)}
-                      className={`w-full text-left px-6 py-4 flex items-start gap-4 transition ${
+                      onClick={handleClick}
+                      onMouseDown={(e) => {
+                        if (e.button === 1) {
+                          e.preventDefault();
+                        }
+                      }}
+                      className={`w-full text-left px-6 py-4 flex items-start gap-4 transition cursor-pointer ${
                         isActive
                           ? 'bg-primary-50 dark:bg-primary-500/10'
                           : 'hover:bg-gray-50 dark:hover:bg-gray-700/40'

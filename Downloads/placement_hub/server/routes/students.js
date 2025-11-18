@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const Student = require('../models/Student');
+const LeaderboardProfile = require('../models/LeaderboardProfile');
 const { protect, authorize } = require('../middleware/auth');
 const { fetchCodingStats } = require('../services/codingPlatformService');
 
@@ -665,37 +666,52 @@ function calculateOverallScore(codingStats) {
 // @access  Public (for now, can be restricted later)
 router.get('/leaderboard', async (req, res) => {
   try {
+    // Get all students
     const students = await Student.find()
       .select('personalInfo academicInfo userId')
       .populate('userId', 'email')
       .lean();
 
-    // Calculate scores for each student
-    const studentsWithScores = await Promise.all(
-      students.map(async (student) => {
-        const handles = {
-          leetcode: student.personalInfo?.leetcode ? extractUsername(student.personalInfo.leetcode, 'leetcode') : null,
-          hackerrank: student.personalInfo?.hackerrank ? extractUsername(student.personalInfo.hackerrank, 'hackerrank') : null,
-          codechef: student.personalInfo?.codechef ? extractUsername(student.personalInfo.codechef, 'codechef') : null,
-          codeforces: student.personalInfo?.codeforces ? extractUsername(student.personalInfo.codeforces, 'codeforces') : null,
-          geeksforgeeks: student.personalInfo?.geeksforgeeks ? extractUsername(student.personalInfo.geeksforgeeks, 'geeksforgeeks') : null
-        };
+    // Get all leaderboard profiles for these users
+    const userIds = students.map(s => s.userId?._id || s.userId);
+    const leaderboardProfiles = await LeaderboardProfile.find({
+      userId: { $in: userIds }
+    }).lean();
 
-        // Fetch coding stats
-        const codingStats = await fetchCodingStats(handles);
-        const overallScore = calculateOverallScore(codingStats);
+    // Create a map for quick lookup
+    const profileMap = new Map();
+    leaderboardProfiles.forEach(profile => {
+      profileMap.set(profile.userId.toString(), profile);
+    });
 
-        return {
-          studentId: student._id.toString(),
-          username: `${student.personalInfo?.firstName || ''} ${student.personalInfo?.lastName || ''}`.trim() || student.userId?.email || 'Unknown',
-          email: student.userId?.email || '',
-          rollNumber: student.academicInfo?.rollNumber || '',
-          department: student.academicInfo?.department || '',
-          overallScore: overallScore,
-          avatarUrl: student.personalInfo?.profilePhoto || null
-        };
-      })
-    );
+    // Calculate scores for each student using cached data or calculate on the fly
+    const studentsWithScores = students.map((student) => {
+      const userId = student.userId?._id || student.userId;
+      const profile = profileMap.get(userId?.toString());
+      
+      // Use cached coding stats from leaderboard profile if available
+      let overallScore = 0;
+      if (profile?.metadata?.codingStats) {
+        overallScore = calculateOverallScore(profile.metadata.codingStats);
+      } else if (profile?.points?.total) {
+        // Fallback to total points if coding stats not available
+        overallScore = profile.points.total;
+      } else {
+        // If no cached data, calculate from handles (but don't fetch - too slow)
+        // Just return 0 for now, can be synced later
+        overallScore = 0;
+      }
+
+      return {
+        studentId: student._id.toString(),
+        username: `${student.personalInfo?.firstName || ''} ${student.personalInfo?.lastName || ''}`.trim() || student.userId?.email || 'Unknown',
+        email: student.userId?.email || '',
+        rollNumber: student.academicInfo?.rollNumber || '',
+        department: student.academicInfo?.department || '',
+        overallScore: overallScore,
+        avatarUrl: student.personalInfo?.profilePhoto || profile?.avatarUrl || null
+      };
+    });
 
     // Sort by overall score descending and assign ranks
     studentsWithScores.sort((a, b) => b.overallScore - a.overallScore);

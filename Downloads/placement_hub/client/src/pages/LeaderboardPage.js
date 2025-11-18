@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Leaderboard from '../components/Leaderboard/Leaderboard';
 import {
   fetchRegisteredStudents,
-  fetchStudentProgress
+  fetchStudentProgress,
+  syncStudentCodingStats
 } from '../utils/leaderboardApi';
 
 const PAGE_SIZE = 15;
@@ -17,6 +18,7 @@ export default function LeaderboardPage() {
   const [profileData, setProfileData] = useState(null);
   const [listLoading, setListLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
   const selectedStudentIdRef = useRef(null);
 
@@ -63,35 +65,29 @@ export default function LeaderboardPage() {
     loadStudents();
   }, [page, searchTerm]);
 
-  useEffect(() => {
-    if (!selectedStudentId) {
-      return;
-    }
-
-    let isMounted = true;
-    async function loadProfile() {
+  const loadProfileData = useCallback(
+    async (studentId, { showLoader = true } = {}) => {
+      if (!studentId) return;
+      if (showLoader) setProfileLoading(true);
       try {
-        setProfileLoading(true);
-        const data = await fetchStudentProgress(selectedStudentId);
-        if (isMounted) {
-          setProfileData(data);
-        }
+        const data = await fetchStudentProgress(studentId);
+        setProfileData(data);
       } catch (err) {
         console.error(err);
-        if (isMounted) {
-          setError('Failed to load student progress.');
-        }
+        setError('Failed to load student progress.');
       } finally {
-        if (isMounted) {
+        if (showLoader) {
           setProfileLoading(false);
         }
       }
-    }
-    loadProfile();
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedStudentId]);
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!selectedStudentId) return;
+    loadProfileData(selectedStudentId);
+  }, [selectedStudentId, loadProfileData]);
 
   function handleSelectStudent(student) {
     setSelectedStudentSummary(student);
@@ -101,6 +97,21 @@ export default function LeaderboardPage() {
   function handleSearch(value) {
     setSearchTerm(value);
     setPage(1);
+  }
+
+  async function handleSyncCodingStats() {
+    if (!selectedStudentId) return;
+    try {
+      setSyncing(true);
+      setError(null);
+      await syncStudentCodingStats(selectedStudentId);
+      await loadProfileData(selectedStudentId, { showLoader: true });
+    } catch (err) {
+      console.error(err);
+      setError('Failed to sync coding stats. Please verify platform usernames.');
+    } finally {
+      setSyncing(false);
+    }
   }
 
   return (
@@ -125,6 +136,8 @@ export default function LeaderboardPage() {
         onPageChange={setPage}
         listLoading={listLoading}
         profileLoading={profileLoading}
+        onSyncCodingStats={handleSyncCodingStats}
+        syncing={syncing}
       />
     </>
   );

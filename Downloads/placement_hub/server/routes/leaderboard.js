@@ -11,6 +11,7 @@ const {
   PERIODS,
   buildEntries
 } = require('../jobs/recalculateLeaderboard');
+const { fetchCodingStats } = require('../services/codingPlatformService');
 const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
@@ -80,6 +81,7 @@ function buildCodingProfiles(studentDoc, leaderboardProfile) {
         },
         trend: stats?.trend ?? 'steady',
         badges: stats?.badges || [],
+        error: stats?.error,
         points: stats?.points ?? null
       };
     })
@@ -100,6 +102,42 @@ async function findRankingsForUser(userId) {
   }
 
   return rankings;
+}
+
+function extractHandleFromLinks(links = [], domain) {
+  if (!Array.isArray(links)) return null;
+  const match = links.find((link) => link.includes(domain));
+  if (!match) return null;
+  try {
+    const url = new URL(match.startsWith('http') ? match : `https://${match}`);
+    const segments = url.pathname.split('/').filter(Boolean);
+    return segments.pop() || null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function collectCodingHandles(studentDoc, leaderboardProfile) {
+  const personal = studentDoc.personalInfo || {};
+  const links = leaderboardProfile?.profileLinks || [];
+
+  return {
+    leetcode:
+      personal.leetcode ||
+      extractHandleFromLinks(links, 'leetcode.com'),
+    hackerrank:
+      personal.hackerrank ||
+      extractHandleFromLinks(links, 'hackerrank.com'),
+    codechef:
+      personal.codechef ||
+      extractHandleFromLinks(links, 'codechef.com'),
+    codeforces:
+      personal.codeforces ||
+      extractHandleFromLinks(links, 'codeforces.com'),
+    geeksforgeeks:
+      personal.geeksforgeeks ||
+      extractHandleFromLinks(links, 'geeksforgeeks.org')
+  };
 }
 
 function parsePositiveInt(value, fallback) {
@@ -444,6 +482,75 @@ router.get(
         error
       );
       res.status(500).json({ message: 'Failed to load student progress' });
+    }
+  }
+);
+
+router.post(
+  '/students/:studentId/sync',
+  protect,
+  authorize('admin'),
+  async (req, res) => {
+    try {
+      const student = await Student.findById(req.params.studentId)
+        .populate('userId', 'email')
+        .lean();
+
+      if (!student) {
+        return res.status(404).json({ message: 'Student not found' });
+      }
+
+      const userRef = student.userId?._id || student.userId;
+
+      let leaderboardProfile = await LeaderboardProfile.findOne({
+        userId: userRef
+      });
+
+      if (!leaderboardProfile) {
+        leaderboardProfile = new LeaderboardProfile({
+          userId: userRef,
+          name: `${student.personalInfo?.firstName || ''} ${
+            student.personalInfo?.lastName || ''
+          }`.trim() || student.userId?.email,
+          avatarUrl: student.personalInfo?.profilePhoto,
+          badges: [],
+          profileLinks: []
+        });
+      }
+
+      const handles = collectCodingHandles(student, leaderboardProfile);
+      const availableHandles = Object.values(handles).filter(Boolean);
+
+      if (!availableHandles.length) {
+        return res.status(400).json({
+          message:
+            'No coding platform usernames found. Please ensure the student profile includes their handles.'
+        });
+      }
+
+      const codingStats = await fetchCodingStats(handles);
+
+      leaderboardProfile.metadata = {
+        ...(leaderboardProfile.metadata || {}),
+        codingStats,
+        externalFetch: {
+          fetchedAt: new Date(),
+          handles
+        }
+      };
+
+      await leaderboardProfile.save();
+
+      res.json({
+        message: 'Coding platform stats synchronized',
+        codingStats
+      });
+    } catch (error) {
+      console.error(
+        '[Leaderboard] POST /api/leaderboard/students/:id/sync error:',
+        error
+      );
+      res.status(500).json({ message: 'Failed to sync coding stats' });
     }
   }
 );

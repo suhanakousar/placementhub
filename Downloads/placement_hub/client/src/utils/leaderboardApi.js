@@ -16,3 +16,8 @@ export const fetchStudentProgress = async (studentId) => {
   return response.data;
 };
 
+export const syncStudentCodingStats = async (studentId) => {
+  const response = await api.post(`/leaderboard/students/${studentId}/sync`);
+  return response.data;
+};
+

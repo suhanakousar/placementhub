@@ -27,7 +27,9 @@ export default function Leaderboard({
   limit,
   onPageChange,
   listLoading,
-  profileLoading
+  profileLoading,
+  onSyncCodingStats,
+  syncing
 }) {
   const [localSearch, setLocalSearch] = useState(searchTerm || '');
 
@@ -285,13 +287,23 @@ export default function Leaderboard({
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-3">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       Coding Platform Stats
                     </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex flex-col md:flex-row md:items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-gray-500 dark:text-gray-400">
                       Last sync: {formatDate(progress.lastSynced)}
                     </p>
+                    <button
+                      type="button"
+                      onClick={onSyncCodingStats}
+                      disabled={syncing || profileLoading}
+                      className="inline-flex items-center justify-center rounded-lg border border-primary-200 text-primary-600 px-3 py-1.5 font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary-50"
+                    >
+                      {syncing ? 'Syncing…' : 'Sync Latest Stats'}
+                    </button>
+                  </div>
                   </div>
                   {codingProfiles.length ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -320,6 +332,11 @@ export default function Leaderboard({
                               </a>
                             )}
                           </div>
+                        {profile.error && (
+                          <p className="mt-2 text-xs text-red-500">
+                            {profile.error}
+                          </p>
+                        )}
                           <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
                             <div>
                               <p className="text-gray-500 dark:text-gray-400">

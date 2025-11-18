@@ -1,111 +1,130 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Leaderboard from '../components/Leaderboard/Leaderboard';
 import {
-  fetchLeaderboard,
-  fetchLeaderboardProfile
+  fetchRegisteredStudents,
+  fetchStudentProgress
 } from '../utils/leaderboardApi';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 15;
 
 export default function LeaderboardPage() {
-  const [period, setPeriod] = useState('today');
+  const [students, setStudents] = useState([]);
   const [page, setPage] = useState(1);
-  const [entries, setEntries] = useState([]);
   const [total, setTotal] = useState(0);
-  const [highlightedUser, setHighlightedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
+  const [selectedStudentSummary, setSelectedStudentSummary] = useState(null);
+  const [profileData, setProfileData] = useState(null);
+  const [listLoading, setListLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [error, setError] = useState(null);
+  const selectedStudentIdRef = useRef(null);
 
   useEffect(() => {
-    async function loadLeaderboard() {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await fetchLeaderboard(period, page, PAGE_SIZE);
-        const mappedEntries = (data.entries || []).map((entry) => ({
-          ...entry,
-          onClick: () => handleSelectUser(entry)
-        }));
+    selectedStudentIdRef.current = selectedStudentId;
+  }, [selectedStudentId]);
 
-        setEntries(mappedEntries);
+  useEffect(() => {
+    async function loadStudents() {
+      try {
+        setListLoading(true);
+        setError(null);
+        const data = await fetchRegisteredStudents({
+          search: searchTerm,
+          page,
+          limit: PAGE_SIZE
+        });
+        setStudents(data.students || []);
         setTotal(data.total || 0);
 
-        if (!highlightedUser && data.entries && data.entries.length > 0) {
-          handleSelectUser(data.entries[0], { replace: true });
+        if (!data.students?.length) {
+          setSelectedStudentSummary(null);
+          setSelectedStudentId(null);
+          setProfileData(null);
+          return;
+        }
+
+        const existingSelection =
+          data.students.find(
+            (student) => student.studentId === selectedStudentIdRef.current
+          ) || data.students[0];
+
+        setSelectedStudentSummary(existingSelection);
+        if (selectedStudentIdRef.current !== existingSelection.studentId) {
+          setSelectedStudentId(existingSelection.studentId);
         }
       } catch (err) {
         console.error(err);
-        setError('Failed to load leaderboard.');
+        setError('Failed to load students.');
       } finally {
-        setLoading(false);
+        setListLoading(false);
       }
     }
-    loadLeaderboard();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, page]);
+    loadStudents();
+  }, [page, searchTerm]);
 
-  async function handleSelectUser(entry, options = {}) {
-    try {
-      const profile = await fetchLeaderboardProfile(entry.userId || entry._id);
-      setHighlightedUser({
-        ...profile,
-        rank: entry.rank
-      });
-    } catch (err) {
-      console.error(err);
-      if (!options.replace) {
-        setHighlightedUser((prev) => prev || null);
+  useEffect(() => {
+    if (!selectedStudentId) {
+      return;
+    }
+
+    let isMounted = true;
+    async function loadProfile() {
+      try {
+        setProfileLoading(true);
+        const data = await fetchStudentProgress(selectedStudentId);
+        if (isMounted) {
+          setProfileData(data);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) {
+          setError('Failed to load student progress.');
+        }
+      } finally {
+        if (isMounted) {
+          setProfileLoading(false);
+        }
       }
     }
-  }
+    loadProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedStudentId]);
 
-  function handlePeriodChange(newPeriod) {
-    setPeriod(newPeriod);
-    setPage(1);
+  function handleSelectStudent(student) {
+    setSelectedStudentSummary(student);
+    setSelectedStudentId(student.studentId);
   }
 
   function handleSearch(value) {
     setSearchTerm(value);
+    setPage(1);
   }
-
-  const filteredEntries = entries.filter((entry) => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      entry.name.toLowerCase().includes(term) ||
-      entry.username?.toLowerCase().includes(term)
-    );
-  });
 
   return (
     <>
-      {loading && (
-        <div className="fixed inset-x-0 top-0 z-50 flex justify-center">
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-slate-900/90 border border-slate-700 px-4 py-1.5 text-xs text-slate-200 shadow-lg shadow-slate-950/60">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            Loading leaderboard...
-          </div>
-        </div>
-      )}
       {error && (
         <div className="fixed inset-x-0 top-0 z-50 flex justify-center">
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-red-900/90 border border-red-700 px-4 py-1.5 text-xs text-red-100 shadow-lg shadow-slate-950/60">
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-red-100 text-red-700 border border-red-200 px-4 py-1.5 text-xs shadow">
             {error}
           </div>
         </div>
       )}
       <Leaderboard
-        highlightedUser={highlightedUser}
-        entries={filteredEntries}
-        onPeriodChange={handlePeriodChange}
+        students={students}
+        selectedStudent={selectedStudentSummary}
+        profileData={profileData}
+        onSelectStudent={handleSelectStudent}
+        searchTerm={searchTerm}
         onSearch={handleSearch}
         page={page}
         total={total}
         limit={PAGE_SIZE}
-        period={period}
         onPageChange={setPage}
-        searchTerm={searchTerm}
+        listLoading={listLoading}
+        profileLoading={profileLoading}
       />
     </>
   );

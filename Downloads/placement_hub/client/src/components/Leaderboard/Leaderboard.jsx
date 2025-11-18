@@ -1,39 +1,33 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
-const PERIOD_TABS = [
-  { id: 'today', label: 'Today' },
-  { id: 'month', label: 'Month' },
-  { id: 'year', label: 'Year' }
-];
-
-function classNames(...classes) {
-  return classes.filter(Boolean).join(' ');
+function formatValue(value, fallback = '—') {
+  if (value === null || value === undefined || value === '') {
+    return fallback;
+  }
+  return value;
 }
 
-function rankStyle(rank) {
-  if (rank === 1) {
-    return 'border-amber-400/60 bg-gradient-to-r from-amber-500/10 to-yellow-300/5 shadow-[0_0_40px_rgba(251,191,36,0.25)]';
-  }
-  if (rank === 2) {
-    return 'border-slate-200/60 bg-gradient-to-r from-slate-200/10 to-slate-50/5';
-  }
-  if (rank === 3) {
-    return 'border-orange-400/60 bg-gradient-to-r from-orange-500/10 to-amber-400/5';
-  }
-  return 'border-slate-800/80 bg-slate-900/60';
+function formatDate(value) {
+  if (!value) return 'Not synced';
+  return new Intl.DateTimeFormat('en', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(value));
 }
 
 export default function Leaderboard({
-  highlightedUser,
-  entries,
-  onPeriodChange,
+  students,
+  selectedStudent,
+  profileData,
+  onSelectStudent,
+  searchTerm,
   onSearch,
   page,
   total,
   limit,
-  period,
   onPageChange,
-  searchTerm
+  listLoading,
+  profileLoading
 }) {
   const [localSearch, setLocalSearch] = useState(searchTerm || '');
 
@@ -46,258 +40,384 @@ export default function Leaderboard({
     [total, limit]
   );
 
+  const codingProfiles = profileData?.codingProfiles || [];
+  const progress = profileData?.progress || {};
+
   function handleSearchSubmit(e) {
     e.preventDefault();
-    onSearch?.(localSearch);
+    onSearch?.(localSearch.trim());
   }
 
   return (
-    <div className="min-h-screen w-full flex items-start justify-center px-4 py-8 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.9fr)] gap-6">
-        <section className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-xl shadow-slate-950/60 p-6 flex flex-col gap-6">
-          <header className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-semibold text-slate-50 tracking-tight">Highlighted Profile</h1>
-              <p className="text-sm text-slate-400 mt-1">
-                Focus on a single student&apos;s progress and ranking.
-              </p>
-            </div>
-            {highlightedUser?.rank && (
-              <div className="flex items-center gap-2 rounded-full border border-emerald-400/60 bg-emerald-500/10 px-4 py-1.5">
-                <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                <p className="text-xs font-medium text-emerald-200">Rank #{highlightedUser.rank}</p>
-              </div>
-            )}
-          </header>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+              Student Coding Leaderboard
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Browse every registered student. Select a profile to review their coding platforms,
+              score breakdowns, and overall progress trends.
+            </p>
+          </div>
+        </div>
 
-          {highlightedUser ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <img
-                    src={
-                      highlightedUser.avatarUrl ||
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                        highlightedUser.name
-                      )}&background=0f172a&color=e5e7eb`
-                    }
-                    alt={highlightedUser.name}
-                    className="h-20 w-20 rounded-2xl border border-slate-700 object-cover"
+        <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+          <section className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-sm flex flex-col">
+            <div className="p-6 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Registered Students
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Search by name, roll number, or department to focus on specific cohorts.
+              </p>
+              <form onSubmit={handleSearchSubmit} className="mt-4 flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={localSearch}
+                    onChange={(e) => {
+                      setLocalSearch(e.target.value);
+                      if (!e.target.value) {
+                        onSearch?.('');
+                      }
+                    }}
+                    placeholder="Search students..."
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
-                  <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center h-7 w-7 rounded-full bg-slate-900 border border-slate-700 text-xs font-semibold text-amber-300">
-                    #{highlightedUser.rank}
+                  <span className="absolute inset-y-0 right-3 flex items-center text-gray-400 text-xs">
+                    ⌕
                   </span>
                 </div>
-                <div className="flex-1">
-                  <p className="text-lg font-semibold text-slate-50">{highlightedUser.name}</p>
-                  {highlightedUser.username && (
-                    <p className="text-sm text-slate-400">@{highlightedUser.username}</p>
-                  )}
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                    {highlightedUser.company && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2.5 py-1 border border-slate-700 text-slate-200">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                        {highlightedUser.company}
-                      </span>
-                    )}
-                    {highlightedUser.location && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2.5 py-1 border border-slate-700">
-                        <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
-                        {highlightedUser.location}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3 mt-2">
-                <div className="rounded-xl bg-slate-900/80 border border-slate-800 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Today</p>
-                  <p className="mt-1 text-xl font-semibold text-slate-50">
-                    {highlightedUser.points?.today ?? 0}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-slate-900/80 border border-slate-800 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">This Month</p>
-                  <p className="mt-1 text-xl font-semibold text-slate-50">
-                    {highlightedUser.points?.month ?? 0}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-slate-900/80 border border-slate-800 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Total</p>
-                  <p className="mt-1 text-xl font-semibold text-amber-300">
-                    {highlightedUser.points?.total ?? highlightedUser.points?.year ?? 0}
-                  </p>
-                </div>
-              </div>
-
-              {Array.isArray(highlightedUser.badges) && highlightedUser.badges.length > 0 && (
-                <div className="mt-2">
-                  <p className="text-xs font-medium text-slate-400 mb-1.5">Badges</p>
-                  <div className="flex flex-wrap gap-2">
-                    {highlightedUser.badges.map((badge) => (
-                      <span
-                        key={badge}
-                        className="inline-flex items-center rounded-full bg-amber-500/10 border border-amber-500/40 text-[11px] font-medium text-amber-200 px-2.5 py-1"
-                      >
-                        {badge}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-400">
-              Select a user from the leaderboard to see their profile details.
-            </p>
-          )}
-        </section>
-
-        <section className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-xl shadow-slate-950/60 p-6 flex flex-col gap-4">
-          <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-50 tracking-tight">Leaderboard</h2>
-              <p className="text-sm text-slate-400 mt-1">
-                Live rankings based on SmartInterviews-style scoring.
-              </p>
-            </div>
-            <div className="inline-flex items-center rounded-full bg-slate-900 px-1 py-1 border border-slate-800 shadow-sm">
-              {PERIOD_TABS.map((tab) => (
                 <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => onPeriodChange?.(tab.id)}
-                  className={classNames(
-                    'px-3.5 py-1.5 text-xs font-medium rounded-full transition-colors',
-                    period === tab.id
-                      ? 'bg-slate-100 text-slate-900'
-                      : 'text-slate-400 hover:text-slate-100'
-                  )}
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold shadow hover:bg-primary-500 transition-colors"
                 >
-                  {tab.label}
+                  Search
                 </button>
-              ))}
-            </div>
-          </header>
-
-          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mt-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={localSearch}
-                onChange={(e) => {
-                  setLocalSearch(e.target.value);
-                  if (!e.target.value) {
-                    onSearch?.('');
-                  }
-                }}
-                placeholder="Search by name or username..."
-                className="w-full rounded-xl bg-slate-950/60 border border-slate-800 px-3.5 py-2.5 pr-9 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-emerald-500/60"
-              />
-              <span className="pointer-events-none absolute inset-y-0 right-3 inline-flex items-center text-slate-500 text-xs">
-                ⌕
-              </span>
-            </div>
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-3.5 py-2.5 text-xs font-semibold text-emerald-950 shadow-lg shadow-emerald-500/40 hover:bg-emerald-400 transition-colors"
-            >
-              Search
-            </button>
-          </form>
-
-          <div className="mt-3 -mx-2 overflow-hidden rounded-xl border border-slate-800 bg-slate-950/40">
-            <div className="hidden md:grid grid-cols-[60px_minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1.2fr)] gap-2 px-4 py-2.5 bg-slate-950/60 text-[11px] font-medium uppercase tracking-wide text-slate-500 border-b border-slate-800">
-              <div>Rank</div>
-              <div>Student</div>
-              <div>Company</div>
-              <div className="text-right">Points</div>
+              </form>
             </div>
 
-            <ul className="divide-y divide-slate-800">
-              {entries?.length ? (
-                entries.map((entry) => (
-                  <li
-                    key={entry.userId || entry._id}
-                    onClick={entry.onClick}
-                    className={classNames('px-2 md:px-4 py-3 cursor-pointer transition-colors', 'hover:bg-slate-900/70')}
-                  >
-                    <div
-                      className={classNames(
-                        'grid grid-cols-[50px_minmax(0,2.4fr)_minmax(0,1.4fr)_minmax(0,1.1fr)] md:grid-cols-[60px_minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1.2fr)] gap-2 items-center rounded-xl border px-2.5 md:px-3 py-2.5 md:py-3',
-                        rankStyle(entry.rank)
-                      )}
+            <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700">
+              {listLoading ? (
+                Array.from({ length: 5 }).map((_, idx) => (
+                  <div key={idx} className="px-6 py-5 animate-pulse">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+                    <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded w-1/2 mt-3" />
+                  </div>
+                ))
+              ) : students?.length ? (
+                students.map((student) => {
+                  const isActive =
+                    selectedStudent?.studentId === student.studentId;
+                  return (
+                    <button
+                      key={student.studentId}
+                      type="button"
+                      onClick={() => onSelectStudent?.(student)}
+                      className={`w-full text-left px-6 py-4 flex items-start gap-4 transition ${
+                        isActive
+                          ? 'bg-primary-50 dark:bg-primary-500/10'
+                          : 'hover:bg-gray-50 dark:hover:bg-gray-700/40'
+                      }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-base font-semibold text-slate-100">#{entry.rank}</span>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={
-                            entry.avatarUrl ||
-                            `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                              entry.name
-                            )}&background=020617&color=e5e7eb`
-                          }
-                          alt={entry.name}
-                          className="h-9 w-9 rounded-xl border border-slate-800 object-cover"
-                        />
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-slate-50">{entry.name}</span>
-                          {entry.username && (
-                            <span className="text-xs text-slate-400">@{entry.username}</span>
+                      <div className="flex-shrink-0">
+                        <div className="h-12 w-12 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-600 dark:text-gray-200 overflow-hidden">
+                          {student.avatarUrl ? (
+                            <img
+                              src={
+                                student.avatarUrl.startsWith('http')
+                                  ? student.avatarUrl
+                                  : `${process.env.REACT_APP_API_URL?.replace('/api', '') || ''}/${student.avatarUrl}`
+                              }
+                              alt={student.fullName}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            (student.fullName || 'NA')
+                              .split(' ')
+                              .map((part) => part[0])
+                              .join('')
+                              .slice(0, 2)
                           )}
                         </div>
                       </div>
-
-                      <div className="hidden sm:flex flex-col">
-                        <span className="text-xs text-slate-300">{entry.company || '—'}</span>
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {student.fullName || 'Unnamed Student'}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {student.department || 'Department N/A'} ·{' '}
+                          {student.rollNumber || 'Roll N/A'}
+                        </p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <span className="inline-flex items-center text-xs font-medium px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                            Stage: {student.placementStage}
+                          </span>
+                          <span className="inline-flex items-center text-xs font-medium px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200">
+                            Profile {student.profileCompletion || 0}%
+                          </span>
+                        </div>
                       </div>
-
-                      <div className="flex items-center justify-end">
-                        <span className="text-sm font-semibold text-emerald-300">{entry.points}</span>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Total Points
+                        </p>
+                        <p className="text-base font-semibold text-primary-600 dark:text-primary-300">
+                          {student.points?.total ?? 0}
+                        </p>
                       </div>
-                    </div>
-                  </li>
-                ))
+                    </button>
+                  );
+                })
               ) : (
-                <li className="px-4 py-6 text-sm text-slate-400 text-center">
-                  No results for this period / search.
-                </li>
+                <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No students matched your search.
+                </div>
               )}
-            </ul>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between gap-3 text-xs text-slate-400">
-            <p>
-              Page <span className="font-semibold text-slate-100">{page}</span> of{' '}
-              <span className="font-semibold text-slate-100">{totalPages}</span>
-            </p>
-            <div className="inline-flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => onPageChange?.(Math.max(1, page - 1))}
-                disabled={page <= 1}
-                className="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-950/60 text-xs text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-900/80"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => onPageChange?.(Math.min(totalPages, page + 1))}
-                disabled={page >= totalPages}
-                className="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-950/60 text-xs text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-900/80"
-              >
-                Next
-              </button>
             </div>
-          </div>
-        </section>
+
+            <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between text-sm text-gray-600 dark:text-gray-300">
+              <p>
+                Page <span className="font-semibold">{page}</span> of{' '}
+                <span className="font-semibold">{totalPages}</span>
+              </p>
+              <div className="inline-flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onPageChange?.(Math.max(1, page - 1))}
+                  disabled={page <= 1}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onPageChange?.(Math.min(totalPages, page + 1))
+                  }
+                  disabled={page >= totalPages}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-sm p-6 space-y-6">
+            {profileLoading ? (
+              <div className="space-y-5 animate-pulse">
+                <div className="h-5 bg-gray-100 dark:bg-gray-700 rounded w-1/2" />
+                <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded" />
+                <div className="grid grid-cols-3 gap-4">
+                  {Array.from({ length: 3 }).map((_, idx) => (
+                    <div key={idx} className="h-24 bg-gray-100 dark:bg-gray-700 rounded-xl" />
+                  ))}
+                </div>
+              </div>
+            ) : profileData ? (
+              <>
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 rounded-2xl bg-gray-100 dark:bg-gray-700 overflow-hidden flex items-center justify-center text-lg font-semibold text-gray-600 dark:text-gray-200">
+                      {profileData.student.avatarUrl ? (
+                        <img
+                          src={
+                            profileData.student.avatarUrl.startsWith('http')
+                              ? profileData.student.avatarUrl
+                              : `${process.env.REACT_APP_API_URL?.replace('/api', '') || ''}/${profileData.student.avatarUrl}`
+                          }
+                          alt={profileData.student.fullName}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        (profileData.student.fullName || 'NA')
+                          .split(' ')
+                          .map((part) => part[0])
+                          .join('')
+                          .slice(0, 2)
+                      )}
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                        {profileData.student.fullName}
+                      </h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {profileData.student.department} ·{' '}
+                        {profileData.student.rollNumber || 'Roll N/A'}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {profileData.student.email}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {['today', 'month', 'year'].map((period) => (
+                      <div
+                        key={period}
+                        className="px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-600 text-xs font-medium text-gray-700 dark:text-gray-200"
+                      >
+                        {period.charAt(0).toUpperCase() + period.slice(1)} Rank:{' '}
+                        {profileData.leaderboard.rankings?.[period] || '—'}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {['today', 'month', 'year', 'total'].map((period) => (
+                    <div
+                      key={period}
+                      className="rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4"
+                    >
+                      <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {period === 'total'
+                          ? 'Total Points'
+                          : `${period.charAt(0).toUpperCase() + period.slice(1)} Points`}
+                      </p>
+                      <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2">
+                        {profileData.leaderboard.points?.[period] ?? 0}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Coding Platform Stats
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Last sync: {formatDate(progress.lastSynced)}
+                    </p>
+                  </div>
+                  {codingProfiles.length ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {codingProfiles.map((profile) => (
+                        <div
+                          key={profile.key}
+                          className="rounded-2xl border border-gray-100 dark:border-gray-700 p-5"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                {profile.platform}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {profile.username || 'Handle not provided'}
+                              </p>
+                            </div>
+                            {profile.profileUrl && (
+                              <a
+                                href={profile.profileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs font-medium text-primary-600 hover:underline"
+                              >
+                                View Profile
+                              </a>
+                            )}
+                          </div>
+                          <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-gray-500 dark:text-gray-400">
+                                Problems Solved
+                              </p>
+                              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                                {formatValue(profile.metrics.problemsSolved)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 dark:text-gray-400">
+                                Contest Rating
+                              </p>
+                              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                                {formatValue(profile.metrics.contestRating)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 dark:text-gray-400">
+                                Contests
+                              </p>
+                              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                                {formatValue(profile.metrics.contests)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 dark:text-gray-400">
+                                Weekly Solved
+                              </p>
+                              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                                {formatValue(profile.metrics.weeklySolved)}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                            Last synced: {formatDate(profile.metrics.lastSynced)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-gray-200 dark:border-gray-600 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                      No coding platform data has been synced for this student yet.
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    Progress Overview
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="rounded-xl border border-gray-100 dark:border-gray-700 p-4">
+                      <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        Problems Solved
+                      </p>
+                      <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2">
+                        {progress.totalProblemsSolved || 0}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        +{progress.weeklySolved || 0} this week · +
+                        {progress.monthlySolved || 0} this month
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 dark:border-gray-700 p-4">
+                      <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        Contests & Hackathons
+                      </p>
+                      <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2">
+                        {progress.totalContests || 0}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        Hackathons: {progress.hackathonCount || 0}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 dark:border-gray-700 p-4">
+                      <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        Portfolio
+                      </p>
+                      <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2">
+                        {progress.projectsCount || 0}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        Certifications: {progress.certificationCount || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="py-16 text-center text-sm text-gray-500 dark:text-gray-400">
+                Select a student to view their detailed progress.
+              </div>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );
 }
-
 

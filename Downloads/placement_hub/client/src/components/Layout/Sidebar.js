@@ -11,13 +11,15 @@ import {
   FaBell,
   FaHeadset,
   FaSignOutAlt,
-  FaCertificate
+  FaCertificate,
+  FaCode
 } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
 
 const studentMenuItems = [
   { path: '/student/dashboard', icon: FaHome, label: 'Dashboard' },
   { path: '/student/profile', icon: FaUser, label: 'Profile' },
+  { path: '/student/competitive-profile', icon: FaCode, label: 'Competitive Profile' },
   { path: '/student/academics', icon: FaGraduationCap, label: 'Academics' },
   { path: '/student/projects', icon: FaProjectDiagram, label: 'Projects & Internships' },
   { path: '/student/hackathons', icon: FaTrophy, label: 'Hackathons & Achievements' },

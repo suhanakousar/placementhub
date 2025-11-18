@@ -71,7 +71,7 @@ mongoose
     console.log('MongoDB Connected');
     scheduleLeaderboardJob();
   })
-  .catch(err => console.error('MongoDB connection error:', err));
+.catch(err => console.error('MongoDB connection error:', err));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));

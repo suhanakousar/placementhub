@@ -18,6 +18,7 @@ async function fetchLeetCode(username) {
       weeklySolved: data.weeklySolved ?? null,
       monthlySolved: data.monthlySolved ?? null,
       contestRating: data.contestRanking ?? data.contestRating ?? null,
+      highestRating: data.contestRanking ?? data.contestRating ?? null, // LeetCode API doesn't provide max rating separately
       contests: data.contestAttended ?? null,
       percentile: data.ranking ? 100 - data.ranking / 1000 : null,
       badges: data.badges?.map((b) => b.displayName) || [],
@@ -83,10 +84,26 @@ async function fetchCodeforces(username) {
 
     const profile = data.result[0];
 
+    // Fetch contest participation count separately
+    let contestCount = null;
+    try {
+      const contestData = await axios.get(
+        `https://codeforces.com/api/user.rating?handle=${encodeURIComponent(username)}`,
+        { timeout: 8000 }
+      );
+      if (contestData?.data?.status === 'OK') {
+        contestCount = contestData.data.result?.length || 0;
+      }
+    } catch (err) {
+      // If contest data fetch fails, continue without it
+      console.log('Could not fetch Codeforces contest count');
+    }
+
     return {
       username,
       contestRating: profile.rating ?? null,
-      contests: profile.friendOfCount ?? null,
+      highestRating: profile.maxRating ?? profile.rating ?? null,
+      contests: contestCount,
       percentile: profile.maxRank ?? null,
       badges: [profile.rank, profile.maxRank].filter(Boolean),
       points: profile.contribution ?? null,
@@ -113,9 +130,19 @@ async function fetchCodeChef(username) {
       throw new Error(data?.message || 'CodeChef API error');
     }
 
+    // Calculate highest rating from contest ratings if available
+    let highestRating = data.rating ?? null;
+    if (data.contestRatings && data.contestRatings.length > 0) {
+      const ratings = data.contestRatings.map(cr => cr.rating).filter(Boolean);
+      if (ratings.length > 0) {
+        highestRating = Math.max(...ratings, data.rating || 0);
+      }
+    }
+
     return {
       username,
       contestRating: data.rating ?? null,
+      highestRating: highestRating,
       contests: data.contestRatings?.length ?? null,
       percentile: data.rankings?.global ?? null,
       badges: data.badges || [],

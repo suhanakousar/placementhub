@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const Student = require('../models/Student');
 const { protect, authorize } = require('../middleware/auth');
+const { fetchCodingStats } = require('../services/codingPlatformService');
 
 const router = express.Router();
 
@@ -521,6 +522,143 @@ router.get('/:id', authorize('admin'), async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
+// @route   GET /api/students/coding-stats
+// @desc    Get coding platform statistics for current student
+// @access  Private (Student)
+router.get('/coding-stats', authorize('student'), async (req, res) => {
+  try {
+    const student = await Student.findOne({ userId: req.user._id });
+    if (!student) {
+      return res.status(404).json({ message: 'Student profile not found' });
+    }
+
+    // Extract handles from personalInfo
+    const handles = {
+      leetcode: student.personalInfo?.leetcode ? extractUsername(student.personalInfo.leetcode, 'leetcode') : null,
+      hackerrank: student.personalInfo?.hackerrank ? extractUsername(student.personalInfo.hackerrank, 'hackerrank') : null,
+      codechef: student.personalInfo?.codechef ? extractUsername(student.personalInfo.codechef, 'codechef') : null,
+      codeforces: student.personalInfo?.codeforces ? extractUsername(student.personalInfo.codeforces, 'codeforces') : null,
+      geeksforgeeks: student.personalInfo?.geeksforgeeks ? extractUsername(student.personalInfo.geeksforgeeks, 'geeksforgeeks') : null
+    };
+
+    // Fetch coding stats
+    const codingStats = await fetchCodingStats(handles);
+
+    // Generate mock rating history for charts (in real app, this would come from historical data)
+    const generateRatingHistory = (platform, currentRating) => {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const history = [];
+      const now = new Date();
+      
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const baseRating = currentRating ? currentRating - (Math.random() * 200 + 100) : 1200;
+        const variation = Math.random() * 100 - 50;
+        history.push({
+          month: months[date.getMonth()],
+          rating: Math.max(0, Math.round(baseRating + variation + (11 - i) * 20))
+        });
+      }
+      return history;
+    };
+
+    // Add rating history to each platform
+    if (codingStats.codechef) {
+      codingStats.codechef.ratingHistory = generateRatingHistory('codechef', codingStats.codechef.contestRating);
+      codingStats.codechef.highestRating = codingStats.codechef.contestRating ? 
+        Math.max(...codingStats.codechef.ratingHistory.map(r => r.rating)) : null;
+      codingStats.codechef.ratingChange = codingStats.codechef.ratingHistory.length > 1 ? 
+        codingStats.codechef.ratingHistory[codingStats.codechef.ratingHistory.length - 1].rating - 
+        codingStats.codechef.ratingHistory[0].rating : 0;
+    }
+    if (codingStats.codeforces) {
+      codingStats.codeforces.ratingHistory = generateRatingHistory('codeforces', codingStats.codeforces.contestRating);
+      codingStats.codeforces.highestRating = codingStats.codeforces.contestRating || 
+        Math.max(...codingStats.codeforces.ratingHistory.map(r => r.rating));
+      codingStats.codeforces.ratingChange = codingStats.codeforces.ratingHistory.length > 1 ? 
+        codingStats.codeforces.ratingHistory[codingStats.codeforces.ratingHistory.length - 1].rating - 
+        codingStats.codeforces.ratingHistory[0].rating : 0;
+    }
+    if (codingStats.leetcode) {
+      codingStats.leetcode.ratingHistory = generateRatingHistory('leetcode', codingStats.leetcode.contestRating);
+      codingStats.leetcode.highestRating = codingStats.leetcode.contestRating || 
+        Math.max(...codingStats.leetcode.ratingHistory.map(r => r.rating));
+      codingStats.leetcode.ratingChange = codingStats.leetcode.ratingHistory.length > 1 ? 
+        codingStats.leetcode.ratingHistory[codingStats.leetcode.ratingHistory.length - 1].rating - 
+        codingStats.leetcode.ratingHistory[0].rating : 0;
+    }
+
+    // Calculate overall score and global rank (mock data for now)
+    const overallScore = calculateOverallScore(codingStats);
+    const globalRank = Math.floor(Math.random() * 5000) + 1;
+
+    // Generate global rankings history
+    const globalRankingsHistory = generateRatingHistory('global', overallScore);
+
+    // Generate score distribution
+    const scoreDistribution = [
+      { name: 'HackerRank', value: codingStats.hackerrank?.points || 0, color: '#16a34a' },
+      { name: 'InterviewBit', value: 0, color: '#3b82f6' },
+      { name: 'LeetCode', value: codingStats.leetcode?.points || codingStats.leetcode?.problemsSolved * 10 || 0, color: '#f89f1b' },
+      { name: 'Codeforces', value: codingStats.codeforces?.points || codingStats.codeforces?.contestRating || 0, color: '#3182ce' },
+      { name: 'CodeChef', value: codingStats.codechef?.points || codingStats.codechef?.contestRating || 0, color: '#8b5a2b' },
+      { name: 'GitHub', value: 0, color: '#6b7280' },
+      { name: 'SPOJ', value: 0, color: '#8b5cf6' }
+    ].filter(item => item.value > 0);
+
+    res.json({
+      codingStats,
+      overallScore,
+      globalRank,
+      globalRankingsHistory,
+      scoreDistribution
+    });
+  } catch (error) {
+    console.error('Error fetching coding stats:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Helper function to extract username from URL
+function extractUsername(url, platform) {
+  if (!url) return null;
+  
+  // Remove protocol and www
+  url = url.replace(/^https?:\/\/(www\.)?/, '');
+  
+  const patterns = {
+    leetcode: /leetcode\.com\/([^\/\?]+)/,
+    hackerrank: /hackerrank\.com\/([^\/\?]+)/,
+    codechef: /codechef\.com\/users\/([^\/\?]+)/,
+    codeforces: /codeforces\.com\/profile\/([^\/\?]+)/,
+    geeksforgeeks: /geeksforgeeks\.org\/user\/([^\/\?]+)/
+  };
+  
+  const match = url.match(patterns[platform]);
+  return match ? match[1] : url.split('/').pop().split('?')[0];
+}
+
+// Helper function to calculate overall score
+function calculateOverallScore(codingStats) {
+  let score = 0;
+  
+  if (codingStats.leetcode) {
+    score += (codingStats.leetcode.contestRating || 0) * 0.3;
+    score += (codingStats.leetcode.problemsSolved || 0) * 2;
+  }
+  if (codingStats.codeforces) {
+    score += (codingStats.codeforces.contestRating || 0) * 0.4;
+  }
+  if (codingStats.codechef) {
+    score += (codingStats.codechef.contestRating || 0) * 0.2;
+  }
+  if (codingStats.hackerrank) {
+    score += (codingStats.hackerrank.points || 0) * 0.1;
+  }
+  
+  return Math.round(score);
+}
 
 module.exports = router;
 

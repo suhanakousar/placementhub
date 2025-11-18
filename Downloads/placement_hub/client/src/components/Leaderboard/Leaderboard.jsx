@@ -1,4 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip
+} from 'recharts';
 
 function formatValue(value, fallback = '—') {
   if (value === null || value === undefined || value === '') {
@@ -44,6 +53,45 @@ export default function Leaderboard({
 
   const codingProfiles = profileData?.codingProfiles || [];
   const progress = profileData?.progress || {};
+  const leaderboardPoints = profileData?.leaderboard?.points || {};
+
+  const scoreDistribution = useMemo(() => {
+    const data = codingProfiles.map((profile) => ({
+      name: profile.platform,
+      value: profile.metrics.problemsSolved || profile.points || 0,
+      color: profile.accentColor || '#6366F1'
+    }));
+    if (!data.length) {
+      return [{ name: 'No data', value: 1, color: '#CBD5F5' }];
+    }
+    return data;
+  }, [codingProfiles]);
+
+  const globalRankingSeries = useMemo(() => {
+    const rankings = profileData?.leaderboard?.rankings || {};
+    const totalSolved = progress.totalProblemsSolved || 0;
+    const basePoints = [
+      Math.max(0, totalSolved - 60),
+      Math.max(0, totalSolved - 30),
+      totalSolved
+    ];
+    return basePoints.map((value, index) => ({
+      name: ['Opening', 'Mid Term', 'Now'][index],
+      solved: value,
+      ranking: Object.values(rankings)[index] || null
+    }));
+  }, [progress.totalProblemsSolved, profileData?.leaderboard?.rankings]);
+
+  const overallScore = useMemo(() => {
+    const codingScore = codingProfiles.reduce(
+      (sum, profile) =>
+        sum +
+        (profile.metrics.problemsSolved || 0) * 2 +
+        (profile.metrics.contestRating || 0),
+      0
+    );
+    return Math.round(codingScore || leaderboardPoints.total || 0);
+  }, [codingProfiles, leaderboardPoints.total]);
 
   function handleSearchSubmit(e) {
     e.preventDefault();
@@ -208,7 +256,7 @@ export default function Leaderboard({
             </div>
           </section>
 
-          <section className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-sm p-6 space-y-6">
+          <section className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-lg p-6 space-y-6">
             {profileLoading ? (
               <div className="space-y-5 animate-pulse">
                 <div className="h-5 bg-gray-100 dark:bg-gray-700 rounded w-1/2" />
@@ -221,80 +269,180 @@ export default function Leaderboard({
               </div>
             ) : profileData ? (
               <>
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 rounded-2xl bg-gray-100 dark:bg-gray-700 overflow-hidden flex items-center justify-center text-lg font-semibold text-gray-600 dark:text-gray-200">
-                      {profileData.student.avatarUrl ? (
-                        <img
-                          src={
-                            profileData.student.avatarUrl.startsWith('http')
-                              ? profileData.student.avatarUrl
-                              : `${process.env.REACT_APP_API_URL?.replace('/api', '') || ''}/${profileData.student.avatarUrl}`
-                          }
-                          alt={profileData.student.fullName}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        (profileData.student.fullName || 'NA')
-                          .split(' ')
-                          .map((part) => part[0])
-                          .join('')
-                          .slice(0, 2)
-                      )}
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                        {profileData.student.fullName}
-                      </h2>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {profileData.student.department} ·{' '}
-                        {profileData.student.rollNumber || 'Roll N/A'}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {profileData.student.email}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {['today', 'month', 'year'].map((period) => (
-                      <div
-                        key={period}
-                        className="px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-600 text-xs font-medium text-gray-700 dark:text-gray-200"
-                      >
-                        {period.charAt(0).toUpperCase() + period.slice(1)} Rank:{' '}
-                        {profileData.leaderboard.rankings?.[period] || '—'}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <div className="col-span-2 flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl p-5 shadow-lg">
+                    <div className="flex items-center gap-4">
+                      <div className="h-16 w-16 rounded-2xl bg-white/20 overflow-hidden flex items-center justify-center text-lg font-semibold">
+                        {profileData.student.avatarUrl ? (
+                          <img
+                            src={
+                              profileData.student.avatarUrl.startsWith('http')
+                                ? profileData.student.avatarUrl
+                                : `${process.env.REACT_APP_API_URL?.replace('/api', '') || ''}/${profileData.student.avatarUrl}`
+                            }
+                            alt={profileData.student.fullName}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          (profileData.student.fullName || 'NA')
+                            .split(' ')
+                            .map((part) => part[0])
+                            .join('')
+                            .slice(0, 2)
+                        )}
                       </div>
-                    ))}
+                      <div>
+                        <h2 className="text-2xl font-semibold">
+                          {profileData.student.fullName}
+                        </h2>
+                        <p className="text-sm text-white/70">
+                          {profileData.student.department} ·{' '}
+                          {profileData.student.rollNumber || 'Roll N/A'}
+                        </p>
+                        <p className="text-sm text-white/70">
+                          {profileData.student.email}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-right">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-white/70">
+                          Overall Score
+                        </p>
+                        <p className="text-3xl font-bold">{overallScore}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-white/70">
+                          Global Rank (Today)
+                        </p>
+                        <p className="text-3xl font-bold">
+                          {profileData.leaderboard.rankings?.today || '—'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow border border-gray-100 dark:border-gray-700">
+                    <p className="text-xs uppercase font-medium text-gray-500 dark:text-gray-400">
+                      Recent Education
+                    </p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
+                      {profileData.student.department || 'Department'} • Year{' '}
+                      {profileData.student.year || 'N/A'}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Roll: {profileData.student.rollNumber || '—'}
+                    </p>
+                    <hr className="my-4 border-dashed border-gray-200 dark:border-gray-700" />
+                    <div className="grid grid-cols-2 gap-3">
+                      {['today', 'month', 'year', 'total'].map((period) => (
+                        <div key={period}>
+                          <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            {period === 'total'
+                              ? 'Total Points'
+                              : `${period} pts`}
+                          </p>
+                          <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {profileData.leaderboard.points?.[period] ?? 0}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {['today', 'month', 'year', 'total'].map((period) => (
-                    <div
-                      key={period}
-                      className="rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4"
-                    >
-                      <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        {period === 'total'
-                          ? 'Total Points'
-                          : `${period.charAt(0).toUpperCase() + period.slice(1)} Points`}
-                      </p>
-                      <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2">
-                        {profileData.leaderboard.points?.[period] ?? 0}
-                      </p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="rounded-2xl border border-gray-100 dark:border-gray-700 p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Global Rankings
+                      </h3>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        Based on problems solved
+                      </span>
                     </div>
-                  ))}
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={globalRankingSeries}>
+                          <defs>
+                            <linearGradient id="colorRank" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#6366F1" stopOpacity={0.8} />
+                              <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <Tooltip
+                            contentStyle={{
+                              background: '#111827',
+                              border: 'none',
+                              borderRadius: '0.5rem',
+                              color: '#fff'
+                            }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="solved"
+                            stroke="#6366F1"
+                            strokeWidth={2}
+                            fillOpacity={1}
+                            fill="url(#colorRank)"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-gray-100 dark:border-gray-700 p-5 flex flex-col md:flex-row items-center gap-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Score Distribution
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Weighted by problems solved per platform
+                      </p>
+                      <div className="space-y-3">
+                        {scoreDistribution.map((entry) => (
+                          <div key={entry.name} className="flex items-center gap-3">
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: entry.color }}
+                            />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                {entry.name}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {entry.value} pts
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="w-44 h-44">
+                      <ResponsiveContainer>
+                        <PieChart>
+                          <Pie
+                            data={scoreDistribution}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={40}
+                            outerRadius={80}
+                            stroke="none"
+                          >
+                            {scoreDistribution.map((entry) => (
+                              <Cell key={entry.name} fill={entry.color} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      Coding Platform Stats
-                    </h3>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Coding Platform Stats
+                  </h3>
                   <div className="flex flex-col md:flex-row md:items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                    <p className="text-gray-500 dark:text-gray-400">
-                      Last sync: {formatDate(progress.lastSynced)}
-                    </p>
+                    <p>Last sync: {formatDate(progress.lastSynced)}</p>
                     <button
                       type="button"
                       onClick={onSyncCodingStats}
@@ -304,15 +452,23 @@ export default function Leaderboard({
                       {syncing ? 'Syncing…' : 'Sync Latest Stats'}
                     </button>
                   </div>
-                  </div>
-                  {codingProfiles.length ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {codingProfiles.map((profile) => (
+                </div>
+
+                {codingProfiles.length ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {codingProfiles.map((profile) => {
+                      const metrics = profile.metrics;
+                      const sparkline = [
+                        { value: Math.max(0, (metrics.problemsSolved || 0) - 60) },
+                        { value: Math.max(0, (metrics.problemsSolved || 0) - 30) },
+                        { value: metrics.problemsSolved || 0 }
+                      ];
+                      return (
                         <div
                           key={profile.key}
-                          className="rounded-2xl border border-gray-100 dark:border-gray-700 p-5"
+                          className="rounded-2xl border border-gray-100 dark:border-gray-700 p-5 bg-gray-50 dark:bg-gray-900"
                         >
-                          <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-center justify-between gap-4">
                             <div>
                               <p className="text-sm font-semibold text-gray-900 dark:text-white">
                                 {profile.platform}
@@ -326,63 +482,68 @@ export default function Leaderboard({
                                 href={profile.profileUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="text-xs font-medium text-primary-600 hover:underline"
+                                className="text-xs font-semibold text-blue-600 hover:underline"
                               >
                                 View Profile
                               </a>
                             )}
                           </div>
-                        {profile.error && (
-                          <p className="mt-2 text-xs text-red-500">
-                            {profile.error}
-                          </p>
-                        )}
-                          <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                          {profile.error && (
+                            <p className="mt-2 text-xs text-red-500">
+                              {profile.error}
+                            </p>
+                          )}
+                          <div className="grid grid-cols-2 gap-4 mt-4 text-sm text-gray-500 dark:text-gray-400">
                             <div>
-                              <p className="text-gray-500 dark:text-gray-400">
-                                Problems Solved
-                              </p>
-                              <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                {formatValue(profile.metrics.problemsSolved)}
+                              <p className="uppercase text-xs">Current Rating</p>
+                              <p className="text-xl font-semibold text-gray-900 dark:text-white">
+                                {formatValue(metrics.contestRating)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-gray-500 dark:text-gray-400">
-                                Contest Rating
-                              </p>
-                              <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                {formatValue(profile.metrics.contestRating)}
+                              <p className="uppercase text-xs">Total Contests</p>
+                              <p className="text-xl font-semibold text-gray-900 dark:text-white">
+                                {formatValue(metrics.contests)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-gray-500 dark:text-gray-400">
-                                Contests
-                              </p>
-                              <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                {formatValue(profile.metrics.contests)}
+                              <p className="uppercase text-xs">Problems Solved</p>
+                              <p className="text-xl font-semibold text-gray-900 dark:text-white">
+                                {formatValue(metrics.problemsSolved)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-gray-500 dark:text-gray-400">
-                                Weekly Solved
-                              </p>
-                              <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                {formatValue(profile.metrics.weeklySolved)}
+                              <p className="uppercase text-xs">Weekly Change</p>
+                              <p className="text-xl font-semibold text-gray-900 dark:text-white">
+                                {formatValue(metrics.weeklySolved)}
                               </p>
                             </div>
                           </div>
-                          <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                            Last synced: {formatDate(profile.metrics.lastSynced)}
+                          <div className="h-16 mt-3">
+                            <ResponsiveContainer>
+                              <AreaChart data={sparkline}>
+                                <Area
+                                  type="monotone"
+                                  dataKey="value"
+                                  stroke={profile.accentColor || '#6366F1'}
+                                  fill={profile.accentColor || '#6366F1'}
+                                  fillOpacity={0.15}
+                                />
+                              </AreaChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            Last synced: {formatDate(metrics.lastSynced)}
                           </p>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-gray-200 dark:border-gray-600 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                      No coding platform data has been synced for this student yet.
-                    </div>
-                  )}
-                </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-gray-200 dark:border-gray-600 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                    No coding platform data has been synced for this student yet.
+                  </div>
+                )}
 
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">

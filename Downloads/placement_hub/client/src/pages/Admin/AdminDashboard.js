@@ -11,6 +11,7 @@ import Verification from './Verification';
 import Posts from './Posts';
 import Notifications from './Notifications';
 import api from '../../utils/api';
+import LeaderboardPage from '../LeaderboardPage';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -68,6 +69,7 @@ const AdminDashboard = () => {
           <Route path="verification" element={<Verification />} />
           <Route path="posts" element={<Posts />} />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="leaderboard" element={<LeaderboardPage />} />
         </Routes>
       </main>
     </div>

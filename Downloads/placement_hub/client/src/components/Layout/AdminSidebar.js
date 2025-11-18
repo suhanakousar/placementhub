@@ -8,7 +8,8 @@ import {
   FaCheckCircle,
   FaBullhorn,
   FaBell,
-  FaSignOutAlt
+  FaSignOutAlt,
+  FaTrophy
 } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -19,7 +20,8 @@ const adminMenuItems = [
   { path: '/admin/drives', icon: FaBriefcase, label: 'Placement Drives' },
   { path: '/admin/reports', icon: FaChartBar, label: 'Reports & Analytics' },
   { path: '/admin/verification', icon: FaCheckCircle, label: 'Verification Center' },
-  { path: '/admin/notifications', icon: FaBell, label: 'Notifications' }
+  { path: '/admin/notifications', icon: FaBell, label: 'Notifications' },
+  { path: '/admin/leaderboard', icon: FaTrophy, label: 'Leaderboard' }
 ];
 
 const AdminSidebar = ({ isOpen, onClose }) => {

@@ -15,7 +15,6 @@ import ResetPassword from './pages/ResetPassword';
 import StudentDashboard from './pages/Student/StudentDashboard';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import PrivateRoute from './components/PrivateRoute';
-import LeaderboardPage from './pages/LeaderboardPage';
 
 function App() {
   return (
@@ -32,7 +31,6 @@ function App() {
               {/* <Route path="/admin-register" element={<AdminRegister />} /> */}
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/leaderboard" element={<LeaderboardPage />} />
               <Route
                 path="/student/*"
                 element={

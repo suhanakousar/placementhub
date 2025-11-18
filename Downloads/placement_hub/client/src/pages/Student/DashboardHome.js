@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import api from '../../utils/api';
 import { getDepartmentName } from '../../utils/departmentNames';
+import LeaderboardTable from '../../components/Leaderboard/LeaderboardTable';
 
 const DashboardHome = ({ studentData }) => {
   const getProfilePhotoUrl = () => {
@@ -529,6 +530,11 @@ const DashboardHome = ({ studentData }) => {
             Upload certificates, resumes, or achievement documents
           </p>
         </div>
+      </div>
+
+      {/* Leaderboard Table */}
+      <div className="mt-6">
+        <LeaderboardTable />
       </div>
     </div>
   );

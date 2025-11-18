@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const { scheduleLeaderboardJob } = require('./jobs/recalculateLeaderboard');
 
 dotenv.config();
 
@@ -64,9 +65,13 @@ app.use((req, res, next) => {
 });
 
 // Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/placement_hub')
-.then(() => console.log('MongoDB Connected'))
-.catch(err => console.error('MongoDB connection error:', err));
+mongoose
+  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/placement_hub')
+  .then(() => {
+    console.log('MongoDB Connected');
+    scheduleLeaderboardJob();
+  })
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -77,6 +82,8 @@ app.use('/api/drives', require('./routes/drives'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/support', require('./routes/support'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/leaderboard', require('./routes/leaderboard'));
+app.use('/api/users', require('./routes/leaderboardUsers'));
 
 // Health check
 app.get('/api/health', (req, res) => {

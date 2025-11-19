@@ -1,8 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { FaArrowUp, FaArrowDown, FaUser } from 'react-icons/fa';
+import React, { useState, useEffect, useMemo } from 'react';
+import { FaArrowUp, FaArrowDown } from 'react-icons/fa';
 import api from '../../utils/api';
 
-const LeaderboardTable = () => {
+const LeaderboardTable = ({
+  hideHeader = false,
+  title = 'Registered Students Leaderboard',
+  subtitle = 'Click on any student to view their competitive profile'
+}) => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,13 +28,19 @@ const LeaderboardTable = () => {
   const getInitials = (name) => {
     if (!name) return 'U';
     const parts = name.split(' ');
-    return parts.map(p => p[0]).join('').toUpperCase().slice(0, 2);
+    return parts
+      .map((p) => p[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   const getAvatarUrl = (avatarUrl) => {
     if (!avatarUrl) return null;
     if (avatarUrl.startsWith('http')) return avatarUrl;
-    const baseUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://placementhub-2.onrender.com';
+    const baseUrl =
+      process.env.REACT_APP_API_URL?.replace('/api', '') ||
+      'https://placementhub-2.onrender.com';
     return `${baseUrl}/${avatarUrl}`;
   };
 
@@ -39,13 +49,15 @@ const LeaderboardTable = () => {
     window.open(url, '_blank');
   };
 
+  const placeholders = useMemo(() => Array.from({ length: 10 }), []);
+
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-gray-200 rounded w-1/3"></div>
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-100 rounded"></div>
+          <div className="h-4 bg-gray-200 rounded w-32" />
+          {placeholders.map((_, idx) => (
+            <div key={idx} className="h-10 bg-gray-100 rounded" />
           ))}
         </div>
       </div>
@@ -53,57 +65,71 @@ const LeaderboardTable = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-xl font-bold text-gray-900">Registered Students Leaderboard</h2>
-        <p className="text-sm text-gray-600 mt-1">Click on any student to view their competitive profile</p>
-      </div>
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-md border border-yellow-200/80 overflow-hidden">
+      {!hideHeader && (
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {subtitle}
+            </p>
+          )}
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-50">
+          <thead className="bg-yellow-50/60 dark:bg-yellow-500/5">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-yellow-200/70">
                 Rank
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-yellow-200/70">
                 Username
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-yellow-200/70">
                 Overall Score
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
             {students.length === 0 ? (
               <tr>
-                <td colSpan="3" className="px-6 py-8 text-center text-gray-500">
+                <td
+                  colSpan="3"
+                  className="px-6 py-8 text-center text-gray-500 dark:text-gray-400"
+                >
                   No students found
                 </td>
               </tr>
             ) : (
-              students.map((student, index) => (
+              students.map((student) => (
                 <tr
                   key={student.studentId}
                   onClick={() => handleRowClick(student.studentId)}
-                  className="hover:bg-gray-50 cursor-pointer transition-colors"
+                  className="hover:bg-yellow-50/60 dark:hover:bg-yellow-500/10 cursor-pointer transition-colors"
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-gray-900">{student.rank}</span>
-                      {student.rankChange !== null && student.rankChange !== undefined && (
-                        <span className="ml-2">
-                          {student.rankChange > 0 ? (
-                            <FaArrowUp className="text-green-500 text-xs" />
-                          ) : student.rankChange < 0 ? (
-                            <FaArrowDown className="text-red-500 text-xs" />
-                          ) : null}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {student.rank}
+                      </span>
+                      {student.rankChange !== null &&
+                        student.rankChange !== undefined && (
+                          <span>
+                            {student.rankChange > 0 ? (
+                              <FaArrowUp className="text-green-500 text-xs" />
+                            ) : student.rankChange < 0 ? (
+                              <FaArrowDown className="text-red-500 text-xs" />
+                            ) : null}
+                          </span>
+                        )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden mr-3">
+                      <div className="flex-shrink-0 h-9 w-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden mr-3 ring-1 ring-gray-200 dark:ring-gray-700">
                         {getAvatarUrl(student.avatarUrl) ? (
                           <img
                             src={getAvatarUrl(student.avatarUrl)}
@@ -126,12 +152,14 @@ const LeaderboardTable = () => {
                           </div>
                         )}
                       </div>
-                      <div className="text-sm font-medium text-gray-900">{student.username}</div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {student.username}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <span className="text-sm font-semibold text-gray-900">
-                      {student.overallScore.toLocaleString()}
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {student.overallScore?.toLocaleString() || '—'}
                     </span>
                   </td>
                 </tr>

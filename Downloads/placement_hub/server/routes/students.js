@@ -797,8 +797,9 @@ router.get('/:studentId/coding-stats', async (req, res) => {
         codingStats.leetcode.ratingHistory[0].rating : 0;
     }
 
-    // Calculate overall score
+    // Calculate overall score and mock rank
     const overallScore = calculateOverallScore(codingStats);
+    const globalRank = Math.floor(Math.random() * 5000) + 1;
 
     // Generate global rankings history
     const globalRankingsHistory = generateRatingHistory('global', overallScore);
@@ -828,6 +829,7 @@ router.get('/:studentId/coding-stats', async (req, res) => {
       studentInfo,
       codingStats,
       overallScore,
+      globalRank,
       globalRankingsHistory,
       scoreDistribution
     });

@@ -36,7 +36,9 @@ R4jSRG4GTA4jBxoC7wtkQBy2Bv6eTQun3/lNpeiDOfRW3vUH0MyO/wiZpWLB5bwZ
 SrbJ9MVM0TZuNkb+iREbMoVEJYHVxhcmFzcyRK1f31/4Bpe98fRLeVeLhN4EBhHl
 RAaBfizkPIZWBuLM3E8vbHo=
 -----END PRIVATE KEY-----`;
-    const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'primary';
+    // For service accounts, use the service account email as the calendar ID
+    // Alternatively, you can share a calendar with the service account and use that calendar ID
+    const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || GOOGLE_CLIENT_EMAIL;
 
     const calendar = google.calendar('v3');
 
@@ -52,7 +54,8 @@ RAaBfizkPIZWBuLM3E8vbHo=
 
     // Authorize the client
     try {
-      await jwtClient.authorize();
+      const token = await jwtClient.authorize();
+      console.log('JWT Authorization successful');
     } catch (authError) {
       console.error('JWT Authorization error:', authError);
       throw new Error(`Authentication failed: ${authError.message || authError.toString()}`);
@@ -101,9 +104,10 @@ RAaBfizkPIZWBuLM3E8vbHo=
       
       // Provide more helpful error messages
       if (insertError.code === 403) {
-        throw new Error('Service account does not have permission to create calendar events. Please ensure the service account has Calendar API access and the calendar is shared with the service account email.');
+        const errorDetails = insertError.response?.data?.error?.message || insertError.message;
+        throw new Error(`Permission denied (403): ${errorDetails}. Solutions: 1) Enable Calendar API in Google Cloud Console, 2) Use service account email "${GOOGLE_CLIENT_EMAIL}" as calendar ID, 3) Share a calendar with "${GOOGLE_CLIENT_EMAIL}" and use that calendar ID.`);
       } else if (insertError.code === 404) {
-        throw new Error(`Calendar not found. Please check that the calendar ID "${GOOGLE_CALENDAR_ID}" exists and is accessible by the service account.`);
+        throw new Error(`Calendar not found (404): "${GOOGLE_CALENDAR_ID}". For service accounts, use the service account email as calendar ID, or share a calendar with "${GOOGLE_CLIENT_EMAIL}".`);
       } else if (insertError.message) {
         throw new Error(`Failed to create calendar event: ${insertError.message}`);
       } else {

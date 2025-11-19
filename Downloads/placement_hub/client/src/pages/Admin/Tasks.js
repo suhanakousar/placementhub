@@ -2,12 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { FaPlus, FaFilter, FaCheckCircle, FaClock, FaExclamationTriangle, FaEdit, FaTrash, FaUser, FaCalendar, FaTimes, FaTasks } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const Tasks = () => {
   const [tasks, setTasks] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    taskId: null,
+    taskTitle: ''
+  });
   const [filters, setFilters] = useState({
     studentId: '',
     status: '',
@@ -315,8 +321,8 @@ const Tasks = () => {
                 <td className="py-3 px-4">
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => handleDeleteTask(task._id)}
-                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                      onClick={() => openDeleteConfirm(task._id, task.title)}
+                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
                       title="Delete Task"
                     >
                       <FaTrash />
@@ -437,6 +443,17 @@ const Tasks = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, taskId: null, taskTitle: '' })}
+        onConfirm={handleDeleteTask}
+        title="Delete Task"
+        message={`Are you sure you want to delete the task "${deleteConfirm.taskTitle}"? This action cannot be undone.`}
+        itemName={deleteConfirm.taskTitle}
+        type="delete"
+      />
     </div>
   );
 };

@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import MeetingForm from './MeetingForm';
 import FeedbackForm from './FeedbackForm';
 import EmailSender from './EmailSender';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { formatTimeInTimezone } from '../../utils/meetingUtils';
 
 const Meetings = () => {
@@ -16,6 +17,12 @@ const Meetings = () => {
   const [showEmailSender, setShowEmailSender] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    type: null, // 'meeting' or 'request'
+    id: null,
+    name: ''
+  });
   const [filters, setFilters] = useState({
     studentId: '',
     status: '',
@@ -60,22 +67,21 @@ const Meetings = () => {
   };
 
   const handleDeclineRequest = async (requestId) => {
-    if (!window.confirm('Are you sure you want to decline this request?')) return;
-    
     try {
       await api.post(`/admin/meetings/requests/${requestId}/decline`, {
-        message: 'Request declined by admin'
+        reason: 'Request declined by admin'
       });
-      toast.success('Request declined');
+      toast.success('Request declined successfully');
       fetchRequests();
+      fetchMeetings();
     } catch (error) {
-      toast.error('Failed to decline request');
+      const errorMessage = error.response?.data?.message || 'Failed to decline request';
+      toast.error(errorMessage);
+      console.error('Decline error:', error.response?.data);
     }
   };
 
   const handleCancelMeeting = async (meetingId) => {
-    if (!window.confirm('Are you sure you want to cancel this meeting?')) return;
-    
     try {
       await api.post(`/admin/meetings/${meetingId}/cancel`, {
         reason: 'Cancelled by admin'
@@ -87,28 +93,35 @@ const Meetings = () => {
     }
   };
 
-  const handleDeleteMeeting = async (meetingId) => {
-    if (!window.confirm('Are you sure you want to delete this meeting? This action cannot be undone.')) return;
-    
+  const handleDeleteMeeting = async () => {
     try {
-      await api.delete(`/admin/meetings/${meetingId}`);
+      await api.delete(`/admin/meetings/${deleteConfirm.id}`);
       toast.success('Meeting deleted successfully');
+      setDeleteConfirm({ isOpen: false, type: null, id: null, name: '' });
       fetchMeetings();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to delete meeting');
     }
   };
 
-  const handleDeleteRequest = async (requestId) => {
-    if (!window.confirm('Are you sure you want to delete this meeting request? This action cannot be undone.')) return;
-    
+  const handleDeleteRequest = async () => {
     try {
-      await api.delete(`/admin/meetings/requests/${requestId}`);
+      await api.delete(`/admin/meetings/requests/${deleteConfirm.id}`);
       toast.success('Meeting request deleted successfully');
+      setDeleteConfirm({ isOpen: false, type: null, id: null, name: '' });
       fetchRequests();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to delete meeting request');
     }
+  };
+
+  const openDeleteConfirm = (type, id, name) => {
+    setDeleteConfirm({
+      isOpen: true,
+      type,
+      id,
+      name
+    });
   };
 
   const handleMarkComplete = async (meetingId) => {
@@ -289,8 +302,8 @@ const Meetings = () => {
                         Decline
                       </button>
                       <button
-                        onClick={() => handleDeleteRequest(request._id)}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                        onClick={() => openDeleteConfirm('request', request._id, request.title)}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
                         title="Delete Request"
                       >
                         <FaTrash />
@@ -444,8 +457,8 @@ const Meetings = () => {
                                 <FaTimesCircle />
                               </button>
                               <button
-                                onClick={() => handleDeleteMeeting(meeting._id)}
-                                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                                onClick={() => openDeleteConfirm('meeting', meeting._id, meeting.title)}
+                                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
                                 title="Delete Meeting"
                               >
                                 <FaTrash />
@@ -454,8 +467,8 @@ const Meetings = () => {
                           )}
                           {(meeting.status === 'cancelled') && (
                             <button
-                              onClick={() => handleDeleteMeeting(meeting._id)}
-                              className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                              onClick={() => openDeleteConfirm('meeting', meeting._id, meeting.title)}
+                              className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
                               title="Delete Meeting"
                             >
                               <FaTrash />

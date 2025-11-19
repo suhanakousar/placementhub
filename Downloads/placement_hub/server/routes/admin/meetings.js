@@ -430,13 +430,17 @@ router.post('/requests/:id/decline', async (req, res) => {
       return res.status(404).json({ message: 'Meeting request not found' });
     }
 
-    if (request.status !== 'pending') {
-      return res.status(400).json({ message: 'Request is not pending' });
+    // Allow declining if pending or expired (but not if already approved/declined/converted)
+    if (request.status === 'approved' || request.status === 'declined' || request.status === 'converted') {
+      return res.status(400).json({ 
+        message: `Cannot decline request. Current status: ${request.status}`,
+        currentStatus: request.status
+      });
     }
 
     request.status = 'declined';
     request.adminResponse = {
-      message: req.body.reason || 'Meeting request declined',
+      message: req.body.reason || req.body.message || 'Meeting request declined',
       respondedAt: new Date()
     };
     await request.save();

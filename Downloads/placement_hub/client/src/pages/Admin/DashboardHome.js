@@ -5,11 +5,14 @@ import api from '../../utils/api';
 import LeaderboardTable from '../../components/Leaderboard/LeaderboardTable';
 
 const DashboardHome = ({ stats: initialStats }) => {
-  const [stats, setStats] = useState(initialStats);
+  const [stats, setStats] = useState(initialStats || {});
+  const [loading, setLoading] = useState(!initialStats);
 
   useEffect(() => {
-    // Fetch stats immediately
-    fetchStats();
+    // Fetch stats immediately if not provided
+    if (!initialStats) {
+      fetchStats();
+    }
 
     // Set up polling every 30 seconds for real-time updates
     const interval = setInterval(fetchStats, 30000);
@@ -19,16 +22,36 @@ const DashboardHome = ({ stats: initialStats }) => {
 
   const fetchStats = async () => {
     try {
+      setLoading(true);
       const response = await api.get('/admin/statistics');
-      setStats(response.data);
+      setStats(response.data || {});
     } catch (error) {
       console.error('Error fetching stats:', error);
+      // Set default empty stats to prevent rendering issues
+      setStats({
+        totalStudents: 0,
+        verifiedResumes: 0,
+        unverifiedResumes: 0,
+        departmentWiseStudents: [],
+        topStudents: [],
+        upcomingDrives: []
+      });
+    } finally {
+      setLoading(false);
     }
   };
   const departmentData = stats?.departmentWiseStudents?.map(dept => ({
     name: dept.department,
     count: dept.count
   })) || [];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

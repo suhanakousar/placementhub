@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Header from '../../components/Layout/Header';
 import AdminSidebar from '../../components/Layout/AdminSidebar';
 import { useAuth } from '../../contexts/AuthContext';
@@ -26,9 +26,18 @@ const AdminDashboard = () => {
   const fetchStats = async () => {
     try {
       const response = await api.get('/admin/statistics');
-      setStats(response.data);
+      setStats(response.data || {});
     } catch (error) {
       console.error('Error fetching stats:', error);
+      // Set default empty stats so dashboard still renders
+      setStats({
+        totalStudents: 0,
+        verifiedResumes: 0,
+        unverifiedResumes: 0,
+        departmentWiseStudents: [],
+        topStudents: [],
+        upcomingDrives: []
+      });
     } finally {
       setLoading(false);
     }
@@ -42,13 +51,8 @@ const AdminDashboard = () => {
     setIsMenuOpen(false);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
+  // Don't block rendering on loading - let DashboardHome handle its own loading state
+  // This ensures the sidebar and layout are always visible
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -61,8 +65,8 @@ const AdminDashboard = () => {
       <AdminSidebar isOpen={isMenuOpen} onClose={closeMenu} />
       <main className="lg:ml-64 lg:pt-16 pt-16 p-4 md:p-6">
         <Routes>
-          <Route index element={<DashboardHome stats={stats} />} />
-          <Route path="dashboard" element={<DashboardHome stats={stats} />} />
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardHome stats={stats || {}} />} />
           <Route path="students" element={<Students />} />
           <Route path="drives" element={<Drives />} />
           <Route path="reports" element={<Reports />} />

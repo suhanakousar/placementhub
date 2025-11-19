@@ -109,12 +109,22 @@ router.get('/statistics', async (req, res) => {
       .limit(5)
       .select('personalInfo academicInfo placementStatus');
 
+    // Get upcoming placement drives
+    const upcomingDrives = await PlacementDrive.find({
+      applicationDeadline: { $gte: new Date() },
+      status: 'open'
+    })
+      .sort({ applicationDeadline: 1 })
+      .limit(5)
+      .select('companyName role package applicationDeadline status');
+
     res.json({
       totalStudents,
       verifiedResumes,
       unverifiedResumes,
       departmentWiseStudents,
-      topStudents
+      topStudents,
+      upcomingDrives: upcomingDrives || []
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

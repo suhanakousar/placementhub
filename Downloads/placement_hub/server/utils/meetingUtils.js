@@ -49,49 +49,64 @@ async function checkMeetingConflicts(startTime, endTime, mentorId, excludeMeetin
  * @returns {string} - ICS file content
  */
 function generateICSFile(meeting, student) {
-  const startDate = new Date(meeting.startTime);
-  const endDate = new Date(meeting.endTime);
+  try {
+    const startDate = new Date(meeting.startTime);
+    const endDate = new Date(meeting.endTime);
 
-  const event = {
-    start: [
-      startDate.getUTCFullYear(),
-      startDate.getUTCMonth() + 1,
-      startDate.getUTCDate(),
-      startDate.getUTCHours(),
-      startDate.getUTCMinutes()
-    ],
-    end: [
-      endDate.getUTCFullYear(),
-      endDate.getUTCMonth() + 1,
-      endDate.getUTCDate(),
-      endDate.getUTCHours(),
-      endDate.getUTCMinutes()
-    ],
-    title: meeting.title,
-    description: meeting.description || '',
-    location: meeting.meetingLink || 'Online',
-    url: meeting.meetingLink,
-    status: 'CONFIRMED',
-    busyStatus: 'BUSY',
-    organizer: { name: 'PlacementHub Mentor', email: 'mentor@placementhub.com' },
-    attendees: [
-      {
-        name: `${student.personalInfo.firstName} ${student.personalInfo.lastName}`,
-        email: student.userId?.email || '',
-        rsvp: true,
-        partstat: 'NEEDS-ACTION',
-        role: 'REQ-PARTICIPANT'
-      }
-    ]
-  };
+    // Validate dates
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      console.error('Invalid date in meeting:', meeting.startTime, meeting.endTime);
+      return null;
+    }
 
-  const { error, value } = createEvent(event);
-  if (error) {
-    console.error('Error generating ICS file:', error);
+    const event = {
+      start: [
+        startDate.getUTCFullYear(),
+        startDate.getUTCMonth() + 1,
+        startDate.getUTCDate(),
+        startDate.getUTCHours(),
+        startDate.getUTCMinutes()
+      ],
+      end: [
+        endDate.getUTCFullYear(),
+        endDate.getUTCMonth() + 1,
+        endDate.getUTCDate(),
+        endDate.getUTCHours(),
+        endDate.getUTCMinutes()
+      ],
+      title: meeting.title || 'Meeting',
+      description: meeting.description || '',
+      location: meeting.meetingLink || 'Online',
+      url: meeting.meetingLink,
+      status: 'CONFIRMED',
+      busyStatus: 'BUSY',
+      organizer: { name: 'PlacementHub Mentor', email: 'mentor@placementhub.com' }
+    };
+
+    // Add attendee if student info is available
+    if (student && student.personalInfo) {
+      event.attendees = [
+        {
+          name: `${student.personalInfo.firstName || ''} ${student.personalInfo.lastName || ''}`.trim() || 'Student',
+          email: student.userId?.email || '',
+          rsvp: true,
+          partstat: 'NEEDS-ACTION',
+          role: 'REQ-PARTICIPANT'
+        }
+      ];
+    }
+
+    const { error, value } = createEvent(event);
+    if (error) {
+      console.error('Error generating ICS file:', error);
+      return null;
+    }
+
+    return value;
+  } catch (error) {
+    console.error('Error in generateICSFile:', error);
     return null;
   }
-
-  return value;
 }
 
 /**

@@ -205,6 +205,23 @@ router.post('/', async (req, res) => {
       attachments
     } = req.body;
 
+    // Validate required fields
+    if (!studentId || !startTime || !endTime || !title || !topic) {
+      return res.status(400).json({ 
+        message: 'Missing required fields: studentId, startTime, endTime, title, and topic are required' 
+      });
+    }
+
+    // Validate dates
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format' });
+    }
+    if (end <= start) {
+      return res.status(400).json({ message: 'End time must be after start time' });
+    }
+
     // Validate student exists
     const student = await Student.findById(studentId);
     if (!student) {
@@ -222,8 +239,37 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Meeting time conflicts with existing meeting' });
     }
 
-    // Generate meeting link
-    const meetingLink = generateMeetingLink(meetingPlatform || 'google_meet', { _id: studentId });
+    // Generate meeting link (will be updated after meeting is created)
+    // For now, use a placeholder that will be replaced
+    let meetingLink = `https://meet.google.com/new?authuser=0`;
+    
+    // If custom platform, check if link is provided
+    if (meetingPlatform === 'custom' && req.body.meetingLink) {
+      meetingLink = req.body.meetingLink;
+    } else if (meetingPlatform !== 'in_person') {
+      // Generate a unique link based on student ID and timestamp
+      try {
+        const linkId = studentId.toString().substring(0, 12) + Date.now().toString().substring(10);
+        switch (meetingPlatform || 'google_meet') {
+          case 'zoom':
+            meetingLink = `https://zoom.us/j/${linkId}`;
+            break;
+          case 'google_meet':
+            meetingLink = `https://meet.google.com/${linkId}`;
+            break;
+          case 'microsoft_teams':
+            meetingLink = `https://teams.microsoft.com/l/meetup-join/${linkId}`;
+            break;
+          default:
+            meetingLink = `https://meet.google.com/new?authuser=0`;
+        }
+      } catch (linkError) {
+        console.error('Error generating meeting link:', linkError);
+        meetingLink = `https://meet.google.com/new?authuser=0`;
+      }
+    } else {
+      meetingLink = 'In Person Meeting';
+    }
 
     // Create meeting
     const meeting = await Meeting.create({
@@ -244,17 +290,27 @@ router.post('/', async (req, res) => {
       attachments: attachments || []
     });
 
-    // Generate ICS file
-    const icsContent = generateICSFile(meeting, student);
-    if (icsContent) {
-      meeting.icsFile = icsContent;
-      await meeting.save();
+    // Generate ICS file (non-blocking)
+    try {
+      const icsContent = generateICSFile(meeting, student);
+      if (icsContent) {
+        meeting.icsFile = icsContent;
+        await meeting.save();
+      }
+    } catch (icsError) {
+      console.error('Error generating ICS file:', icsError);
+      // Continue even if ICS generation fails
     }
 
-    // Create reminders
-    await createRemindersForMeeting(meeting, student);
+    // Create reminders (non-blocking)
+    try {
+      await createRemindersForMeeting(meeting, student);
+    } catch (reminderError) {
+      console.error('Error creating reminders:', reminderError);
+      // Continue even if reminder creation fails
+    }
 
-    // Send confirmation email to student
+    // Send confirmation email to student (non-blocking)
     try {
       const studentUser = await require('../../models/User').findById(student.userId);
       if (studentUser && studentUser.email) {
@@ -290,6 +346,7 @@ router.post('/', async (req, res) => {
       }
     } catch (emailError) {
       console.error('Error sending confirmation email:', emailError);
+      // Continue even if email fails
     }
 
     res.status(201).json({
@@ -298,7 +355,12 @@ router.post('/', async (req, res) => {
       meeting
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error creating meeting:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

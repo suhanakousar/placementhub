@@ -71,6 +71,12 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Prevent duplicate submissions
+    if (submitting) {
+      return;
+    }
+    
     setSubmitting(true);
 
     try {
@@ -85,18 +91,53 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
         });
         toast.success('Meeting request approved and meeting created');
       } else {
+        // Validate required fields
+        if (!formData.studentId || !formData.startTime || !formData.endTime || !formData.title) {
+          toast.error('Please fill in all required fields');
+          setSubmitting(false);
+          return;
+        }
+
+        // Validate dates
+        const start = new Date(formData.startTime);
+        const end = new Date(formData.endTime);
+        if (end <= start) {
+          toast.error('End time must be after start time');
+          setSubmitting(false);
+          return;
+        }
+
         // Create new meeting directly
         await api.post('/admin/meetings', {
-          ...formData,
-          startTime: new Date(formData.startTime).toISOString(),
-          endTime: new Date(formData.endTime).toISOString()
+          studentId: formData.studentId,
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
+          title: formData.title,
+          topic: formData.topic,
+          description: formData.description,
+          notes: formData.notes,
+          meetingPlatform: formData.meetingPlatform,
+          studentTimezone: formData.studentTimezone,
+          mentorTimezone: formData.mentorTimezone
         });
         toast.success('Meeting created successfully');
       }
       onSuccess();
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to create meeting');
+      console.error('Meeting creation error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create meeting';
+      toast.error(errorMessage);
+      
+      // If it's a conflict error, don't close the form
+      if (error.response?.status === 400 && errorMessage.includes('conflict')) {
+        // Keep form open
+      } else {
+        // Close form on other errors after showing message
+        setTimeout(() => {
+          onClose();
+        }, 2000);
+      }
     } finally {
       setSubmitting(false);
     }

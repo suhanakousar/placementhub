@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Leaderboard from '../components/Leaderboard/Leaderboard';
+import LeaderboardTable from '../components/Leaderboard/LeaderboardTable';
 import {
   fetchRegisteredStudents,
   fetchStudentProgress,
@@ -115,14 +116,32 @@ export default function LeaderboardPage() {
   }
 
   return (
-    <>
+    <div className="space-y-6">
       {error && (
-        <div className="fixed inset-x-0 top-0 z-50 flex justify-center">
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-red-100 text-red-700 border border-red-200 px-4 py-1.5 text-xs shadow">
+        <div className="sticky top-4 z-50 flex justify-center">
+          <div className="inline-flex items-center gap-2 rounded-full bg-red-100 text-red-700 border border-red-200 px-4 py-1.5 text-xs shadow">
             {error}
           </div>
         </div>
       )}
+
+      <section className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-sm p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Registered Students Leaderboard
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Click any student to open their public coding profile analytics in a new tab.
+            </p>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Need full analytics? Use the detail panel below after selecting a student.
+          </p>
+        </div>
+        <LeaderboardTable />
+      </section>
+
       <Leaderboard
         students={students}
         selectedStudent={selectedStudentSummary}
@@ -139,7 +158,7 @@ export default function LeaderboardPage() {
         onSyncCodingStats={handleSyncCodingStats}
         syncing={syncing}
       />
-    </>
+    </div>
   );
 }
 

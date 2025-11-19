@@ -951,4 +951,9 @@ router.delete('/students/:id', async (req, res) => {
   }
 });
 
+// Sub-routes
+router.use('/meetings', require('./admin/meetings'));
+router.use('/tasks', require('./admin/tasks'));
+router.use('/emails', require('./admin/emails'));
+
 module.exports = router;

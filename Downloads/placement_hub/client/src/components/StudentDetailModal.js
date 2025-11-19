@@ -135,9 +135,15 @@ const StudentDetailModal = ({ student, isOpen, onClose, onDownloadResume }) => {
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Year</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Passout Batch</p>
                 <p className="font-medium text-gray-800 dark:text-white">
                   {student.academicInfo?.year || 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Specialization</p>
+                <p className="font-medium text-gray-800 dark:text-white">
+                  {student.academicInfo?.specialization || 'N/A'}
                 </p>
               </div>
               <div>

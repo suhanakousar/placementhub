@@ -12,7 +12,8 @@ import {
   FaHeadset,
   FaSignOutAlt,
   FaCertificate,
-  FaCode
+  FaCode,
+  FaCalendarCheck
 } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -26,6 +27,7 @@ const studentMenuItems = [
   { path: '/student/certifications', icon: FaCertificate, label: 'Certifications' },
   { path: '/student/resumes', icon: FaFileAlt, label: 'Resume Manager' },
   { path: '/student/posts', icon: FaBullhorn, label: 'Posts & Drives' },
+  { path: '/student/meetings', icon: FaCalendarCheck, label: 'Meetings & Mentoring' },
   { path: '/student/notifications', icon: FaBell, label: 'Notifications' },
   { path: '/student/support', icon: FaHeadset, label: 'Support' }
 ];

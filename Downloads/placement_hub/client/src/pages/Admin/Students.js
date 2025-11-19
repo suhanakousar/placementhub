@@ -442,7 +442,8 @@ const Students = () => {
               <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Email</th>
               <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Roll Number</th>
               <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Department</th>
-              <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Year</th>
+              <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Passout Batch</th>
+              <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Specialization</th>
               <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">CGPA</th>
               <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Status</th>
               <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Resumes</th>
@@ -469,6 +470,9 @@ const Students = () => {
                 </td>
                 <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
                   {student.academicInfo?.year}
+                </td>
+                <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
+                  {student.academicInfo?.specialization || 'N/A'}
                 </td>
                 <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
                   {student.academicInfo?.cgpa || 'N/A'}

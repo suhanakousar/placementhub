@@ -31,14 +31,28 @@ const ConfirmDeleteModal = ({ isOpen, onClose, onConfirm, title, message, itemNa
 
           <div className="flex space-x-3">
             <button
-              onClick={onConfirm}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onConfirm) {
+                  onConfirm();
+                }
+              }}
               className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+              type="button"
             >
               {type === 'delete' ? 'Delete' : 'Confirm'}
             </button>
             <button
-              onClick={onClose}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onClose) {
+                  onClose();
+                }
+              }}
               className="flex-1 px-4 py-2 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-400 dark:hover:bg-gray-600 transition"
+              type="button"
             >
               Cancel
             </button>

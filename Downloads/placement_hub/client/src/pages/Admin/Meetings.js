@@ -127,6 +127,7 @@ const Meetings = () => {
   };
 
   const openDeleteConfirm = (type, id, name) => {
+    console.log('Opening delete confirm:', { type, id, name });
     setDeleteConfirm({
       isOpen: true,
       type,
@@ -328,9 +329,14 @@ const Meetings = () => {
                       )}
                       {(request.status === 'pending' || request.status === 'declined') && (
                         <button
-                          onClick={() => openDeleteConfirm('request', request._id, request.title)}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openDeleteConfirm('request', request._id, request.title);
+                          }}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition cursor-pointer"
                           title="Delete Request"
+                          type="button"
                         >
                           <FaTrash />
                         </button>
@@ -484,9 +490,14 @@ const Meetings = () => {
                                 <FaTimesCircle />
                               </button>
                               <button
-                                onClick={() => openDeleteConfirm('meeting', meeting._id, meeting.title)}
-                                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  openDeleteConfirm('meeting', meeting._id, meeting.title);
+                                }}
+                                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition cursor-pointer"
                                 title="Delete Meeting"
+                                type="button"
                               >
                                 <FaTrash />
                               </button>
@@ -494,9 +505,14 @@ const Meetings = () => {
                           )}
                           {(meeting.status === 'cancelled') && (
                             <button
-                              onClick={() => openDeleteConfirm('meeting', meeting._id, meeting.title)}
-                              className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openDeleteConfirm('meeting', meeting._id, meeting.title);
+                              }}
+                              className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition cursor-pointer"
                               title="Delete Meeting"
+                              type="button"
                             >
                               <FaTrash />
                             </button>
@@ -558,6 +574,20 @@ const Meetings = () => {
           onSuccess={() => {}}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, type: null, id: null, name: '' })}
+        onConfirm={deleteConfirm.type === 'meeting' ? handleDeleteMeeting : handleDeleteRequest}
+        title={deleteConfirm.type === 'meeting' ? 'Delete Meeting' : 'Delete Meeting Request'}
+        message={deleteConfirm.type === 'meeting' 
+          ? `Are you sure you want to delete the meeting "${deleteConfirm.name}"? This action cannot be undone.`
+          : `Are you sure you want to delete the meeting request "${deleteConfirm.name}"? This action cannot be undone.`
+        }
+        itemName={deleteConfirm.name}
+        type="delete"
+      />
     </div>
   );
 };

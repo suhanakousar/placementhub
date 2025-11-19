@@ -40,6 +40,16 @@ const studentSchema = new mongoose.Schema({
     codeforces: String,
     geeksforgeeks: String
   },
+  codingProfiles: [
+    {
+      url: { type: String, required: true },
+      platform: { type: String },
+      username: { type: String },
+      lastFetchedAt: Date,
+      lastFetchStatus: { type: String, enum: ['success', 'error'], default: undefined },
+      lastError: String
+    }
+  ],
   academicInfo: {
     rollNumber: { type: String, required: true, unique: true },
     department: { type: String, required: true },

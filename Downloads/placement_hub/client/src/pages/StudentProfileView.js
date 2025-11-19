@@ -21,14 +21,14 @@ import { getDepartmentName } from '../utils/departmentNames';
 const StudentProfileView = () => {
   const { studentId } = useParams();
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     async function fetchStudentProfile() {
       try {
-        const response = await api.get(`/students/${studentId}/coding-stats`);
-        setData(response.data);
+        const response = await api.get(`/leaderboard-public/${studentId}`);
+        setProfile(response.data);
       } catch (err) {
         console.error('Error fetching student profile:', err);
         setError('Failed to load student profile');
@@ -39,115 +39,101 @@ const StudentProfileView = () => {
     fetchStudentProfile();
   }, [studentId]);
 
+  const studentInfo = profile?.student || {};
+  const platforms = profile?.platforms || [];
+  const scoreDistribution = profile?.scoreDistribution || [];
+  const rankingSeries = profile?.globalRankingSeries || [];
+  const tieBreakers = profile?.tieBreakers || {};
+  const displayScore = profile?.displayScore || 0;
+  const globalRank = profile?.globalRank || '—';
+
   const getProfilePhotoUrl = () => {
-    if (data?.studentInfo?.profilePhoto) {
-      if (data.studentInfo.profilePhoto.startsWith('http')) {
-        return data.studentInfo.profilePhoto;
+    if (studentInfo?.avatarUrl) {
+      if (studentInfo.avatarUrl.startsWith('http')) {
+        return studentInfo.avatarUrl;
       }
       const baseUrl =
         process.env.REACT_APP_API_URL?.replace('/api', '') ||
         'https://placementhub-2.onrender.com';
-      return `${baseUrl}/${data.studentInfo.profilePhoto}`;
+      return `${baseUrl}/${studentInfo.avatarUrl}`;
     }
     return null;
   };
 
   const getInitials = () => {
-    const firstName = data?.studentInfo?.firstName || '';
-    const lastName = data?.studentInfo?.lastName || '';
+    const firstName = studentInfo?.firstName || '';
+    const lastName = studentInfo?.lastName || '';
     const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
     return initials || 'U';
   };
 
-  const codingStats = useMemo(() => data?.codingStats ?? {}, [data?.codingStats]);
+  const totalSolved = useMemo(
+    () =>
+      platforms.reduce(
+        (sum, platform) => sum + (platform.solvedProblems || 0),
+        0
+      ),
+    [platforms]
+  );
 
-  const aggregatedStats = useMemo(() => {
-    const totalSolved =
-      (codingStats.leetcode?.problemsSolved || 0) +
-      (codingStats.hackerrank?.problemsSolved || 0) +
-      (codingStats.geeksforgeeks?.problemsSolved || 0);
-    const weeklySolved = codingStats.leetcode?.weeklySolved || 0;
-    const monthlySolved = codingStats.leetcode?.monthlySolved || 0;
-    const totalContests =
-      (codingStats.leetcode?.contests || 0) +
-      (codingStats.codeforces?.contests || 0) +
-      (codingStats.codechef?.contests || 0) +
-      (codingStats.hackerrank?.contests || 0);
-    const dailyAverage =
-      weeklySolved > 0
-        ? Math.max(1, Math.round(weeklySolved / 7))
-        : Math.max(1, Math.round(totalSolved / 30));
+  const badgesCount = useMemo(
+    () => platforms.reduce((sum, platform) => sum + (platform.badges?.length || 0), 0),
+    [platforms]
+  );
 
-    return {
-      totalSolved,
-      weeklySolved,
-      monthlySolved,
-      totalContests,
-      dailyAverage
-    };
-  }, [codingStats]);
+  const dailyAverage = Math.max(1, Math.round(totalSolved / 30) || 1);
 
   const languageUsage = useMemo(() => {
-    const baseWeights = [
-      { label: 'Python', weight: 0.32 },
-      { label: 'C++', weight: 0.28 },
-      { label: 'Java', weight: 0.18 },
-      { label: 'JavaScript', weight: 0.14 },
-      { label: 'Go', weight: 0.08 }
-    ];
-
-    const seed = (studentId || 'seed').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const adjusted = baseWeights.map((entry, idx) => {
-      const variance = ((seed + idx * 13) % 8) / 100 - 0.04;
-      return { ...entry, weight: Math.max(0.05, entry.weight + variance) };
-    });
-
-    const totalWeight = adjusted.reduce((sum, entry) => sum + entry.weight, 0);
-    const totalSolved = Math.max(aggregatedStats.totalSolved, 1);
-
-    return adjusted.map((entry) => ({
-      label: entry.label,
-      value: Math.round((entry.weight / totalWeight) * totalSolved)
+    if (!platforms.length) {
+      return [
+        { label: 'Python', value: 12 },
+        { label: 'C++', value: 9 },
+        { label: 'Java', value: 7 },
+        { label: 'JavaScript', value: 5 },
+        { label: 'Go', value: 3 }
+      ];
+    }
+    const total = platforms.reduce(
+      (sum, platform) => sum + (platform.solvedProblems || 0),
+      0
+    );
+    return platforms.map((platform) => ({
+      label: platform.label,
+      value: platform.solvedProblems || Math.round(total / platforms.length) || 1
     }));
-  }, [aggregatedStats.totalSolved, studentId]);
+  }, [platforms]);
 
   const dailyProgress = useMemo(() => {
-    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const base = aggregatedStats.dailyAverage;
-
-    return labels.map((label, idx) => ({
-      label,
-      solved: Math.max(0, base + ((idx % 3) - 1) * 2)
+    if (!rankingSeries.length) {
+      const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return labels.map((label, idx) => ({
+        label,
+        solved: Math.max(1, (idx % 3) + 4)
+      }));
+    }
+    const subset = rankingSeries.slice(-7);
+    return subset.map((entry) => ({
+      label: entry.name,
+      solved: Math.max(1, Math.round((entry.solved || 0) / 120))
     }));
-  }, [aggregatedStats.dailyAverage]);
+  }, [rankingSeries]);
 
   const submissionHistory = useMemo(() => {
-    const history = data?.globalRankingsHistory || [];
-    if (!history.length) {
-      return [];
+    const source = rankingSeries.slice(-6);
+    if (!source.length) {
+      return [
+        { label: 'Week 1', submissions: 32, accepted: 24, efficiency: 75 },
+        { label: 'Week 2', submissions: 28, accepted: 22, efficiency: 78 },
+        { label: 'Week 3', submissions: 40, accepted: 31, efficiency: 77 }
+      ];
     }
-    return history.slice(-6).map((entry) => {
-      const submissions = Math.max(12, Math.round(entry.rating / 12));
-      const accepted = Math.max(4, Math.round(submissions * 0.72));
-      return {
-        label: entry.month,
-        submissions,
-        accepted,
-        efficiency: Math.min(100, Math.round((accepted / submissions) * 100))
-      };
-    });
-  }, [data?.globalRankingsHistory]);
-
-  const contestCards = useMemo(
-    () =>
-      [
-        { platform: 'LeetCode', color: '#f59e0b', data: codingStats.leetcode },
-        { platform: 'Codeforces', color: '#2563eb', data: codingStats.codeforces },
-        { platform: 'CodeChef', color: '#8b5a2b', data: codingStats.codechef },
-        { platform: 'HackerRank', color: '#16a34a', data: codingStats.hackerrank }
-      ].filter((entry) => entry.data && !entry.data.error),
-    [codingStats]
-  );
+    return source.map((entry) => ({
+      label: entry.name,
+      submissions: Math.max(10, Math.round(entry.solved / 40)),
+      accepted: Math.max(4, Math.round(entry.solved / 60)),
+      efficiency: Math.min(100, Math.round((entry.solved / 2000) * 100))
+    }));
+  }, [rankingSeries]);
 
   if (loading) {
     return (
@@ -157,7 +143,7 @@ const StudentProfileView = () => {
     );
   }
 
-  if (error || !data) {
+  if (error || !profile) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
         <div className="bg-white/5 border border-white/10 rounded-2xl p-10 text-center max-w-md w-full text-white">
@@ -168,8 +154,6 @@ const StudentProfileView = () => {
   }
 
   const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#6b7280', '#14b8a6'];
-  const displayedGlobalRank =
-    data.globalRank ?? Math.max(1, Math.round(5000 - (data.overallScore || 0) / 10));
 
   return (
     <div className="min-h-screen bg-slate-950 py-10 px-4 text-white">
@@ -199,25 +183,26 @@ const StudentProfileView = () => {
                   Live Coding Analytics
                 </p>
                 <h1 className="text-3xl font-bold mt-1">
-                  {data.studentInfo?.firstName} {data.studentInfo?.lastName}
+                  {studentInfo.firstName} {studentInfo.lastName}
                 </h1>
                 <p className="text-sm text-white/70 mt-1">
-                  {getDepartmentName(data.studentInfo?.department)} · Year {data.studentInfo?.year} ·{' '}
-                  {data.studentInfo?.rollNumber || 'Roll N/A'}
+                  {getDepartmentName(studentInfo.department)} · Year{' '}
+                  {studentInfo.year || 'N/A'}
                 </p>
+                <p className="text-xs text-white/50">{studentInfo.email}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4 text-right">
               <div>
                 <p className="text-xs uppercase tracking-widest text-white/60">Overall Score</p>
                 <p className="text-4xl font-bold text-amber-400">
-                  {data.overallScore?.toLocaleString() || 0}
+                  {displayScore.toLocaleString()}
                 </p>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-widest text-white/60">Global Rank</p>
                 <p className="text-4xl font-bold text-emerald-300">
-                  #{displayedGlobalRank}
+                  #{globalRank}
                 </p>
               </div>
             </div>
@@ -228,26 +213,23 @@ const StudentProfileView = () => {
           {[
             {
               label: 'Problems Solved',
-              value: aggregatedStats.totalSolved,
-              meta: `+${aggregatedStats.weeklySolved || 0} this week`
+              value: totalSolved,
+              meta: `~${dailyAverage * 7} this month`
             },
             {
               label: 'Weekly Avg',
-              value: `${aggregatedStats.dailyAverage} / day`,
-              meta: `${aggregatedStats.monthlySolved || 0} this month`
+              value: `${dailyAverage} / day`,
+              meta: `${dailyAverage * 7} this week`
             },
             {
               label: 'Total Contests',
-              value: aggregatedStats.totalContests,
-              meta: `${codingStats.codeforces?.contests || 0} CF · ${codingStats.codechef?.contests || 0} CC`
+              value: tieBreakers.totalContests || 0,
+              meta: 'Across all platforms'
             },
             {
               label: 'Badges Earned',
-              value:
-                (codingStats.leetcode?.badges?.length || 0) +
-                (codingStats.hackerrank?.badges?.length || 0) +
-                (codingStats.codechef?.badges?.length || 0),
-              meta: 'Across all platforms'
+              value: badgesCount,
+              meta: 'Across all profiles'
             }
           ].map((card) => (
             <div
@@ -272,7 +254,7 @@ const StudentProfileView = () => {
             </p>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.globalRankingsHistory || []}>
+                <AreaChart data={rankingSeries}>
                   <defs>
                     <linearGradient id="globalTrend" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#818cf8" stopOpacity={0.7} />
@@ -280,7 +262,7 @@ const StudentProfileView = () => {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="month" stroke="#94a3b8" />
+                  <XAxis dataKey="name" stroke="#94a3b8" />
                   <YAxis stroke="#94a3b8" />
                   <Tooltip
                     contentStyle={{
@@ -291,7 +273,7 @@ const StudentProfileView = () => {
                   />
                   <Area
                     type="monotone"
-                    dataKey="rating"
+                    dataKey="solved"
                     stroke="#6366f1"
                     strokeWidth={3}
                     fill="url(#globalTrend)"
@@ -313,13 +295,13 @@ const StudentProfileView = () => {
                 <ResponsiveContainer>
                   <PieChart>
                     <Pie
-                      data={data.scoreDistribution || []}
+                      data={scoreDistribution}
                       dataKey="value"
                       nameKey="name"
                       innerRadius={60}
                       outerRadius={100}
                     >
-                      {(data.scoreDistribution || []).map((entry, index) => (
+                      {scoreDistribution.map((entry, index) => (
                         <Cell
                           key={entry.name}
                           fill={entry.color || COLORS[index % COLORS.length]}
@@ -331,7 +313,7 @@ const StudentProfileView = () => {
                 </ResponsiveContainer>
               </div>
               <div className="w-full space-y-2 mt-4">
-                {(data.scoreDistribution || []).map((item, index) => (
+                {scoreDistribution.map((item, index) => (
                   <div key={item.name} className="flex items-center gap-3">
                     <span
                       className="h-2 w-2 rounded-full"
@@ -404,39 +386,42 @@ const StudentProfileView = () => {
           </div>
         </section>
 
-        {contestCards.length > 0 && (
+        {platforms.length > 0 && (
           <section className="bg-white rounded-2xl shadow-xl p-6 text-gray-900">
             <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <FaTrophy className="text-amber-500" />
               Contest Rankings
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {contestCards.map((card) => (
+              {platforms.map((platform) => (
                 <div
-                  key={card.platform}
+                  key={platform.platformId}
                   className="border border-gray-100 rounded-2xl p-4 space-y-3"
                 >
                   <div className="flex items-center justify-between">
-                    <p className="font-semibold text-gray-900">{card.platform}</p>
+                    <p className="font-semibold text-gray-900">{platform.label}</p>
                     <span
                       className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: card.color }}
+                      style={{ backgroundColor: platform.accentColor }}
                     />
                   </div>
                   <div>
                     <p className="text-xs uppercase text-gray-500">Current rating</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {card.data?.contestRating?.toLocaleString() || '—'}
+                      {platform.currentRating?.toLocaleString() || '—'}
                     </p>
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
                     <span>Highest</span>
-                    <span>{card.data?.highestRating?.toLocaleString() || '—'}</span>
+                    <span>{platform.highestRating?.toLocaleString() || '—'}</span>
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
                     <span>Contests</span>
-                    <span>{card.data?.contests ?? '—'}</span>
+                    <span>{platform.totalContests ?? '—'}</span>
                   </div>
+                  {platform.warning && (
+                    <p className="text-xs text-red-500">{platform.warning}</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -446,7 +431,7 @@ const StudentProfileView = () => {
         <section className="bg-white rounded-2xl shadow-xl p-6 text-gray-900">
           <h3 className="text-xl font-semibold mb-2">Submission History</h3>
           <p className="text-sm text-gray-500 mb-4">
-            Live feed combining LeetCode, Codeforces, and CodeChef activity
+            Live feed combining all tracked platforms
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -459,18 +444,16 @@ const StudentProfileView = () => {
                 </tr>
               </thead>
               <tbody>
-                {(submissionHistory.length ? submissionHistory : dailyProgress).map((row) => (
+                {submissionHistory.map((row) => (
                   <tr key={row.label} className="border-b border-gray-50">
                     <td className="py-3 text-gray-700">{row.label}</td>
                     <td className="py-3 font-semibold text-gray-900">
-                      {row.submissions || row.solved}
+                      {row.submissions}
                     </td>
-                    <td className="py-3 text-gray-700">
-                      {row.accepted || Math.round((row.solved || 0) * 0.7)}
-                    </td>
+                    <td className="py-3 text-gray-700">{row.accepted}</td>
                     <td className="py-3">
                       <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold">
-                        {(row.efficiency || Math.min(100, (row.solved || 0) * 10))}%
+                        {row.efficiency}%
                       </span>
                     </td>
                   </tr>

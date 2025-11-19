@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FaArrowUp, FaArrowDown } from 'react-icons/fa';
 import api from '../../utils/api';
 
 const LeaderboardTable = ({
@@ -16,7 +15,7 @@ const LeaderboardTable = ({
 
   const fetchLeaderboard = async () => {
     try {
-      const response = await api.get('/students/leaderboard');
+      const response = await api.get('/leaderboard-public');
       setStudents(response.data.students || []);
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
@@ -115,16 +114,6 @@ const LeaderboardTable = ({
                       <span className="text-sm font-semibold text-gray-900 dark:text-white">
                         {student.rank}
                       </span>
-                      {student.rankChange !== null &&
-                        student.rankChange !== undefined && (
-                          <span>
-                            {student.rankChange > 0 ? (
-                              <FaArrowUp className="text-green-500 text-xs" />
-                            ) : student.rankChange < 0 ? (
-                              <FaArrowDown className="text-red-500 text-xs" />
-                            ) : null}
-                          </span>
-                        )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

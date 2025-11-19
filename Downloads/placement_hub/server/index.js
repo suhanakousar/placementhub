@@ -84,6 +84,7 @@ app.use('/api/support', require('./routes/support'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/leaderboard', require('./routes/leaderboard'));
 app.use('/api/users', require('./routes/leaderboardUsers'));
+app.use('/api/leaderboard-public', require('./routes/leaderboardPublic'));
 
 // Health check
 app.get('/api/health', (req, res) => {

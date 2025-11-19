@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaUsers, FaCheckCircle, FaTimesCircle, FaTrophy, FaBriefcase } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import api from '../../utils/api';
+import LeaderboardTable from '../../components/Leaderboard/LeaderboardTable';
 
 const DashboardHome = ({ stats: initialStats }) => {
   const [stats, setStats] = useState(initialStats);
@@ -149,6 +150,18 @@ const DashboardHome = ({ stats: initialStats }) => {
             <p className="text-gray-500 text-center py-4">No upcoming drives</p>
           )}
         </div>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-gray-800 dark:text-white">
+            Registered Students Leaderboard
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Click a student to open their live analytics
+          </p>
+        </div>
+        <LeaderboardTable hideHeader />
       </div>
     </div>
   );

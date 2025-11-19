@@ -76,7 +76,18 @@ const Meetings = () => {
       fetchMeetings();
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Failed to decline request';
-      toast.error(errorMessage);
+      const currentStatus = error.response?.data?.currentStatus;
+      
+      if (currentStatus === 'declined') {
+        toast.error('This request has already been declined');
+        // Refresh to show updated status
+        fetchRequests();
+      } else if (currentStatus === 'approved') {
+        toast.error('This request has already been approved. Cancel the meeting instead.');
+        fetchRequests();
+      } else {
+        toast.error(errorMessage);
+      }
       console.error('Decline error:', error.response?.data);
     }
   };
@@ -289,25 +300,41 @@ const Meetings = () => {
                       )}
                     </div>
                     <div className="flex space-x-2 ml-4">
-                      <button
-                        onClick={() => handleApproveRequest(request._id)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleDeclineRequest(request._id)}
-                        className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
-                      >
-                        Decline
-                      </button>
-                      <button
-                        onClick={() => openDeleteConfirm('request', request._id, request.title)}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-                        title="Delete Request"
-                      >
-                        <FaTrash />
-                      </button>
+                      {request.status === 'pending' && (
+                        <>
+                          <button
+                            onClick={() => handleApproveRequest(request._id)}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleDeclineRequest(request._id)}
+                            className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition"
+                          >
+                            Decline
+                          </button>
+                        </>
+                      )}
+                      {request.status === 'declined' && (
+                        <span className="px-4 py-2 bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm">
+                          Declined
+                        </span>
+                      )}
+                      {request.status === 'approved' && (
+                        <span className="px-4 py-2 bg-green-300 dark:bg-green-700 text-green-700 dark:text-green-300 rounded-lg text-sm">
+                          Approved
+                        </span>
+                      )}
+                      {(request.status === 'pending' || request.status === 'declined') && (
+                        <button
+                          onClick={() => openDeleteConfirm('request', request._id, request.title)}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                          title="Delete Request"
+                        >
+                          <FaTrash />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

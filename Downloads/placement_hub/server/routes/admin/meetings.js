@@ -25,16 +25,20 @@ router.get('/', async (req, res) => {
   try {
     const admin = await Admin.findOne({ userId: req.user._id });
     if (!admin) {
-      return res.status(404).json({ message: 'Admin profile not found' });
+      return res.status(404).json({ 
+        message: 'Admin profile not found. Please ensure you have an admin profile.',
+        userId: req.user._id
+      });
     }
 
-    const { status, upcoming, past, studentId } = req.query;
+    const { status, upcoming, past, studentId, dateRange } = req.query;
     let query = { mentorId: admin._id };
 
     if (status) {
       query.status = status;
     } else if (upcoming === 'true') {
       query.startTime = { $gte: new Date() };
+      query.status = { $ne: 'cancelled' };
     } else if (past === 'true') {
       query.endTime = { $lt: new Date() };
     }
@@ -43,15 +47,55 @@ router.get('/', async (req, res) => {
       query.studentId = studentId;
     }
 
-    const meetings = await Meeting.find(query)
-      .populate('studentId', 'personalInfo academicInfo')
-      .populate('feedbackId')
-      .populate('requestId')
-      .sort({ startTime: 1 });
+    if (dateRange) {
+      const date = new Date(dateRange);
+      const startOfDay = new Date(date.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(date.setHours(23, 59, 59, 999));
+      query.startTime = { $gte: startOfDay, $lte: endOfDay };
+    }
 
-    res.json(meetings);
+    const meetings = await Meeting.find(query)
+      .populate({
+        path: 'studentId',
+        select: 'personalInfo academicInfo userId',
+        populate: {
+          path: 'userId',
+          select: 'email',
+          model: 'User'
+        }
+      })
+      .populate({
+        path: 'feedbackId',
+        select: 'rating tags strengths areasForImprovement detailedComments recommendations visibleToStudent',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'requestId',
+        select: 'title topic status',
+        strictPopulate: false
+      })
+      .sort({ startTime: 1 })
+      .lean();
+
+    // Transform the data to ensure proper structure
+    const transformedMeetings = meetings.map(meeting => ({
+      ...meeting,
+      studentId: meeting.studentId ? {
+        _id: meeting.studentId._id,
+        personalInfo: meeting.studentId.personalInfo || {},
+        academicInfo: meeting.studentId.academicInfo || {},
+        userId: meeting.studentId.userId || null
+      } : null
+    }));
+
+    res.json(transformedMeetings);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error fetching meetings:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -78,10 +122,9 @@ router.get('/dashboard', async (req, res) => {
 
     // Pending requests
     const pendingRequests = await MeetingRequest.find({
-      mentorId: admin._id,
       status: 'pending'
     })
-      .populate('studentId', 'personalInfo')
+      .populate('studentId', 'personalInfo academicInfo')
       .sort({ createdAt: -1 })
       .limit(10);
 
@@ -658,24 +701,37 @@ router.get('/requests', async (req, res) => {
   try {
     const admin = await Admin.findOne({ userId: req.user._id });
     if (!admin) {
-      return res.status(404).json({ message: 'Admin profile not found' });
+      return res.status(404).json({ message: 'Admin profile not found. Please ensure you have an admin profile.' });
     }
 
     const { status } = req.query;
-    let query = { mentorId: admin._id };
+    let query = {}; // All requests go to the single admin mentor
 
     if (status) {
       query.status = status;
     }
 
     const requests = await MeetingRequest.find(query)
-      .populate('studentId', 'personalInfo academicInfo')
+      .populate({
+        path: 'studentId',
+        select: 'personalInfo academicInfo',
+        populate: {
+          path: 'userId',
+          select: 'email'
+        }
+      })
       .populate('meetingId')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json(requests);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error fetching meeting requests:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

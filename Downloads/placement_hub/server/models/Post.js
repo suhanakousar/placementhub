@@ -58,7 +58,11 @@ const postSchema = new mongoose.Schema({
     default: Date.now
   },
   expiryDate: Date,
-  tags: [String]
+  tags: [String],
+  // Filter fields for targeted posts
+  targetDepartment: { type: String }, // If set, only students from this department can see
+  targetYear: { type: Number }, // If set, only students with this passout batch can see
+  targetSpecialization: { type: String } // If set, only students with this specialization can see
 });
 
 postSchema.pre('save', function(next) {

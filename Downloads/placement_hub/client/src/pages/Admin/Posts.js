@@ -15,7 +15,10 @@ const Posts = () => {
     requiresVerification: false,
     isActive: true,
     tags: '',
-    expiryDate: ''
+    expiryDate: '',
+    targetDepartment: '',
+    targetYear: '',
+    targetSpecialization: ''
   });
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +53,15 @@ const Posts = () => {
       formDataToSend.append('tags', formData.tags || '');
       if (formData.expiryDate) {
         formDataToSend.append('expiryDate', formData.expiryDate);
+      }
+      if (formData.targetDepartment) {
+        formDataToSend.append('targetDepartment', formData.targetDepartment);
+      }
+      if (formData.targetYear) {
+        formDataToSend.append('targetYear', formData.targetYear);
+      }
+      if (formData.targetSpecialization) {
+        formDataToSend.append('targetSpecialization', formData.targetSpecialization);
       }
 
       // Append files to FormData
@@ -106,7 +118,10 @@ const Posts = () => {
         requiresVerification: false,
         isActive: true,
         tags: '',
-        expiryDate: ''
+        expiryDate: '',
+        targetDepartment: '',
+        targetYear: '',
+        targetSpecialization: ''
       });
       setFiles([]);
       fetchPosts();
@@ -180,7 +195,10 @@ const Posts = () => {
       requiresVerification: post.requiresVerification,
       isActive: post.isActive,
       tags: post.tags?.join(', ') || '',
-      expiryDate: post.expiryDate ? new Date(post.expiryDate).toISOString().split('T')[0] : ''
+      expiryDate: post.expiryDate ? new Date(post.expiryDate).toISOString().split('T')[0] : '',
+      targetDepartment: post.targetDepartment || '',
+      targetYear: post.targetYear || '',
+      targetSpecialization: post.targetSpecialization || ''
     });
     setShowAddForm(true);
   };
@@ -210,7 +228,10 @@ const Posts = () => {
                 requiresVerification: false,
                 isActive: true,
                 tags: '',
-                expiryDate: ''
+                expiryDate: '',
+                targetDepartment: '',
+                targetYear: '',
+                targetSpecialization: ''
               });
               setFiles([]);
             }}
@@ -330,6 +351,107 @@ const Posts = () => {
                     onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-600 dark:text-white"
                   />
+                </div>
+              </div>
+              <div className="border-t pt-4 mt-4">
+                <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Target Audience (Optional - Leave empty to show to all students)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Target Department
+                    </label>
+                    <select
+                      value={formData.targetDepartment}
+                      onChange={(e) => setFormData({ ...formData, targetDepartment: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-600 dark:text-white"
+                    >
+                      <option value="">All Departments</option>
+                      <option value="CSE">Computer Science & Engineering</option>
+                      <option value="ECE">Electronics & Communication Engineering</option>
+                      <option value="EEE">Electrical & Electronics Engineering</option>
+                      <option value="ME">Mechanical Engineering</option>
+                      <option value="CE">Civil Engineering</option>
+                      <option value="IT">Information Technology</option>
+                      <option value="CSIT">Computer Science and Information Technology</option>
+                      <option value="AI">Artificial Intelligence & Data Science (AI & DS)</option>
+                      <option value="BT">Biotechnology</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Target Passout Batch
+                    </label>
+                    <select
+                      value={formData.targetYear}
+                      onChange={(e) => setFormData({ ...formData, targetYear: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-600 dark:text-white"
+                    >
+                      <option value="">All Batches</option>
+                      <option value="2026">2026</option>
+                      <option value="2027">2027</option>
+                      <option value="2028">2028</option>
+                      <option value="2029">2029</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Target Specialization
+                    </label>
+                    <select
+                      value={formData.targetSpecialization}
+                      onChange={(e) => setFormData({ ...formData, targetSpecialization: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-600 dark:text-white"
+                    >
+                      <option value="">All Specializations</option>
+                      <option value="AGRI-BIOTECHNOLOGY">AGRI-BIOTECHNOLOGY</option>
+                      <option value="AI AND AUTONOMOUS SYSTEMS">AI AND AUTONOMOUS SYSTEMS</option>
+                      <option value="AI FOR COMPUTATIONAL INTELLIGENCE">AI FOR COMPUTATIONAL INTELLIGENCE</option>
+                      <option value="AI-DRIVEN EDGE ARCHITECTURES AND APPLICATIONS">AI-DRIVEN EDGE ARCHITECTURES AND APPLICATIONS</option>
+                      <option value="AI-DRIVEN LANGUAGE TECHNOLOGIES">AI-DRIVEN LANGUAGE TECHNOLOGIES</option>
+                      <option value="AUTOMOTIVE ELECTRONICS AND AUTOSAR">AUTOMOTIVE ELECTRONICS AND AUTOSAR</option>
+                      <option value="AUTOMOTIVE ENERGY ENGINEERING">AUTOMOTIVE ENERGY ENGINEERING</option>
+                      <option value="BIOINFORMATICS">BIOINFORMATICS</option>
+                      <option value="DATA COMMUNICATIONS">DATA COMMUNICATIONS</option>
+                      <option value="E-MOBILITY ENGINEERING">E-MOBILITY ENGINEERING</option>
+                      <option value="ELECTRICAL MACHINES">ELECTRICAL MACHINES</option>
+                      <option value="ENGINEERING DESIGN">ENGINEERING DESIGN</option>
+                      <option value="STRUCTURAL ENGINEERING">STRUCTURAL ENGINEERING</option>
+                      <option value="GEOTECHNICAL AND TRANSPORTATION ENGINEERING">GEOTECHNICAL AND TRANSPORTATION ENGINEERING</option>
+                      <option value="GREEN ENERGY TECHNOLOGIES">GREEN ENERGY TECHNOLOGIES</option>
+                      <option value="INDUSTRIAL AUTOMATION">INDUSTRIAL AUTOMATION</option>
+                      <option value="SMART GRID TECHNOLOGIES">SMART GRID TECHNOLOGIES</option>
+                      <option value="HEALTHCARE DATA ANALYTICS">HEALTHCARE DATA ANALYTICS</option>
+                      <option value="INDUSTRIAL BIOTECHNOLOGY">INDUSTRIAL BIOTECHNOLOGY</option>
+                      <option value="GENERATIVE AI & MACHINE LEARNING">GENERATIVE AI & MACHINE LEARNING</option>
+                      <option value="IOT ANALYTICS">IOT ANALYTICS</option>
+                      <option value="MEDICAL BIOTECHNOLOGY">MEDICAL BIOTECHNOLOGY</option>
+                      <option value="ROBOTICS AND AUTOMATION">ROBOTICS AND AUTOMATION</option>
+                      <option value="SMART MANUFACTURING">SMART MANUFACTURING</option>
+                      <option value="VERY LARGE-SCALE INTEGRATION">VERY LARGE-SCALE INTEGRATION</option>
+                      <option value="WATER RESOURCE AND ENVIRONMENTAL ENGINEERING">WATER RESOURCE AND ENVIRONMENTAL ENGINEERING</option>
+                      <option value="CONSTRUCTION TECHNOLOGY AND MANAGEMENT">CONSTRUCTION TECHNOLOGY AND MANAGEMENT</option>
+                      <option value="NANOTECHNOLOGY & OPTOELECTRONICS">NANOTECHNOLOGY & OPTOELECTRONICS</option>
+                      <option value="CLOUD AND EDGE COMPUTING">CLOUD AND EDGE COMPUTING</option>
+                      <option value="CLOUD INFRASTRUCTURE DESIGN AND ENGINEERING">CLOUD INFRASTRUCTURE DESIGN AND ENGINEERING</option>
+                      <option value="CLOUD NATIVE SECURITY">CLOUD NATIVE SECURITY</option>
+                      <option value="CLOUD NATIVE SOFTWARE ENGINEERING">CLOUD NATIVE SOFTWARE ENGINEERING</option>
+                      <option value="CLOUD-BASED SCIENTIFIC COMPUTING">CLOUD-BASED SCIENTIFIC COMPUTING</option>
+                      <option value="DATA ENGINEERING FOR AI">DATA ENGINEERING FOR AI</option>
+                      <option value="DATA SCIENCE AND BIG DATA ANALYTICS">DATA SCIENCE AND BIG DATA ANALYTICS</option>
+                      <option value="DISTRIBUTED LEDGER ANALYTICS">DISTRIBUTED LEDGER ANALYTICS</option>
+                      <option value="SOCIAL AND DIGITAL MEDIA ANALYTICS">SOCIAL AND DIGITAL MEDIA ANALYTICS</option>
+                      <option value="AI SYSTEMS FOR VISUAL INTELLIGENCE">AI SYSTEMS FOR VISUAL INTELLIGENCE</option>
+                      <option value="5G - 6G WIRELESS TECHNOLOGIES">5G - 6G WIRELESS TECHNOLOGIES</option>
+                      <option value="CROSS PLATFORM DEVELOPMENT FRAMEWORKS">CROSS PLATFORM DEVELOPMENT FRAMEWORKS</option>
+                      <option value="GAME DEVELOPMENT AND UX DESIGN">GAME DEVELOPMENT AND UX DESIGN</option>
+                      <option value="SPATIAL COMPUTING AND IMMERSIVE TECHNOLOGIES">SPATIAL COMPUTING AND IMMERSIVE TECHNOLOGIES</option>
+                      <option value="BLOCKCHAIN ENGINEERING FOR WEB3">BLOCKCHAIN ENGINEERING FOR WEB3</option>
+                      <option value="CYBER PHYSICAL SYSTEMS AND IOT">CYBER PHYSICAL SYSTEMS AND IOT</option>
+                      <option value="CYBER SECURITY AND BLOCKCHAIN TECHNOLOGY">CYBER SECURITY AND BLOCKCHAIN TECHNOLOGY</option>
+                      <option value="HARDWARE-SOFTWARE CO-DESIGN FOR SECURITY">HARDWARE-SOFTWARE CO-DESIGN FOR SECURITY</option>
+                      <option value="SOFTWARE MODELLING AND DEVOPS">SOFTWARE MODELLING AND DEVOPS</option>
+                    </select>
+                  </div>
                 </div>
               </div>
               <div>

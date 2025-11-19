@@ -16,9 +16,56 @@ router.get('/', protect, authorize('student'), async (req, res) => {
     }
 
     const isVerified = student.placementStatus?.resumeVerified || false;
+    const studentDepartment = student.academicInfo?.department;
+    const studentYear = student.academicInfo?.year;
+    const studentSpecialization = student.academicInfo?.specialization;
 
     // Get posts that are active and either don't require verification or student is verified
     const now = new Date();
+    
+    // Build target audience filter
+    // A post is visible if:
+    // 1. It has no target filters (show to all), OR
+    // 2. All specified target filters match the student
+    const targetAudienceFilter = {
+      $or: [
+        // No target filters - show to all
+        {
+          $and: [
+            { $or: [{ targetDepartment: null }, { targetDepartment: '' }, { targetDepartment: { $exists: false } }] },
+            { $or: [{ targetYear: null }, { targetYear: { $exists: false } }] },
+            { $or: [{ targetSpecialization: null }, { targetSpecialization: '' }, { targetSpecialization: { $exists: false } }] }
+          ]
+        },
+        // Has target filters - must match all specified ones
+        {
+          $and: [
+            // If targetDepartment is set, student must match
+            {
+              $or: [
+                { $or: [{ targetDepartment: null }, { targetDepartment: '' }, { targetDepartment: { $exists: false } }] },
+                ...(studentDepartment ? [{ targetDepartment: studentDepartment }] : [])
+              ]
+            },
+            // If targetYear is set, student must match
+            {
+              $or: [
+                { $or: [{ targetYear: null }, { targetYear: { $exists: false } }] },
+                ...(studentYear ? [{ targetYear: studentYear }] : [])
+              ]
+            },
+            // If targetSpecialization is set, student must match
+            {
+              $or: [
+                { $or: [{ targetSpecialization: null }, { targetSpecialization: '' }, { targetSpecialization: { $exists: false } }] },
+                ...(studentSpecialization ? [{ targetSpecialization: studentSpecialization }] : [])
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
     let query = {
       isActive: true,
       $and: [
@@ -33,7 +80,8 @@ router.get('/', protect, authorize('student'), async (req, res) => {
             { expiryDate: null },
             { expiryDate: { $gte: now } }
           ]
-        }
+        },
+        targetAudienceFilter
       ]
     };
 

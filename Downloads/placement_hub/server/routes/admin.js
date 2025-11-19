@@ -518,6 +518,15 @@ router.post('/posts', async (req, res, next) => {
       if (expiryDate) {
         postData.expiryDate = new Date(expiryDate);
       }
+      if (req.body.targetDepartment) {
+        postData.targetDepartment = String(req.body.targetDepartment).trim();
+      }
+      if (req.body.targetYear) {
+        postData.targetYear = parseInt(req.body.targetYear);
+      }
+      if (req.body.targetSpecialization) {
+        postData.targetSpecialization = String(req.body.targetSpecialization).trim();
+      }
 
       // Prepare attachments array - MUST be an array of objects, not a string
       // CRITICAL: Ensure attachments is always an array of plain objects
@@ -832,6 +841,15 @@ router.put('/posts/:id', (req, res, next) => {
       if (!isNaN(date.getTime())) {
         post.expiryDate = date;
       }
+    }
+    if (req.body.targetDepartment !== undefined) {
+      post.targetDepartment = req.body.targetDepartment ? String(req.body.targetDepartment).trim() : undefined;
+    }
+    if (req.body.targetYear !== undefined) {
+      post.targetYear = req.body.targetYear ? parseInt(req.body.targetYear) : undefined;
+    }
+    if (req.body.targetSpecialization !== undefined) {
+      post.targetSpecialization = req.body.targetSpecialization ? String(req.body.targetSpecialization).trim() : undefined;
     }
 
     await post.save();

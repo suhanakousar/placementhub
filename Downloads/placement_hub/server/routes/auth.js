@@ -33,7 +33,8 @@ router.post('/register', [
   body('lastName').optional().isLength({ min: 1 }),
   body('rollNumber').optional().isLength({ min: 1 }),
   body('department').optional().isIn(['CSE', 'ECE', 'EEE', 'ME', 'CE', 'IT', 'CSIT', 'AI', 'BT']),
-  body('year').optional().isInt({ min: 1, max: 4 })
+  body('year').optional().isInt({ min: 2026, max: 2029 }),
+  body('specialization').optional().isString()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -41,7 +42,7 @@ router.post('/register', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { firebaseUid, email, password, role = 'student', firstName, lastName, rollNumber, department, year } = req.body;
+    const { firebaseUid, email, password, role = 'student', firstName, lastName, rollNumber, department, year, specialization } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -69,7 +70,8 @@ router.post('/register', [
         academicInfo: {
           rollNumber,
           department,
-          year
+          year,
+          specialization: specialization || undefined
         }
       });
     } else if (role === 'admin') {

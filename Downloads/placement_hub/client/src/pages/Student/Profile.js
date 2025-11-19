@@ -25,6 +25,7 @@ const Profile = ({ studentData, onUpdate }) => {
       rollNumber: studentData?.academicInfo?.rollNumber || '',
       department: studentData?.academicInfo?.department || '',
       year: studentData?.academicInfo?.year || '',
+      specialization: studentData?.academicInfo?.specialization || '',
       semester: studentData?.academicInfo?.semester || '',
       cgpa: studentData?.academicInfo?.cgpa || ''
     }
@@ -33,7 +34,7 @@ const Profile = ({ studentData, onUpdate }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (['rollNumber', 'department', 'year', 'semester', 'cgpa'].includes(name)) {
+    if (['rollNumber', 'department', 'year', 'specialization', 'semester', 'cgpa'].includes(name)) {
       setFormData({
         ...formData,
         academicInfo: {
@@ -292,7 +293,7 @@ const Profile = ({ studentData, onUpdate }) => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Year
+                Passout Batch
               </label>
               <select
                 name="year"
@@ -301,11 +302,71 @@ const Profile = ({ studentData, onUpdate }) => {
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 required
               >
-                <option value="">Select Year</option>
-                <option value="1">1st Year</option>
-                <option value="2">2nd Year</option>
-                <option value="3">3rd Year</option>
-                <option value="4">4th Year</option>
+                <option value="">Select Passout Batch</option>
+                <option value="2026">2026</option>
+                <option value="2027">2027</option>
+                <option value="2028">2028</option>
+                <option value="2029">2029</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Specialization
+              </label>
+              <select
+                name="specialization"
+                value={formData.academicInfo.specialization}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Select Specialization</option>
+                <option value="AGRI-BIOTECHNOLOGY">AGRI-BIOTECHNOLOGY</option>
+                <option value="AI AND AUTONOMOUS SYSTEMS">AI AND AUTONOMOUS SYSTEMS</option>
+                <option value="AI FOR COMPUTATIONAL INTELLIGENCE">AI FOR COMPUTATIONAL INTELLIGENCE</option>
+                <option value="AI-DRIVEN EDGE ARCHITECTURES AND APPLICATIONS">AI-DRIVEN EDGE ARCHITECTURES AND APPLICATIONS</option>
+                <option value="AI-DRIVEN LANGUAGE TECHNOLOGIES">AI-DRIVEN LANGUAGE TECHNOLOGIES</option>
+                <option value="AUTOMOTIVE ELECTRONICS AND AUTOSAR">AUTOMOTIVE ELECTRONICS AND AUTOSAR</option>
+                <option value="AUTOMOTIVE ENERGY ENGINEERING">AUTOMOTIVE ENERGY ENGINEERING</option>
+                <option value="BIOINFORMATICS">BIOINFORMATICS</option>
+                <option value="DATA COMMUNICATIONS">DATA COMMUNICATIONS</option>
+                <option value="E-MOBILITY ENGINEERING">E-MOBILITY ENGINEERING</option>
+                <option value="ELECTRICAL MACHINES">ELECTRICAL MACHINES</option>
+                <option value="ENGINEERING DESIGN">ENGINEERING DESIGN</option>
+                <option value="STRUCTURAL ENGINEERING">STRUCTURAL ENGINEERING</option>
+                <option value="GEOTECHNICAL AND TRANSPORTATION ENGINEERING">GEOTECHNICAL AND TRANSPORTATION ENGINEERING</option>
+                <option value="GREEN ENERGY TECHNOLOGIES">GREEN ENERGY TECHNOLOGIES</option>
+                <option value="INDUSTRIAL AUTOMATION">INDUSTRIAL AUTOMATION</option>
+                <option value="SMART GRID TECHNOLOGIES">SMART GRID TECHNOLOGIES</option>
+                <option value="HEALTHCARE DATA ANALYTICS">HEALTHCARE DATA ANALYTICS</option>
+                <option value="INDUSTRIAL BIOTECHNOLOGY">INDUSTRIAL BIOTECHNOLOGY</option>
+                <option value="GENERATIVE AI & MACHINE LEARNING">GENERATIVE AI & MACHINE LEARNING</option>
+                <option value="IOT ANALYTICS">IOT ANALYTICS</option>
+                <option value="MEDICAL BIOTECHNOLOGY">MEDICAL BIOTECHNOLOGY</option>
+                <option value="ROBOTICS AND AUTOMATION">ROBOTICS AND AUTOMATION</option>
+                <option value="SMART MANUFACTURING">SMART MANUFACTURING</option>
+                <option value="VERY LARGE-SCALE INTEGRATION">VERY LARGE-SCALE INTEGRATION</option>
+                <option value="WATER RESOURCE AND ENVIRONMENTAL ENGINEERING">WATER RESOURCE AND ENVIRONMENTAL ENGINEERING</option>
+                <option value="CONSTRUCTION TECHNOLOGY AND MANAGEMENT">CONSTRUCTION TECHNOLOGY AND MANAGEMENT</option>
+                <option value="NANOTECHNOLOGY & OPTOELECTRONICS">NANOTECHNOLOGY & OPTOELECTRONICS</option>
+                <option value="CLOUD AND EDGE COMPUTING">CLOUD AND EDGE COMPUTING</option>
+                <option value="CLOUD INFRASTRUCTURE DESIGN AND ENGINEERING">CLOUD INFRASTRUCTURE DESIGN AND ENGINEERING</option>
+                <option value="CLOUD NATIVE SECURITY">CLOUD NATIVE SECURITY</option>
+                <option value="CLOUD NATIVE SOFTWARE ENGINEERING">CLOUD NATIVE SOFTWARE ENGINEERING</option>
+                <option value="CLOUD-BASED SCIENTIFIC COMPUTING">CLOUD-BASED SCIENTIFIC COMPUTING</option>
+                <option value="DATA ENGINEERING FOR AI">DATA ENGINEERING FOR AI</option>
+                <option value="DATA SCIENCE AND BIG DATA ANALYTICS">DATA SCIENCE AND BIG DATA ANALYTICS</option>
+                <option value="DISTRIBUTED LEDGER ANALYTICS">DISTRIBUTED LEDGER ANALYTICS</option>
+                <option value="SOCIAL AND DIGITAL MEDIA ANALYTICS">SOCIAL AND DIGITAL MEDIA ANALYTICS</option>
+                <option value="AI SYSTEMS FOR VISUAL INTELLIGENCE">AI SYSTEMS FOR VISUAL INTELLIGENCE</option>
+                <option value="5G - 6G WIRELESS TECHNOLOGIES">5G - 6G WIRELESS TECHNOLOGIES</option>
+                <option value="CROSS PLATFORM DEVELOPMENT FRAMEWORKS">CROSS PLATFORM DEVELOPMENT FRAMEWORKS</option>
+                <option value="GAME DEVELOPMENT AND UX DESIGN">GAME DEVELOPMENT AND UX DESIGN</option>
+                <option value="SPATIAL COMPUTING AND IMMERSIVE TECHNOLOGIES">SPATIAL COMPUTING AND IMMERSIVE TECHNOLOGIES</option>
+                <option value="BLOCKCHAIN ENGINEERING FOR WEB3">BLOCKCHAIN ENGINEERING FOR WEB3</option>
+                <option value="CYBER PHYSICAL SYSTEMS AND IOT">CYBER PHYSICAL SYSTEMS AND IOT</option>
+                <option value="CYBER SECURITY AND BLOCKCHAIN TECHNOLOGY">CYBER SECURITY AND BLOCKCHAIN TECHNOLOGY</option>
+                <option value="HARDWARE-SOFTWARE CO-DESIGN FOR SECURITY">HARDWARE-SOFTWARE CO-DESIGN FOR SECURITY</option>
+                <option value="SOFTWARE MODELLING AND DEVOPS">SOFTWARE MODELLING AND DEVOPS</option>
               </select>
             </div>
             <div>

@@ -53,7 +53,8 @@ const studentSchema = new mongoose.Schema({
   academicInfo: {
     rollNumber: { type: String, required: true, unique: true },
     department: { type: String, required: true },
-    year: { type: Number, required: true },
+    year: { type: Number, required: true }, // Passout batch: 2026, 2027, 2028, 2029
+    specialization: { type: String },
     semester: Number,
     cgpa: Number,
     semesters: [{

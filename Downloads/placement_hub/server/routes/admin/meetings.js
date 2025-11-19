@@ -471,8 +471,150 @@ router.post('/requests/:id/decline', async (req, res) => {
   }
 });
 
+// @route   POST /api/admin/meetings/:id/cancel
+// @desc    Cancel a meeting
+// @access  Private (Admin)
+router.post('/:id/cancel', async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ userId: req.user._id });
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin profile not found' });
+    }
+
+    const meeting = await Meeting.findOne({
+      _id: req.params.id,
+      mentorId: admin._id
+    }).populate('studentId');
+
+    if (!meeting) {
+      return res.status(404).json({ message: 'Meeting not found' });
+    }
+
+    meeting.status = 'cancelled';
+    meeting.cancelledBy = 'admin';
+    meeting.cancellationReason = req.body.reason || 'Cancelled by mentor';
+    meeting.cancelledAt = new Date();
+    await meeting.save();
+
+    // Send cancellation email to student
+    try {
+      const studentUser = await require('../../models/User').findById(meeting.studentId.userId);
+      if (studentUser && studentUser.email) {
+        const localStartTime = formatTimeInTimezone(meeting.startTime, meeting.studentTimezone);
+        
+        await sendEmail({
+          to: studentUser.email,
+          subject: `Meeting Cancelled: ${meeting.title}`,
+          html: `
+            <h2>Meeting Cancelled</h2>
+            <p>Your meeting has been cancelled.</p>
+            <p><strong>Title:</strong> ${meeting.title}</p>
+            <p><strong>Original Date & Time:</strong> ${localStartTime}</p>
+            <p><strong>Reason:</strong> ${meeting.cancellationReason}</p>
+            <p>You can request a new meeting if needed.</p>
+          `
+        });
+      }
+    } catch (emailError) {
+      console.error('Error sending cancellation email:', emailError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Meeting cancelled successfully',
+      meeting
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   POST /api/admin/meetings/:id/complete
+// @desc    Mark a meeting as completed
+// @access  Private (Admin)
+router.post('/:id/complete', async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ userId: req.user._id });
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin profile not found' });
+    }
+
+    const meeting = await Meeting.findOne({
+      _id: req.params.id,
+      mentorId: admin._id
+    });
+
+    if (!meeting) {
+      return res.status(404).json({ message: 'Meeting not found' });
+    }
+
+    meeting.status = 'completed';
+    await meeting.save();
+
+    res.json({
+      success: true,
+      message: 'Meeting marked as completed',
+      meeting
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   POST /api/admin/meetings/:id/no-show
+// @desc    Mark a meeting as no-show
+// @access  Private (Admin)
+router.post('/:id/no-show', async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ userId: req.user._id });
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin profile not found' });
+    }
+
+    const meeting = await Meeting.findOne({
+      _id: req.params.id,
+      mentorId: admin._id
+    }).populate('studentId');
+
+    if (!meeting) {
+      return res.status(404).json({ message: 'Meeting not found' });
+    }
+
+    meeting.status = 'no_show';
+    await meeting.save();
+
+    // Send no-show email to student with reschedule link
+    try {
+      const studentUser = await require('../../models/User').findById(meeting.studentId.userId);
+      if (studentUser && studentUser.email) {
+        await sendEmail({
+          to: studentUser.email,
+          subject: `Meeting No-Show: ${meeting.title}`,
+          html: `
+            <h2>Meeting No-Show</h2>
+            <p>You missed your scheduled meeting.</p>
+            <p><strong>Title:</strong> ${meeting.title}</p>
+            <p><strong>Scheduled Time:</strong> ${formatTimeInTimezone(meeting.startTime, meeting.studentTimezone)}</p>
+            <p>Please request a new meeting to reschedule.</p>
+          `
+        });
+      }
+    } catch (emailError) {
+      console.error('Error sending no-show email:', emailError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Meeting marked as no-show',
+      meeting
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // @route   PUT /api/admin/meetings/:id
-// @desc    Update a meeting (reschedule, cancel, etc.)
+// @desc    Update a meeting (reschedule, etc.)
 // @access  Private (Admin)
 router.put('/:id', async (req, res) => {
   try {
@@ -688,6 +830,81 @@ router.post('/:id/feedback', async (req, res) => {
       success: true,
       message: 'Feedback added successfully',
       feedback
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   DELETE /api/admin/meetings/:id
+// @desc    Delete a meeting
+// @access  Private (Admin)
+router.delete('/:id', async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ userId: req.user._id });
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin profile not found' });
+    }
+
+    const meeting = await Meeting.findOne({
+      _id: req.params.id,
+      mentorId: admin._id
+    });
+
+    if (!meeting) {
+      return res.status(404).json({ message: 'Meeting not found' });
+    }
+
+    // Only allow deletion of cancelled or future meetings
+    if (meeting.status === 'completed' || meeting.status === 'in_progress') {
+      return res.status(400).json({ 
+        message: 'Cannot delete completed or in-progress meetings' 
+      });
+    }
+
+    // Delete associated reminders
+    await Reminder.deleteMany({ meetingId: meeting._id });
+
+    // Delete the meeting
+    await Meeting.findByIdAndDelete(meeting._id);
+
+    res.json({
+      success: true,
+      message: 'Meeting deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   DELETE /api/admin/meetings/requests/:id
+// @desc    Delete a meeting request
+// @access  Private (Admin)
+router.delete('/requests/:id', async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ userId: req.user._id });
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin profile not found' });
+    }
+
+    const request = await MeetingRequest.findById(req.params.id);
+
+    if (!request) {
+      return res.status(404).json({ message: 'Meeting request not found' });
+    }
+
+    // Only allow deletion of pending or declined requests
+    if (request.status === 'approved' && request.meetingId) {
+      return res.status(400).json({ 
+        message: 'Cannot delete approved request with associated meeting. Cancel the meeting first.' 
+      });
+    }
+
+    await MeetingRequest.findByIdAndDelete(request._id);
+
+    res.json({
+      success: true,
+      message: 'Meeting request deleted successfully'
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

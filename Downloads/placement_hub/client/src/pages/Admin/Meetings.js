@@ -83,7 +83,31 @@ const Meetings = () => {
       toast.success('Meeting cancelled');
       fetchMeetings();
     } catch (error) {
-      toast.error('Failed to cancel meeting');
+      toast.error(error.response?.data?.message || 'Failed to cancel meeting');
+    }
+  };
+
+  const handleDeleteMeeting = async (meetingId) => {
+    if (!window.confirm('Are you sure you want to delete this meeting? This action cannot be undone.')) return;
+    
+    try {
+      await api.delete(`/admin/meetings/${meetingId}`);
+      toast.success('Meeting deleted successfully');
+      fetchMeetings();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete meeting');
+    }
+  };
+
+  const handleDeleteRequest = async (requestId) => {
+    if (!window.confirm('Are you sure you want to delete this meeting request? This action cannot be undone.')) return;
+    
+    try {
+      await api.delete(`/admin/meetings/requests/${requestId}`);
+      toast.success('Meeting request deleted successfully');
+      fetchRequests();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete meeting request');
     }
   };
 
@@ -260,9 +284,16 @@ const Meetings = () => {
                       </button>
                       <button
                         onClick={() => handleDeclineRequest(request._id)}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                        className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
                       >
                         Decline
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRequest(request._id)}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                        title="Delete Request"
+                      >
+                        <FaTrash />
                       </button>
                     </div>
                   </div>
@@ -404,12 +435,30 @@ const Meetings = () => {
                             </button>
                           )}
                           {meeting.status !== 'cancelled' && new Date(meeting.startTime) > new Date() && (
+                            <>
+                              <button
+                                onClick={() => handleCancelMeeting(meeting._id)}
+                                className="p-2 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded"
+                                title="Cancel Meeting"
+                              >
+                                <FaTimesCircle />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteMeeting(meeting._id)}
+                                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                                title="Delete Meeting"
+                              >
+                                <FaTrash />
+                              </button>
+                            </>
+                          )}
+                          {(meeting.status === 'cancelled') && (
                             <button
-                              onClick={() => handleCancelMeeting(meeting._id)}
+                              onClick={() => handleDeleteMeeting(meeting._id)}
                               className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                              title="Cancel Meeting"
+                              title="Delete Meeting"
                             >
-                              <FaTimesCircle />
+                              <FaTrash />
                             </button>
                           )}
                         </div>

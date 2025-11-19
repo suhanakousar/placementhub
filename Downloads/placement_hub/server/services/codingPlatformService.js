@@ -2,6 +2,12 @@ const axios = require('axios');
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
 const MAX_RETRIES = 2;
+const RAPIDAPI_KEY =
+  process.env.RAPIDAPI_KEY ||
+  process.env.X_RAPIDAPI_KEY ||
+  'f627be65a2mshfe6bd4a0cff94f1p16906fjsn66a6d43077ce';
+const RAPIDAPI_HOST =
+  process.env.RAPIDAPI_HOST || 'competitive-coding-api.p.rapidapi.com';
 
 const platformCache = new Map();
 
@@ -506,14 +512,27 @@ async function fetchCodeChef(username) {
 
 async function fetchFromCompetitiveApi(platformKey, username) {
   if (!username) return null;
+  if (!RAPIDAPI_KEY) {
+    return {
+      platformId: platformKey,
+      username,
+      warning: 'RapidAPI key missing. Set RAPIDAPI_KEY in server environment.'
+    };
+  }
   try {
     const { data } = await axios.get(
-      `https://competitive-coding-api.herokuapp.com/api/${platformKey}/${encodeURIComponent(
+      `https://${RAPIDAPI_HOST}/api/${platformKey}/${encodeURIComponent(
         username
       )}`,
-      { timeout: 8000 }
+      {
+        timeout: 8000,
+        headers: {
+          'X-RapidAPI-Key': RAPIDAPI_KEY,
+          'X-RapidAPI-Host': RAPIDAPI_HOST
+        }
+      }
     );
-    if (!data || data.status !== 'Success') {
+    if (!data || (data.status && data.status !== 'Success')) {
       throw new Error(data?.message || `${platformKey} API error`);
     }
     return {
@@ -532,7 +551,7 @@ async function fetchFromCompetitiveApi(platformKey, username) {
     return {
       platformId: platformKey,
       username,
-      warning: error.message
+      warning: error.response?.data?.message || error.message
     };
   }
 }

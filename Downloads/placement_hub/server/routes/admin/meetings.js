@@ -243,54 +243,33 @@ router.post('/', async (req, res) => {
     // Get student user email for meeting creation
     const studentUser = await require('../../models/User').findById(student.userId);
     
-    // Create real meeting based on platform
+    // Create real Google Meet meeting
     let meetingLink = '';
     let meetingDetails = null;
     
     try {
-      meetingDetails = await createRealMeeting(meetingPlatform || 'google_meet', {
+      meetingDetails = await createRealMeeting('google_meet', {
         title,
         startTime,
         endTime,
         timezone: studentTimezone || 'UTC',
-        attendeeEmail: studentUser?.email,
-        customLink: req.body.meetingLink
+        attendeeEmail: studentUser?.email
       });
       
       meetingLink = meetingDetails.joinUrl || meetingDetails.meetingLink || '';
       
-      if (!meetingLink && meetingPlatform === 'custom' && req.body.meetingLink) {
-        meetingLink = req.body.meetingLink;
-      } else if (!meetingLink && meetingPlatform === 'in_person') {
-        meetingLink = 'In Person Meeting';
-      } else if (!meetingLink) {
-        // Fallback
-        meetingLink = `https://meet.google.com/new?authuser=0`;
+      if (!meetingLink) {
+        return res.status(500).json({ 
+          message: 'Failed to create Google Meet meeting. No meeting link was generated.',
+          error: 'Missing meeting link'
+        });
       }
     } catch (meetingError) {
-      console.error('Error creating real meeting:', meetingError);
-      // Fallback to placeholder
-      if (meetingPlatform === 'custom' && req.body.meetingLink) {
-        meetingLink = req.body.meetingLink;
-      } else if (meetingPlatform === 'in_person') {
-        meetingLink = 'In Person Meeting';
-      } else {
-        // Generate a unique code as fallback
-        const linkId = studentId.toString().substring(0, 12) + Date.now().toString().substring(10);
-        switch (meetingPlatform || 'google_meet') {
-          case 'zoom':
-            meetingLink = `https://zoom.us/j/${linkId}`;
-            break;
-          case 'google_meet':
-            meetingLink = `https://meet.google.com/${linkId}`;
-            break;
-          case 'microsoft_teams':
-            meetingLink = `https://teams.microsoft.com/l/meetup-join/${linkId}`;
-            break;
-          default:
-            meetingLink = `https://meet.google.com/new?authuser=0`;
-        }
-      }
+      console.error('Error creating Google Meet meeting:', meetingError);
+      return res.status(500).json({ 
+        message: 'Failed to create Google Meet meeting.',
+        error: meetingError.message
+      });
     }
 
     // Create meeting
@@ -306,7 +285,7 @@ router.post('/', async (req, res) => {
       description,
       notes,
       meetingLink,
-      meetingPlatform: meetingPlatform || 'google_meet',
+      meetingPlatform: 'google_meet',
       meetingId: meetingDetails?.meetingId || null,
       meetingPassword: meetingDetails?.password || null,
       meetingDialIn: meetingDetails?.dialInNumber || null,
@@ -411,7 +390,7 @@ router.post('/requests/:id/approve', async (req, res) => {
       return res.status(400).json({ message: 'Request is not pending' });
     }
 
-    const { startTime, endTime, meetingPlatform, notes } = req.body;
+    const { startTime, endTime, notes } = req.body;
 
     // Check for conflicts
     const hasConflict = await checkMeetingConflicts(
@@ -424,8 +403,38 @@ router.post('/requests/:id/approve', async (req, res) => {
       return res.status(400).json({ message: 'Meeting time conflicts with existing meeting' });
     }
 
-    // Generate meeting link
-    const meetingLink = generateMeetingLink(meetingPlatform || 'google_meet', { _id: request._id });
+    // Get student user email for meeting creation
+    const studentUser = await require('../../models/User').findById(request.studentId.userId);
+
+    // Create real Google Meet meeting
+    let meetingLink = '';
+    let meetingDetails = null;
+    
+    try {
+      meetingDetails = await createRealMeeting('google_meet', {
+        title: request.title,
+        startTime,
+        endTime,
+        timezone: request.studentTimezone || 'UTC',
+        attendeeEmail: studentUser?.email,
+        description: request.description
+      });
+      
+      meetingLink = meetingDetails.joinUrl || meetingDetails.meetingLink || '';
+      
+      if (!meetingLink) {
+        return res.status(500).json({ 
+          message: 'Failed to create Google Meet meeting. No meeting link was generated.',
+          error: 'Missing meeting link'
+        });
+      }
+    } catch (meetingError) {
+      console.error('Error creating Google Meet meeting:', meetingError);
+      return res.status(500).json({ 
+        message: 'Failed to create Google Meet meeting.',
+        error: meetingError.message
+      });
+    }
 
     // Create meeting
     const meeting = await Meeting.create({
@@ -440,7 +449,11 @@ router.post('/requests/:id/approve', async (req, res) => {
       description: request.description,
       notes: notes || request.additionalNotes,
       meetingLink,
-      meetingPlatform: meetingPlatform || 'google_meet',
+      meetingPlatform: 'google_meet',
+      meetingId: meetingDetails?.meetingId || null,
+      meetingPassword: meetingDetails?.password || null,
+      meetingDialIn: meetingDetails?.dialInNumber || null,
+      meetingStartUrl: meetingDetails?.startUrl || null,
       status: 'approved',
       requestId: request._id,
       createdBy: 'admin',

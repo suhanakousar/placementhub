@@ -59,7 +59,7 @@ const meetingSchema = new mongoose.Schema({
   },
   meetingPlatform: {
     type: String,
-    enum: ['zoom', 'google_meet', 'microsoft_teams', 'custom', 'in_person'],
+    enum: ['google_meet'],
     default: 'google_meet'
   },
   // Real meeting details

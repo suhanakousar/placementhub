@@ -32,11 +32,7 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
   ];
 
   const platforms = [
-    { value: 'google_meet', label: 'Google Meet' },
-    { value: 'zoom', label: 'Zoom' },
-    { value: 'microsoft_teams', label: 'Microsoft Teams' },
-    { value: 'custom', label: 'Custom Link' },
-    { value: 'in_person', label: 'In Person' }
+    { value: 'google_meet', label: 'Google Meet' }
   ];
 
   useEffect(() => {
@@ -51,8 +47,7 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
           topic: initialData.topic || 'resume_review',
           description: initialData.description || '',
           notes: initialData.notes || '',
-          meetingPlatform: initialData.meetingPlatform || 'google_meet',
-          customLink: initialData.meetingLink || '',
+          meetingPlatform: 'google_meet',
           studentTimezone: initialData.studentTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
           mentorTimezone: initialData.mentorTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone
         });
@@ -67,7 +62,6 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
           description: '',
           notes: '',
           meetingPlatform: 'google_meet',
-          customLink: '',
           studentTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           mentorTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         });
@@ -132,15 +126,10 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
           topic: formData.topic,
           description: formData.description,
           notes: formData.notes,
-          meetingPlatform: formData.meetingPlatform,
+          meetingPlatform: 'google_meet',
           studentTimezone: formData.studentTimezone,
           mentorTimezone: formData.mentorTimezone
         };
-        
-        // Add custom link if platform is custom
-        if (formData.meetingPlatform === 'custom' && formData.customLink) {
-          meetingPayload.meetingLink = formData.customLink;
-        }
         
         await api.post('/admin/meetings', meetingPayload);
         toast.success('Meeting created successfully');
@@ -267,33 +256,13 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <FaVideo className="inline mr-1" />
-                Meeting Platform *
+                Meeting Platform
               </label>
-              <select
-                value={formData.meetingPlatform}
-                onChange={(e) => setFormData({ ...formData, meetingPlatform: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                required
-              >
-                {platforms.map(platform => (
-                  <option key={platform.value} value={platform.value}>{platform.label}</option>
-                ))}
-              </select>
-              {formData.meetingPlatform === 'custom' && (
-                <input
-                  type="text"
-                  value={formData.customLink || ''}
-                  onChange={(e) => setFormData({ ...formData, customLink: e.target.value })}
-                  placeholder="Enter custom meeting link"
-                  className="mt-2 w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                />
-              )}
+              <div className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white bg-gray-50 dark:bg-gray-800">
+                <span className="text-gray-700 dark:text-gray-300">Google Meet</span>
+              </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {formData.meetingPlatform === 'zoom' && 'A real Zoom meeting will be created'}
-                {formData.meetingPlatform === 'google_meet' && 'A real Google Meet link will be generated'}
-                {formData.meetingPlatform === 'microsoft_teams' && 'A real Teams meeting will be created'}
-                {formData.meetingPlatform === 'custom' && 'Enter your custom meeting link'}
-                {formData.meetingPlatform === 'in_person' && 'In-person meeting (no link needed)'}
+                A real Google Meet meeting will be created automatically
               </p>
             </div>
           </div>

@@ -107,17 +107,24 @@ const Tasks = () => {
     }
   };
 
-  const handleDeleteTask = async (taskId) => {
-    if (!window.confirm('Are you sure you want to delete this task?')) return;
-    
+  const handleDeleteTask = async () => {
     try {
-      await api.delete(`/admin/tasks/${taskId}`);
+      await api.delete(`/admin/tasks/${deleteConfirm.taskId}`);
       toast.success('Task deleted successfully');
+      setDeleteConfirm({ isOpen: false, taskId: null, taskTitle: '' });
       fetchTasks();
       fetchStats();
     } catch (error) {
-      toast.error('Failed to delete task');
+      toast.error(error.response?.data?.message || 'Failed to delete task');
     }
+  };
+
+  const openDeleteConfirm = (taskId, taskTitle) => {
+    setDeleteConfirm({
+      isOpen: true,
+      taskId,
+      taskTitle
+    });
   };
 
   const getPriorityColor = (priority) => {

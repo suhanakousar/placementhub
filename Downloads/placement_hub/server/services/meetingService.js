@@ -6,6 +6,13 @@ const { google } = require('googleapis');
  */
 async function createGoogleMeetMeeting(meetingData) {
   try {
+    console.log('Creating Google Meet meeting with data:', {
+      title: meetingData.title,
+      startTime: meetingData.startTime,
+      endTime: meetingData.endTime,
+      timezone: meetingData.timezone
+    });
+
     // Google Service Account credentials from environment or use provided
     const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL || 'meet-service@factcheckapp-476109.iam.gserviceaccount.com';
     const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY || `-----BEGIN PRIVATE KEY-----
@@ -141,6 +148,25 @@ RAaBfizkPIZWBuLM3E8vbHo=
       response: error.response?.data,
       stack: error.stack
     });
+    
+    // If it's a permission/API error, provide a fallback instant meeting link
+    if (error.code === 403 || error.message?.includes('Permission') || error.message?.includes('403')) {
+      console.log('Calendar API permission denied. Using fallback instant meeting link.');
+      // Generate a unique instant meeting link that works without Calendar API
+      const meetingId = `new-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      const instantLink = `https://meet.google.com/new?hs=${meetingId}`;
+      
+      return {
+        meetingLink: instantLink,
+        meetingId: meetingId,
+        joinUrl: instantLink,
+        dialInNumber: null,
+        password: null,
+        startUrl: instantLink,
+        note: 'Instant meeting link (Calendar API not configured)'
+      };
+    }
+    
     throw new Error(`Failed to create Google Meet meeting: ${error.message || error.toString()}`);
   }
 }

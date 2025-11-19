@@ -361,10 +361,16 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating meeting:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      code: error.code
+    });
     res.status(500).json({ 
       message: 'Server error', 
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: error.message || error.toString(),
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

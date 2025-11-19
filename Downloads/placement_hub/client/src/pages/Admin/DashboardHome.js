@@ -11,7 +11,7 @@ const DashboardHome = ({ stats: initialStats }) => {
   useEffect(() => {
     // Fetch stats immediately if not provided
     if (!initialStats) {
-      fetchStats();
+    fetchStats();
     }
 
     // Set up polling every 30 seconds for real-time updates

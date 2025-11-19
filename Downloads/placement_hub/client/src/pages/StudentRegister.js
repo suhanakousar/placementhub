@@ -201,7 +201,7 @@ const StudentRegister = () => {
                   <option value="BT">Biotechnology</option>
                 </select>
               </div>
-              <div>
+            <div>
                 <label htmlFor="year" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Passout Batch
                 </label>

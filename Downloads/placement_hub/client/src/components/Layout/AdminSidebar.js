@@ -9,15 +9,22 @@ import {
   FaBullhorn,
   FaBell,
   FaSignOutAlt,
-  FaTrophy
+  FaTrophy,
+  FaUserTie,
+  FaTasks,
+  FaCalendarCheck,
+  FaVideo
 } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
 
 const adminMenuItems = [
   { path: '/admin/dashboard', icon: FaHome, label: 'Dashboard' },
+  { path: '/admin/mentor', icon: FaUserTie, label: 'Mentor Dashboard' },
+  { path: '/admin/meetings', icon: FaVideo, label: 'Meetings' },
   { path: '/admin/students', icon: FaUsers, label: 'Students' },
   { path: '/admin/posts', icon: FaBullhorn, label: 'Posts & Announcements' },
   { path: '/admin/drives', icon: FaBriefcase, label: 'Placement Drives' },
+  { path: '/admin/tasks', icon: FaTasks, label: 'Task Management' },
   { path: '/admin/reports', icon: FaChartBar, label: 'Reports & Analytics' },
   { path: '/admin/verification', icon: FaCheckCircle, label: 'Verification Center' },
   { path: '/admin/notifications', icon: FaBell, label: 'Notifications' },

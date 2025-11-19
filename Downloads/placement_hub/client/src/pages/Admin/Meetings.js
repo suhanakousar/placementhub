@@ -439,15 +439,26 @@ const Meetings = () => {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex space-x-2">
-                          {meeting.meetingLink && (
+                          {meeting.meetingLink && meeting.meetingLink !== 'In Person Meeting' && (
                             <a
                               href={meeting.meetingLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                              className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition"
                               title="Join Meeting"
                             >
                               <FaVideo />
+                            </a>
+                          )}
+                          {meeting.meetingStartUrl && (
+                            <a
+                              href={meeting.meetingStartUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition"
+                              title="Start Meeting (Host)"
+                            >
+                              Start
                             </a>
                           )}
                           {meeting.status === 'confirmed' && new Date(meeting.startTime) <= new Date() && (

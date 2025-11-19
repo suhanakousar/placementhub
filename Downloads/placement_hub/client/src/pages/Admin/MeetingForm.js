@@ -52,8 +52,24 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
           description: initialData.description || '',
           notes: initialData.notes || '',
           meetingPlatform: initialData.meetingPlatform || 'google_meet',
+          customLink: initialData.meetingLink || '',
           studentTimezone: initialData.studentTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
           mentorTimezone: initialData.mentorTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+        });
+      } else {
+        // Reset form when opening fresh
+        setFormData({
+          studentId: '',
+          startTime: '',
+          endTime: '',
+          title: '',
+          topic: 'resume_review',
+          description: '',
+          notes: '',
+          meetingPlatform: 'google_meet',
+          customLink: '',
+          studentTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          mentorTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         });
       }
     }
@@ -108,7 +124,7 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
         }
 
         // Create new meeting directly
-        await api.post('/admin/meetings', {
+        const meetingPayload = {
           studentId: formData.studentId,
           startTime: start.toISOString(),
           endTime: end.toISOString(),
@@ -119,7 +135,14 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
           meetingPlatform: formData.meetingPlatform,
           studentTimezone: formData.studentTimezone,
           mentorTimezone: formData.mentorTimezone
-        });
+        };
+        
+        // Add custom link if platform is custom
+        if (formData.meetingPlatform === 'custom' && formData.customLink) {
+          meetingPayload.meetingLink = formData.customLink;
+        }
+        
+        await api.post('/admin/meetings', meetingPayload);
         toast.success('Meeting created successfully');
       }
       onSuccess();
@@ -256,6 +279,22 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
                   <option key={platform.value} value={platform.value}>{platform.label}</option>
                 ))}
               </select>
+              {formData.meetingPlatform === 'custom' && (
+                <input
+                  type="text"
+                  value={formData.customLink || ''}
+                  onChange={(e) => setFormData({ ...formData, customLink: e.target.value })}
+                  placeholder="Enter custom meeting link"
+                  className="mt-2 w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                />
+              )}
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {formData.meetingPlatform === 'zoom' && 'A real Zoom meeting will be created'}
+                {formData.meetingPlatform === 'google_meet' && 'A real Google Meet link will be generated'}
+                {formData.meetingPlatform === 'microsoft_teams' && 'A real Teams meeting will be created'}
+                {formData.meetingPlatform === 'custom' && 'Enter your custom meeting link'}
+                {formData.meetingPlatform === 'in_person' && 'In-person meeting (no link needed)'}
+              </p>
             </div>
           </div>
 

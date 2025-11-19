@@ -62,6 +62,23 @@ const meetingSchema = new mongoose.Schema({
     enum: ['zoom', 'google_meet', 'microsoft_teams', 'custom', 'in_person'],
     default: 'google_meet'
   },
+  // Real meeting details
+  meetingId: {
+    type: String, // Platform-specific meeting ID
+    default: null
+  },
+  meetingPassword: {
+    type: String, // Meeting password if required
+    default: null
+  },
+  meetingDialIn: {
+    type: String, // Dial-in number
+    default: null
+  },
+  meetingStartUrl: {
+    type: String, // Host start URL (for Zoom, etc.)
+    default: null
+  },
   // Status tracking
   status: {
     type: String,

@@ -12,6 +12,7 @@ const { checkMeetingConflicts, generateICSFile, generateMeetingLink, formatTimeI
 const { sendEmail } = require('../../utils/emailService');
 const { createRemindersForMeeting } = require('../../utils/reminderUtils');
 const { createTasksFromFeedback } = require('../../utils/taskUtils');
+const { createRealMeeting } = require('../../services/meetingService');
 
 const router = express.Router();
 
@@ -239,16 +240,42 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Meeting time conflicts with existing meeting' });
     }
 
-    // Generate meeting link (will be updated after meeting is created)
-    // For now, use a placeholder that will be replaced
-    let meetingLink = `https://meet.google.com/new?authuser=0`;
+    // Get student user email for meeting creation
+    const studentUser = await require('../../models/User').findById(student.userId);
     
-    // If custom platform, check if link is provided
-    if (meetingPlatform === 'custom' && req.body.meetingLink) {
-      meetingLink = req.body.meetingLink;
-    } else if (meetingPlatform !== 'in_person') {
-      // Generate a unique link based on student ID and timestamp
-      try {
+    // Create real meeting based on platform
+    let meetingLink = '';
+    let meetingDetails = null;
+    
+    try {
+      meetingDetails = await createRealMeeting(meetingPlatform || 'google_meet', {
+        title,
+        startTime,
+        endTime,
+        timezone: studentTimezone || 'UTC',
+        attendeeEmail: studentUser?.email,
+        customLink: req.body.meetingLink
+      });
+      
+      meetingLink = meetingDetails.joinUrl || meetingDetails.meetingLink || '';
+      
+      if (!meetingLink && meetingPlatform === 'custom' && req.body.meetingLink) {
+        meetingLink = req.body.meetingLink;
+      } else if (!meetingLink && meetingPlatform === 'in_person') {
+        meetingLink = 'In Person Meeting';
+      } else if (!meetingLink) {
+        // Fallback
+        meetingLink = `https://meet.google.com/new?authuser=0`;
+      }
+    } catch (meetingError) {
+      console.error('Error creating real meeting:', meetingError);
+      // Fallback to placeholder
+      if (meetingPlatform === 'custom' && req.body.meetingLink) {
+        meetingLink = req.body.meetingLink;
+      } else if (meetingPlatform === 'in_person') {
+        meetingLink = 'In Person Meeting';
+      } else {
+        // Generate a unique code as fallback
         const linkId = studentId.toString().substring(0, 12) + Date.now().toString().substring(10);
         switch (meetingPlatform || 'google_meet') {
           case 'zoom':
@@ -263,12 +290,7 @@ router.post('/', async (req, res) => {
           default:
             meetingLink = `https://meet.google.com/new?authuser=0`;
         }
-      } catch (linkError) {
-        console.error('Error generating meeting link:', linkError);
-        meetingLink = `https://meet.google.com/new?authuser=0`;
       }
-    } else {
-      meetingLink = 'In Person Meeting';
     }
 
     // Create meeting
@@ -285,6 +307,10 @@ router.post('/', async (req, res) => {
       notes,
       meetingLink,
       meetingPlatform: meetingPlatform || 'google_meet',
+      meetingId: meetingDetails?.meetingId || null,
+      meetingPassword: meetingDetails?.password || null,
+      meetingDialIn: meetingDetails?.dialInNumber || null,
+      meetingStartUrl: meetingDetails?.startUrl || null,
       status: 'approved',
       createdBy: 'admin',
       attachments: attachments || []

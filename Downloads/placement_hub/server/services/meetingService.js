@@ -41,15 +41,22 @@ RAaBfizkPIZWBuLM3E8vbHo=
     const calendar = google.calendar('v3');
 
     // Create JWT client for service account authentication
+    const privateKey = GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
+    
     const jwtClient = new google.auth.JWT(
       GOOGLE_CLIENT_EMAIL,
       null,
-      GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      privateKey,
       ['https://www.googleapis.com/auth/calendar']
     );
 
     // Authorize the client
-    await jwtClient.authorize();
+    try {
+      await jwtClient.authorize();
+    } catch (authError) {
+      console.error('JWT Authorization error:', authError);
+      throw new Error(`Authentication failed: ${authError.message || authError.toString()}`);
+    }
 
     // Create calendar event with Google Meet
     const event = {
@@ -79,12 +86,30 @@ RAaBfizkPIZWBuLM3E8vbHo=
     }
 
     // Insert the event with Meet link
-    const response = await calendar.events.insert({
-      auth: jwtClient,
-      calendarId: GOOGLE_CALENDAR_ID,
-      conferenceDataVersion: 1,
-      requestBody: event,
-    });
+    let response;
+    try {
+      response = await calendar.events.insert({
+        auth: jwtClient,
+        calendarId: GOOGLE_CALENDAR_ID,
+        conferenceDataVersion: 1,
+        requestBody: event,
+      });
+    } catch (insertError) {
+      console.error('Calendar API insert error:', insertError);
+      console.error('Error response:', insertError.response?.data);
+      console.error('Error code:', insertError.code);
+      
+      // Provide more helpful error messages
+      if (insertError.code === 403) {
+        throw new Error('Service account does not have permission to create calendar events. Please ensure the service account has Calendar API access and the calendar is shared with the service account email.');
+      } else if (insertError.code === 404) {
+        throw new Error(`Calendar not found. Please check that the calendar ID "${GOOGLE_CALENDAR_ID}" exists and is accessible by the service account.`);
+      } else if (insertError.message) {
+        throw new Error(`Failed to create calendar event: ${insertError.message}`);
+      } else {
+        throw new Error(`Failed to create calendar event: ${insertError.toString()}`);
+      }
+    }
 
     // Extract the Meet link from the response
     const meetLink = response.data.conferenceData?.entryPoints?.[0]?.uri || 
@@ -106,7 +131,13 @@ RAaBfizkPIZWBuLM3E8vbHo=
     };
   } catch (error) {
     console.error('Error creating Google Meet meeting:', error);
-    throw new Error(`Failed to create Google Meet meeting: ${error.message}`);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data,
+      stack: error.stack
+    });
+    throw new Error(`Failed to create Google Meet meeting: ${error.message || error.toString()}`);
   }
 }
 

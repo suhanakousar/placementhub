@@ -743,7 +743,7 @@ router.get('/certifications/:certificationId/download', authorize('student'), as
 // @route   GET /api/students
 // @desc    Get all students (Admin only)
 // @access  Private (Admin)
-router.get('/', authorize('admin'), async (req, res) => {
+router.get('/', protect, authorize('admin'), async (req, res) => {
   try {
     const students = await Student.find()
       .populate('userId', 'email')

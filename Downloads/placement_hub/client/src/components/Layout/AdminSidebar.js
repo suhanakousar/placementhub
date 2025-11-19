@@ -138,6 +138,9 @@ const AdminSidebar = ({ isOpen, onClose }) => {
         }}
       >
         <div className="p-4 pb-6">
+          <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-bold text-gray-800 dark:text-white">Admin Menu</h2>
+          </div>
           <nav className="space-y-2">
             {adminMenuItems.map((item) => {
               const Icon = item.icon;

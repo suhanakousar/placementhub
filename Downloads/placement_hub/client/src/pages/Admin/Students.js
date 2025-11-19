@@ -38,10 +38,16 @@ const Students = () => {
   const fetchStudents = async () => {
     try {
       const response = await api.get('/students');
-      setStudents(response.data);
-      setFilteredStudents(response.data);
+      setStudents(response.data || []);
+      setFilteredStudents(response.data || []);
+      if (!response.data || response.data.length === 0) {
+        toast.info('No students found in the system');
+      }
     } catch (error) {
       console.error('Error fetching students:', error);
+      toast.error(error.response?.data?.message || 'Failed to load students');
+      setStudents([]);
+      setFilteredStudents([]);
     } finally {
       setLoading(false);
     }
@@ -549,8 +555,37 @@ const Students = () => {
             ))}
           </tbody>
         </table>
-        {filteredStudents.length === 0 && (
-          <p className="text-gray-500 text-center py-8">No students found</p>
+        {filteredStudents.length === 0 && !loading && (
+          <div className="text-center py-12">
+            <FaUsers className="mx-auto text-4xl text-gray-400 mb-4" />
+            <p className="text-gray-500 dark:text-gray-400 text-lg font-medium mb-2">
+              {students.length === 0 
+                ? 'No students registered yet' 
+                : 'No students match your filters'}
+            </p>
+            {students.length === 0 ? (
+              <p className="text-gray-400 dark:text-gray-500 text-sm">
+                Students will appear here once they register
+              </p>
+            ) : (
+              <button
+                onClick={() => {
+                  setFilters({
+                    department: '',
+                    year: '',
+                    specialization: '',
+                    hasProjects: '',
+                    hasInternships: '',
+                    hasHackathons: ''
+                  });
+                  setSearchTerm('');
+                }}
+                className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
         )}
       </div>
 

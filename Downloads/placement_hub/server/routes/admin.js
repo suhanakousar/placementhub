@@ -380,20 +380,42 @@ router.get('/students/resumes/download', async (req, res) => {
         continue;
       }
 
-      let filePath;
-      if (preferredResume.file.startsWith('uploads/')) {
-        filePath = path.join(__dirname, '..', preferredResume.file);
-      } else if (preferredResume.file.startsWith('uploads\\')) {
-        const filename = preferredResume.file.split(/[/\\]/).pop();
-        filePath = path.join(__dirname, '..', 'uploads', filename);
-      } else if (preferredResume.file.includes('uploads')) {
-        const filename = preferredResume.file.split(/[/\\]/).pop();
-        filePath = path.join(__dirname, '..', 'uploads', filename);
-      } else {
-        filePath = path.join(__dirname, '..', 'uploads', preferredResume.file);
+      const rawPath = (preferredResume.file || '').trim();
+      if (!rawPath) {
+        continue;
       }
 
-      if (!fs.existsSync(filePath)) {
+      const candidatePaths = new Set();
+
+      if (rawPath.startsWith('uploads/')) {
+        candidatePaths.add(path.join(__dirname, '..', rawPath));
+      }
+
+      if (rawPath.startsWith('uploads\\')) {
+        candidatePaths.add(path.join(__dirname, '..', rawPath.replace(/\\/g, '/')));
+      }
+
+      if (rawPath.includes('uploads')) {
+        const filename = rawPath.split(/[/\\]/).pop();
+        candidatePaths.add(path.join(__dirname, '..', 'uploads', filename));
+      }
+
+      const normalizedRelative = rawPath.replace(/^[/\\]+/, '');
+      candidatePaths.add(path.join(__dirname, '..', 'uploads', normalizedRelative));
+
+      if (path.isAbsolute(rawPath)) {
+        candidatePaths.add(rawPath);
+      }
+
+      let filePath = null;
+      for (const candidate of candidatePaths) {
+        if (fs.existsSync(candidate)) {
+          filePath = candidate;
+          break;
+        }
+      }
+
+      if (!filePath) {
         continue;
       }
 

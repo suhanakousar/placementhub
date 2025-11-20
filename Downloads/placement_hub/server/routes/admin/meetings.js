@@ -451,13 +451,15 @@ router.post('/bulk', async (req, res) => {
     }
 
     let meetingDetails;
+    const primaryStudentEmail = targetStudents[0]?.userId?.email || null;
     try {
       meetingDetails = await createRealMeeting(meetingPlatform, {
         title,
         description,
         startTime,
         endTime,
-        timezone: studentTimezone || 'UTC'
+        timezone: studentTimezone || 'UTC',
+        attendeeEmail: primaryStudentEmail
       });
     } catch (meetingError) {
       console.error('Error creating meeting link for bulk session:', meetingError);

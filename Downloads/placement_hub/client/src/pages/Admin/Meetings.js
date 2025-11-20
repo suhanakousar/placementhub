@@ -420,9 +420,21 @@ const Meetings = () => {
                       <td className="py-3 px-4">
                         <div>
                           <p className="font-medium text-gray-800 dark:text-white">{meeting.title}</p>
+                          {meeting.isGroupMeeting && (
+                            <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 mt-1">
+                              Group Session
+                            </span>
+                          )}
                           <p className="text-sm text-gray-600 dark:text-gray-400">
                             {meeting.topic?.replace('_', ' ')}
                           </p>
+                          {meeting.isGroupMeeting && meeting.groupFilters && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              {meeting.groupFilters.department && `Dept: ${meeting.groupFilters.department} `}
+                              {meeting.groupFilters.year && `• Batch: ${meeting.groupFilters.year} `}
+                              {meeting.groupFilters.specialization && `• Spec: ${meeting.groupFilters.specialization}`}
+                            </p>
+                          )}
                         </div>
                       </td>
                       <td className="py-3 px-4">

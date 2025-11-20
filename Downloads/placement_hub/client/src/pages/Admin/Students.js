@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FaSearch, FaDownload, FaEye, FaFileExport, FaFilePdf, FaEnvelope, FaTrash, FaExclamationTriangle, FaTimes, FaUsers } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
@@ -7,8 +7,8 @@ import { getDepartmentName } from '../../utils/departmentNames';
 
 const Students = () => {
   const [students, setStudents] = useState([]);
-  const [filteredStudents, setFilteredStudents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     department: '',
     year: '',
@@ -26,82 +26,65 @@ const Students = () => {
     studentName: '',
     step: 1 // 1 = first confirmation, 2 = final warning
   });
+  const hasActiveFilters = Boolean(
+    debouncedSearchTerm ||
+    filters.department ||
+    filters.year ||
+    filters.specialization ||
+    filters.hasProjects ||
+    filters.hasInternships ||
+    filters.hasHackathons
+  );
 
   useEffect(() => {
-    fetchStudents();
-  }, []);
+    const handler = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
-  useEffect(() => {
-    filterStudents();
-  }, [students, searchTerm, filters]);
-
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
+    setLoading(true);
     try {
-      const response = await api.get('/students');
-      setStudents(response.data || []);
-      setFilteredStudents(response.data || []);
-      if (!response.data || response.data.length === 0) {
-        toast.info('No students found in the system');
+      const params = {};
+      if (debouncedSearchTerm) params.search = debouncedSearchTerm;
+      if (filters.department) params.department = filters.department;
+      if (filters.year) params.year = filters.year;
+      if (filters.specialization) params.specialization = filters.specialization;
+      if (filters.hasProjects) params.hasProjects = filters.hasProjects;
+      if (filters.hasInternships) params.hasInternships = filters.hasInternships;
+      if (filters.hasHackathons) params.hasHackathons = filters.hasHackathons;
+
+      const response = await api.get('/students', { params });
+      const studentData = response.data || [];
+      setStudents(studentData);
+
+      if (studentData.length === 0) {
+        toast.info(
+          hasActiveFilters
+            ? 'No students match your filters'
+            : 'No students found in the system'
+        );
       }
     } catch (error) {
       console.error('Error fetching students:', error);
       toast.error(error.response?.data?.message || 'Failed to load students');
       setStudents([]);
-      setFilteredStudents([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    debouncedSearchTerm,
+    filters.department,
+    filters.year,
+    filters.specialization,
+    filters.hasProjects,
+    filters.hasInternships,
+    filters.hasHackathons,
+    hasActiveFilters
+  ]);
 
-  const filterStudents = () => {
-    let filtered = students;
-
-    if (searchTerm) {
-      filtered = filtered.filter(student =>
-        student.personalInfo?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.personalInfo?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.academicInfo?.rollNumber?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (filters.department) {
-      filtered = filtered.filter(student => student.academicInfo?.department === filters.department);
-    }
-
-    if (filters.year) {
-      filtered = filtered.filter(student => student.academicInfo?.year === parseInt(filters.year));
-    }
-
-    if (filters.specialization) {
-      filtered = filtered.filter(student => student.academicInfo?.specialization === filters.specialization);
-    }
-
-    if (filters.hasProjects) {
-      if (filters.hasProjects === 'yes') {
-        filtered = filtered.filter(student => student.projects && student.projects.length > 0);
-      } else if (filters.hasProjects === 'no') {
-        filtered = filtered.filter(student => !student.projects || student.projects.length === 0);
-      }
-    }
-
-    if (filters.hasInternships) {
-      if (filters.hasInternships === 'yes') {
-        filtered = filtered.filter(student => student.internships && student.internships.length > 0);
-      } else if (filters.hasInternships === 'no') {
-        filtered = filtered.filter(student => !student.internships || student.internships.length === 0);
-      }
-    }
-
-    if (filters.hasHackathons) {
-      if (filters.hasHackathons === 'yes') {
-        filtered = filtered.filter(student => student.hackathons && student.hackathons.length > 0);
-      } else if (filters.hasHackathons === 'no') {
-        filtered = filtered.filter(student => !student.hackathons || student.hackathons.length === 0);
-      }
-    }
-
-    setFilteredStudents(filtered);
-  };
+  useEffect(() => {
+    fetchStudents();
+  }, [fetchStudents]);
 
   const handleDownloadResume = async (studentId) => {
     try {
@@ -178,6 +161,7 @@ const Students = () => {
       if (filters.hasProjects) queryParams.append('hasProjects', filters.hasProjects);
       if (filters.hasInternships) queryParams.append('hasInternships', filters.hasInternships);
       if (filters.hasHackathons) queryParams.append('hasHackathons', filters.hasHackathons);
+      if (searchTerm) queryParams.append('search', searchTerm);
       queryParams.append('format', format);
 
       const response = await api.get(`/admin/students/export?${queryParams.toString()}`, {
@@ -250,8 +234,7 @@ const Students = () => {
       toast.success('Student account and all data deleted successfully');
       
       // Remove student from list
-      setStudents(students.filter(student => student._id !== deleteConfirmation.studentId));
-      setFilteredStudents(filteredStudents.filter(student => student._id !== deleteConfirmation.studentId));
+      setStudents(prev => prev.filter(student => student._id !== deleteConfirmation.studentId));
       
       // Close confirmation modal
       setDeleteConfirmation({
@@ -457,7 +440,7 @@ const Students = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredStudents.map((student) => (
+            {students.map((student) => (
               <tr key={student._id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                 <td className="py-3 px-4 text-gray-800 dark:text-white">
                   {student.personalInfo?.firstName} {student.personalInfo?.lastName}
@@ -555,19 +538,15 @@ const Students = () => {
             ))}
           </tbody>
         </table>
-        {filteredStudents.length === 0 && !loading && (
+        {students.length === 0 && !loading && (
           <div className="text-center py-12">
             <FaUsers className="mx-auto text-4xl text-gray-400 mb-4" />
             <p className="text-gray-500 dark:text-gray-400 text-lg font-medium mb-2">
-              {students.length === 0 
-                ? 'No students registered yet' 
-                : 'No students match your filters'}
+              {hasActiveFilters
+                ? 'No students match your filters'
+                : 'No students registered yet'}
             </p>
-            {students.length === 0 ? (
-              <p className="text-gray-400 dark:text-gray-500 text-sm">
-                Students will appear here once they register
-              </p>
-            ) : (
+            {hasActiveFilters ? (
               <button
                 onClick={() => {
                   setFilters({
@@ -584,15 +563,19 @@ const Students = () => {
               >
                 Clear Filters
               </button>
+            ) : (
+              <p className="text-gray-400 dark:text-gray-500 text-sm">
+                Students will appear here once they register
+              </p>
             )}
           </div>
         )}
       </div>
 
-      {filteredStudents.length > 0 && (
+      {students.length > 0 && (
         <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
           <p className="text-sm text-gray-700 dark:text-gray-300">
-            <strong>Total Students:</strong> {filteredStudents.length} student(s) found
+            <strong>Total Students:</strong> {students.length} student(s) found
             {filters.department && ` in ${getDepartmentName(filters.department)} department`}
             {filters.year && ` in Passout Batch ${filters.year}`}
             {filters.specialization && ` with specialization ${filters.specialization}`}

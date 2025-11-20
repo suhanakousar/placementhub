@@ -375,6 +375,212 @@ router.post('/', async (req, res) => {
   }
 });
 
+// @route   POST /api/admin/meetings/bulk
+// @desc    Create a group meeting for filtered students
+// @access  Private (Admin)
+router.post('/bulk', async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ userId: req.user._id });
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin profile not found' });
+    }
+
+    const {
+      studentIds = [],
+      filters = {},
+      startTime,
+      endTime,
+      title,
+      topic,
+      description,
+      notes,
+      meetingPlatform = 'google_meet',
+      studentTimezone,
+      mentorTimezone,
+      attachments = []
+    } = req.body;
+
+    if (!startTime || !endTime || !title || !topic) {
+      return res.status(400).json({
+        message: 'Missing required fields: startTime, endTime, title, and topic are required'
+      });
+    }
+
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format' });
+    }
+    if (end <= start) {
+      return res.status(400).json({ message: 'End time must be after start time' });
+    }
+
+    let targetStudents = [];
+
+    if (Array.isArray(studentIds) && studentIds.length > 0) {
+      targetStudents = await Student.find({ _id: { $in: studentIds } })
+        .populate('userId', 'email')
+        .sort({ 'academicInfo.rollNumber': 1 });
+    } else {
+      const filterQuery = {};
+      if (filters.department) {
+        filterQuery['academicInfo.department'] = filters.department;
+      }
+      if (filters.specialization) {
+        filterQuery['academicInfo.specialization'] = filters.specialization;
+      }
+      if (filters.year) {
+        const parsedYear = parseInt(filters.year, 10);
+        if (!isNaN(parsedYear)) {
+          filterQuery['academicInfo.year'] = parsedYear;
+        }
+      }
+
+      targetStudents = await Student.find(filterQuery)
+        .populate('userId', 'email')
+        .sort({ 'academicInfo.rollNumber': 1 });
+    }
+
+    if (!targetStudents.length) {
+      return res.status(404).json({ message: 'No students found for the selected filters' });
+    }
+
+    const hasConflict = await checkMeetingConflicts(start, end, admin._id);
+    if (hasConflict) {
+      return res.status(400).json({ message: 'Meeting time conflicts with existing meeting' });
+    }
+
+    let meetingDetails;
+    try {
+      meetingDetails = await createRealMeeting(meetingPlatform, {
+        title,
+        description,
+        startTime,
+        endTime,
+        timezone: studentTimezone || 'UTC'
+      });
+    } catch (meetingError) {
+      console.error('Error creating meeting link for bulk session:', meetingError);
+      return res.status(500).json({
+        message: 'Failed to create meeting link',
+        error: meetingError.message
+      });
+    }
+
+    const groupSessionId = `group-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const successfulMeetings = [];
+    const failedMeetings = [];
+
+    for (const student of targetStudents) {
+      try {
+        const studentTz = student.personalInfo?.timezone || studentTimezone || 'UTC';
+
+        const meeting = await Meeting.create({
+          studentId: student._id,
+          mentorId: admin._id,
+          startTime: new Date(start),
+          endTime: new Date(end),
+          studentTimezone: studentTz,
+          mentorTimezone: mentorTimezone || 'UTC',
+          title,
+          topic,
+          description,
+          notes,
+          meetingLink: meetingDetails?.meetingLink || '',
+          meetingPlatform,
+          meetingId: meetingDetails?.meetingId || null,
+          meetingPassword: meetingDetails?.password || null,
+          meetingDialIn: meetingDetails?.dialInNumber || null,
+          meetingStartUrl: meetingDetails?.startUrl || null,
+          status: 'approved',
+          createdBy: 'admin',
+          attachments,
+          isGroupMeeting: true,
+          groupSessionId,
+          groupFilters: {
+            department: filters?.department || null,
+            specialization: filters?.specialization || null,
+            year: filters?.year ? parseInt(filters.year, 10) || null : null
+          }
+        });
+
+        try {
+          const icsContent = generateICSFile(meeting, student);
+          if (icsContent) {
+            meeting.icsFile = icsContent;
+            await meeting.save();
+          }
+        } catch (icsError) {
+          console.error('ICS generation failed for student', student._id, icsError);
+        }
+
+        try {
+          await createRemindersForMeeting(meeting, student);
+        } catch (reminderError) {
+          console.error('Reminder creation failed for student', student._id, reminderError);
+        }
+
+        try {
+          if (student.userId?.email) {
+            const localStartTime = formatTimeInTimezone(meeting.startTime, studentTz);
+            await sendEmail({
+              to: student.userId.email,
+              subject: `Group Meeting Scheduled: ${meeting.title}`,
+              html: `
+                <h2>Group Meeting Scheduled</h2>
+                <p>A new mentor session has been scheduled for you.</p>
+                <p><strong>Title:</strong> ${meeting.title}</p>
+                <p><strong>Date & Time:</strong> ${localStartTime}</p>
+                <p><strong>Topic:</strong> ${meeting.topic}</p>
+                <p><strong>Meeting Link:</strong> <a href="${meeting.meetingLink}">${meeting.meetingLink}</a></p>
+                ${meeting.description ? `<p><strong>Description:</strong> ${meeting.description}</p>` : ''}
+                <p>This is a group meeting scheduled for students${filters?.department ? ` in ${filters.department}` : ''}${filters?.year ? `, batch ${filters.year}` : ''}${filters?.specialization ? `, specialization ${filters.specialization}` : ''}.</p>
+              `
+            });
+
+            await EmailLog.create({
+              recipientId: student._id,
+              recipientType: 'Student',
+              recipientEmail: student.userId.email,
+              sentBy: admin._id,
+              subject: `Group Meeting Scheduled: ${meeting.title}`,
+              body: meeting.description || '',
+              status: 'sent',
+              sentAt: new Date(),
+              includesMeetingLink: true,
+              meetingId: meeting._id
+            });
+          }
+        } catch (emailError) {
+          console.error('Email notification failed for student', student._id, emailError);
+        }
+
+        successfulMeetings.push(meeting._id);
+      } catch (meetingError) {
+        console.error('Bulk meeting creation error:', meetingError);
+        failedMeetings.push({
+          studentId: student._id,
+          reason: meetingError.message
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Meeting scheduled for ${successfulMeetings.length} students`,
+      summary: {
+        scheduled: successfulMeetings.length,
+        failed: failedMeetings.length,
+        failures: failedMeetings
+      },
+      groupSessionId
+    });
+  } catch (error) {
+    console.error('Bulk meeting scheduling error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // @route   POST /api/admin/meetings/requests/:id/approve
 // @desc    Approve a meeting request and create meeting
 // @access  Private (Admin)

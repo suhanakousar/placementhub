@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FaTimes, FaCalendar, FaClock, FaUser, FaVideo } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
@@ -17,8 +17,56 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
     mentorTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
   });
   const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [studentFilters, setStudentFilters] = useState({
+    search: '',
+    department: '',
+    year: '',
+    specialization: ''
+  });
+  const [applyToFilteredStudents, setApplyToFilteredStudents] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const filteredStudents = useMemo(() => {
+    const searchValue = studentFilters.search.trim().toLowerCase();
+    return students.filter((student) => {
+      const firstName = student.personalInfo?.firstName || '';
+      const lastName = student.personalInfo?.lastName || '';
+      const rollNumber = student.academicInfo?.rollNumber || '';
+      const email = student.userId?.email || '';
+      const matchesSearch = searchValue
+        ? `${firstName} ${lastName}`.toLowerCase().includes(searchValue) ||
+          rollNumber.toLowerCase().includes(searchValue) ||
+          email.toLowerCase().includes(searchValue)
+        : true;
+      const matchesDepartment = studentFilters.department
+        ? student.academicInfo?.department === studentFilters.department
+        : true;
+      const matchesYear = studentFilters.year
+        ? String(student.academicInfo?.year || '') === studentFilters.year
+        : true;
+      const matchesSpecialization = studentFilters.specialization
+        ? student.academicInfo?.specialization === studentFilters.specialization
+        : true;
+      return matchesSearch && matchesDepartment && matchesYear && matchesSpecialization;
+    });
+  }, [students, studentFilters]);
+  const departmentOptions = useMemo(() => {
+    const departments = students
+      .map((student) => student.academicInfo?.department)
+      .filter(Boolean);
+    return Array.from(new Set(departments)).sort();
+  }, [students]);
+  const specializationOptions = useMemo(() => {
+    const specializations = students
+      .map((student) => student.academicInfo?.specialization)
+      .filter(Boolean);
+    return Array.from(new Set(specializations)).sort();
+  }, [students]);
+  const yearOptions = useMemo(() => {
+    const years = students
+      .map((student) => student.academicInfo?.year)
+      .filter(Boolean);
+    return Array.from(new Set(years)).sort((a, b) => a - b);
+  }, [students]);
 
   const topics = [
     { value: 'resume_review', label: 'Resume Review' },
@@ -66,8 +114,21 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
           mentorTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         });
       }
+      setApplyToFilteredStudents(false);
+      setStudentFilters({
+        search: '',
+        department: '',
+        year: '',
+        specialization: ''
+      });
     }
   }, [isOpen, initialData]);
+
+  useEffect(() => {
+    if (applyToFilteredStudents && filteredStudents.length === 0) {
+      setApplyToFilteredStudents(false);
+    }
+  }, [applyToFilteredStudents, filteredStudents.length]);
 
   const fetchStudents = async () => {
     try {
@@ -102,7 +163,7 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
         toast.success('Meeting request approved and meeting created');
       } else {
         // Validate required fields
-        if (!formData.studentId || !formData.startTime || !formData.endTime || !formData.title) {
+        if ((!formData.studentId && !applyToFilteredStudents) || !formData.startTime || !formData.endTime || !formData.title) {
           toast.error('Please fill in all required fields');
           setSubmitting(false);
           return;
@@ -117,22 +178,50 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
           return;
         }
 
-        // Create new meeting directly
-        const meetingPayload = {
-          studentId: formData.studentId,
-          startTime: start.toISOString(),
-          endTime: end.toISOString(),
-          title: formData.title,
-          topic: formData.topic,
-          description: formData.description,
-          notes: formData.notes,
-          meetingPlatform: 'google_meet',
-          studentTimezone: formData.studentTimezone,
-          mentorTimezone: formData.mentorTimezone
-        };
-        
-        await api.post('/admin/meetings', meetingPayload);
-        toast.success('Meeting created successfully');
+        if (applyToFilteredStudents) {
+          if (filteredStudents.length === 0) {
+            toast.error('No students match the selected filters');
+            setSubmitting(false);
+            return;
+          }
+
+          const filtersPayload = {};
+          if (studentFilters.department) filtersPayload.department = studentFilters.department;
+          if (studentFilters.year) filtersPayload.year = studentFilters.year;
+          if (studentFilters.specialization) filtersPayload.specialization = studentFilters.specialization;
+
+          await api.post('/admin/meetings/bulk', {
+            studentIds: filteredStudents.map((student) => student._id),
+            filters: filtersPayload,
+            startTime: start.toISOString(),
+            endTime: end.toISOString(),
+            title: formData.title,
+            topic: formData.topic,
+            description: formData.description,
+            notes: formData.notes,
+            meetingPlatform: formData.meetingPlatform,
+            studentTimezone: formData.studentTimezone,
+            mentorTimezone: formData.mentorTimezone
+          });
+          toast.success(`Meeting scheduled for ${filteredStudents.length} students`);
+        } else {
+          // Create new meeting directly
+          const meetingPayload = {
+            studentId: formData.studentId,
+            startTime: start.toISOString(),
+            endTime: end.toISOString(),
+            title: formData.title,
+            topic: formData.topic,
+            description: formData.description,
+            notes: formData.notes,
+            meetingPlatform: formData.meetingPlatform,
+            studentTimezone: formData.studentTimezone,
+            mentorTimezone: formData.mentorTimezone
+          };
+          
+          await api.post('/admin/meetings', meetingPayload);
+          toast.success('Meeting created successfully');
+        }
       }
       onSuccess();
       onClose();
@@ -173,6 +262,93 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {!requestId && (
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/20">
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                Filter students by cohorts
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  value={studentFilters.search}
+                  onChange={(e) => setStudentFilters({ ...studentFilters, search: e.target.value })}
+                  placeholder="Search by name, email, or roll number"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                />
+                <select
+                  value={studentFilters.department}
+                  onChange={(e) => setStudentFilters({ ...studentFilters, department: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">All Departments</option>
+                  {departmentOptions.map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={studentFilters.year}
+                  onChange={(e) => setStudentFilters({ ...studentFilters, year: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">All Passout Batches</option>
+                  {yearOptions.map((yr) => (
+                    <option key={yr} value={String(yr)}>
+                      {yr}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={studentFilters.specialization}
+                  onChange={(e) => setStudentFilters({ ...studentFilters, specialization: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">All Specializations</option>
+                  {specializationOptions.map((spec) => (
+                    <option key={spec} value={spec}>
+                      {spec}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between text-xs text-gray-600 dark:text-gray-400 gap-2">
+                <span>{filteredStudents.length} student(s) match the current filters</span>
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setStudentFilters({
+                      search: '',
+                      department: '',
+                      year: '',
+                      specialization: ''
+                    })}
+                    className="text-primary-600 dark:text-primary-400 hover:underline"
+                  >
+                    Reset filters
+                  </button>
+                </div>
+              </div>
+              <label className="mt-3 flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 text-primary-600 rounded"
+                  checked={applyToFilteredStudents}
+                  onChange={(e) => {
+                    setApplyToFilteredStudents(e.target.checked);
+                    if (e.target.checked) {
+                      setFormData((prev) => ({ ...prev, studentId: '' }));
+                    }
+                  }}
+                  disabled={filteredStudents.length === 0}
+                />
+                <span>
+                  Schedule for all matched students ({filteredStudents.length})
+                </span>
+              </label>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               <FaUser className="inline mr-1" />
@@ -182,16 +358,21 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
               value={formData.studentId}
               onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-              required
-              disabled={!!requestId}
+              required={!applyToFilteredStudents}
+              disabled={!!requestId || applyToFilteredStudents}
             >
               <option value="">Select a student</option>
-              {students.map(student => (
+              {filteredStudents.map(student => (
                 <option key={student._id} value={student._id}>
                   {student.personalInfo?.firstName} {student.personalInfo?.lastName} - {student.academicInfo?.rollNumber}
                 </option>
               ))}
             </select>
+            {applyToFilteredStudents && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                This meeting will be scheduled for all {filteredStudents.length} filtered students.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

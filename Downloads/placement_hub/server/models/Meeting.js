@@ -142,6 +142,19 @@ const meetingSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Feedback'
   },
+  // Group session metadata
+  isGroupMeeting: {
+    type: Boolean,
+    default: false
+  },
+  groupSessionId: {
+    type: String
+  },
+  groupFilters: {
+    department: String,
+    year: Number,
+    specialization: String
+  },
   // Audit trail
   createdBy: {
     type: String,

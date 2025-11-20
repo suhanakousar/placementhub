@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const Student = require('../models/Student');
 const LeaderboardProfile = require('../models/LeaderboardProfile');
+const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 const { fetchCodingStats } = require('../services/codingPlatformService');
 
@@ -745,11 +746,97 @@ router.get('/certifications/:certificationId/download', authorize('student'), as
 // @access  Private (Admin)
 router.get('/', protect, authorize('admin'), async (req, res) => {
   try {
-    const students = await Student.find()
+    const {
+      search,
+      department,
+      year,
+      specialization,
+      hasProjects,
+      hasInternships,
+      hasHackathons
+    } = req.query;
+
+    const query = {};
+    const andConditions = [];
+
+    if (department) {
+      query['academicInfo.department'] = department;
+    }
+
+    if (specialization) {
+      query['academicInfo.specialization'] = specialization;
+    }
+
+    if (year) {
+      const parsedYear = parseInt(year, 10);
+      if (!isNaN(parsedYear)) {
+        query['academicInfo.year'] = parsedYear;
+      }
+    }
+
+    if (hasProjects === 'yes') {
+      andConditions.push({ 'projects.0': { $exists: true } });
+    } else if (hasProjects === 'no') {
+      andConditions.push({
+        $or: [
+          { projects: { $exists: false } },
+          { projects: { $size: 0 } }
+        ]
+      });
+    }
+
+    if (hasInternships === 'yes') {
+      andConditions.push({ 'internships.0': { $exists: true } });
+    } else if (hasInternships === 'no') {
+      andConditions.push({
+        $or: [
+          { internships: { $exists: false } },
+          { internships: { $size: 0 } }
+        ]
+      });
+    }
+
+    if (hasHackathons === 'yes') {
+      andConditions.push({ 'hackathons.0': { $exists: true } });
+    } else if (hasHackathons === 'no') {
+      andConditions.push({
+        $or: [
+          { hackathons: { $exists: false } },
+          { hackathons: { $size: 0 } }
+        ]
+      });
+    }
+
+    if (search && search.trim().length > 0) {
+      const regex = new RegExp(search.trim(), 'i');
+      const searchConditions = [
+        { 'personalInfo.firstName': regex },
+        { 'personalInfo.lastName': regex },
+        { 'academicInfo.rollNumber': regex },
+        { 'academicInfo.department': regex },
+        { 'academicInfo.specialization': regex }
+      ];
+
+      const matchingUsers = await User.find({ email: regex }).select('_id');
+      if (matchingUsers.length > 0) {
+        searchConditions.push({
+          userId: { $in: matchingUsers.map((u) => u._id) }
+        });
+      }
+
+      andConditions.push({ $or: searchConditions });
+    }
+
+    if (andConditions.length > 0) {
+      query.$and = andConditions;
+    }
+
+    const students = await Student.find(query)
       .populate('userId', 'email')
       .sort({ 'academicInfo.rollNumber': 1 });
     res.json(students);
   } catch (error) {
+    console.error('Error fetching students with filters:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

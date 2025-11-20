@@ -313,50 +313,6 @@ router.put('/profile', authorize('student'), async (req, res) => {
   }
 });
 
-// @route   POST /api/students/profile-photo
-// @desc    Upload profile photo
-// @access  Private (Student)
-router.post('/profile-photo', authorize('student'), upload.single('profilePhoto'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
-    }
-
-    const student = await Student.findOne({ userId: req.user._id });
-    if (!student) {
-      return res.status(404).json({ message: 'Student profile not found' });
-    }
-
-    // Delete old profile photo if exists
-    if (student.personalInfo?.profilePhoto) {
-      const oldFilePath = path.join(__dirname, '..', student.personalInfo.profilePhoto);
-      if (fs.existsSync(oldFilePath)) {
-        try {
-          fs.unlinkSync(oldFilePath);
-        } catch (fileError) {
-          console.error('Error deleting old profile photo:', fileError);
-        }
-      }
-    }
-
-    const relativePath = `uploads/${path.basename(req.file.path)}`;
-    
-    // Update profile photo
-    if (!student.personalInfo) {
-      student.personalInfo = {};
-    }
-    student.personalInfo.profilePhoto = relativePath;
-    await student.save();
-
-    res.json({ 
-      message: 'Profile photo uploaded successfully',
-      profilePhoto: relativePath 
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
 // @route   POST /api/students/projects
 // @desc    Add a project
 // @access  Private (Student)

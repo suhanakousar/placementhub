@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const archiver = require('archiver');
 const Student = require('../models/Student');
 const PlacementDrive = require('../models/PlacementDrive');
 const Post = require('../models/Post');
@@ -280,8 +281,8 @@ router.get('/students/export', async (req, res) => {
     let query = {};
     if (department) query['academicInfo.department'] = department;
     if (year) query['academicInfo.year'] = parseInt(year);
-    if (verified === 'verified') query['placementStatus.resumeVerified'] = true;
-    if (verified === 'unverified') query['placementStatus.resumeVerified'] = false;
+    // Only include resume-verified students in exports
+    query['placementStatus.resumeVerified'] = true;
 
     const students = await Student.find(query).populate('userId', 'email').sort({ 'academicInfo.rollNumber': 1 });
 
@@ -327,6 +328,93 @@ router.get('/students/export', async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   GET /api/admin/students/resumes/download
+// @desc    Download verified student resumes as a ZIP
+router.get('/students/resumes/download', async (req, res) => {
+  try {
+    const { department, year, specialization } = req.query;
+    const query = {
+      'placementStatus.resumeVerified': true
+    };
+
+    if (department) query['academicInfo.department'] = department;
+    if (specialization) query['academicInfo.specialization'] = specialization;
+    if (year) {
+      const parsedYear = parseInt(year, 10);
+      if (!isNaN(parsedYear)) {
+        query['academicInfo.year'] = parsedYear;
+      }
+    }
+
+    const students = await Student.find(query)
+      .populate('userId', 'email')
+      .sort({ 'academicInfo.rollNumber': 1 });
+
+    if (!students.length) {
+      return res.status(404).json({ message: 'No verified students match the selected filters' });
+    }
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    const filenameParts = ['verified_resumes'];
+    if (department) filenameParts.push(department);
+    if (year) filenameParts.push(year);
+    if (specialization) filenameParts.push('specialization');
+    filenameParts.push(Date.now());
+    const zipName = filenameParts.join('_') + '.zip';
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename=${zipName}`);
+    archive.pipe(res);
+
+    let filesAdded = 0;
+
+    for (const student of students) {
+      const preferredResume =
+        student.resumes?.find(resume => resume.verified && resume.file) ||
+        student.resumes?.find(resume => resume.file);
+
+      if (!preferredResume || !preferredResume.file) {
+        continue;
+      }
+
+      let filePath;
+      if (preferredResume.file.startsWith('uploads/')) {
+        filePath = path.join(__dirname, '..', preferredResume.file);
+      } else if (preferredResume.file.startsWith('uploads\\')) {
+        const filename = preferredResume.file.split(/[/\\]/).pop();
+        filePath = path.join(__dirname, '..', 'uploads', filename);
+      } else if (preferredResume.file.includes('uploads')) {
+        const filename = preferredResume.file.split(/[/\\]/).pop();
+        filePath = path.join(__dirname, '..', 'uploads', filename);
+      } else {
+        filePath = path.join(__dirname, '..', 'uploads', preferredResume.file);
+      }
+
+      if (!fs.existsSync(filePath)) {
+        continue;
+      }
+
+      const safeFirstName = (student.personalInfo?.firstName || 'Student').replace(/\s+/g, '_');
+      const safeLastName = (student.personalInfo?.lastName || '').replace(/\s+/g, '_');
+      const safeRoll = (student.academicInfo?.rollNumber || student._id.toString()).replace(/\s+/g, '_');
+      const archiveName = `${safeFirstName}_${safeLastName}_${safeRoll}.pdf`;
+
+      archive.file(filePath, { name: archiveName });
+      filesAdded += 1;
+    }
+
+    if (filesAdded === 0) {
+      archive.destroy();
+      return res.status(404).json({ message: 'No resume files available for the selected students' });
+    }
+
+    archive.finalize();
+  } catch (error) {
+    console.error('Error creating resume ZIP:', error);
+    res.status(500).json({ message: 'Failed to create resume archive', error: error.message });
   }
 });
 

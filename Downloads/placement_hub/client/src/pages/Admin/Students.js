@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FaSearch, FaDownload, FaEye, FaFileExport, FaFilePdf, FaEnvelope, FaTrash, FaExclamationTriangle, FaTimes, FaUsers } from 'react-icons/fa';
+import { FaSearch, FaDownload, FaEye, FaFileExport, FaFilePdf, FaEnvelope, FaTrash, FaExclamationTriangle, FaTimes, FaUsers, FaCheckCircle, FaFileArchive } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import StudentDetailModal from '../../components/StudentDetailModal';
@@ -26,6 +26,7 @@ const Students = () => {
     studentName: '',
     step: 1 // 1 = first confirmation, 2 = final warning
   });
+  const [verifyingStudentId, setVerifyingStudentId] = useState(null);
   const hasActiveFilters = Boolean(
     debouncedSearchTerm ||
     filters.department ||
@@ -152,6 +153,44 @@ const Students = () => {
     }
   };
 
+  const handleVerifyStudent = async (studentId) => {
+    try {
+      setVerifyingStudentId(studentId);
+      await api.put(`/admin/students/${studentId}/verify`, { verified: true });
+      toast.success('Resume marked as verified');
+      fetchStudents();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to verify resume');
+    } finally {
+      setVerifyingStudentId(null);
+    }
+  };
+
+  const handleDownloadVerifiedResumesZip = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (filters.department) queryParams.append('department', filters.department);
+      if (filters.year) queryParams.append('year', filters.year);
+      if (filters.specialization) queryParams.append('specialization', filters.specialization);
+
+      const response = await api.get(`/admin/students/resumes/download?${queryParams.toString()}`, {
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `verified_resumes_${Date.now()}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Verified resumes ZIP downloaded');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to download resumes');
+    }
+  };
+
   const handleExportData = async (format = 'csv') => {
     try {
       const queryParams = new URLSearchParams();
@@ -273,6 +312,14 @@ const Students = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Manage Students</h2>
         <div className="flex space-x-2">
+          <button
+            onClick={handleDownloadVerifiedResumesZip}
+            className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            title="Download verified resumes ZIP"
+          >
+            <FaFileArchive />
+            <span>Resumes ZIP</span>
+          </button>
           <button
             onClick={() => handleExportData('csv')}
             className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -478,31 +525,47 @@ const Students = () => {
                   )}
                 </td>
                 <td className="py-3 px-4">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {student.resumes?.length || 0}
+                  {student.placementStatus?.resumeVerified ? (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {student.resumes?.length || 0}
+                      </span>
+                      {student.resumes && student.resumes.length > 0 && (
+                        <div className="flex flex-col space-y-1">
+                          {student.resumes.slice(0, 2).map((resume, idx) => (
+                            <button
+                              key={resume._id || idx}
+                              onClick={() => handleDownloadResumeById(student._id, resume._id)}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded text-xs"
+                              title={`Download: ${resume.name}`}
+                            >
+                              <FaFilePdf />
+                            </button>
+                          ))}
+                          {student.resumes.length > 2 && (
+                            <span className="text-xs text-gray-500">+{student.resumes.length - 2}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      Verify resume to access files
                     </span>
-                    {student.resumes && student.resumes.length > 0 && (
-                      <div className="flex flex-col space-y-1">
-                        {student.resumes.slice(0, 2).map((resume, idx) => (
-                          <button
-                            key={resume._id || idx}
-                            onClick={() => handleDownloadResumeById(student._id, resume._id)}
-                            className="p-1 text-blue-600 hover:bg-blue-50 rounded text-xs"
-                            title={`Download: ${resume.name}`}
-                          >
-                            <FaFilePdf />
-                          </button>
-                        ))}
-                        {student.resumes.length > 2 && (
-                          <span className="text-xs text-gray-500">+{student.resumes.length - 2}</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </td>
                 <td className="py-3 px-4">
                   <div className="flex space-x-2">
+                    {!student.placementStatus?.resumeVerified && (
+                      <button
+                        onClick={() => handleVerifyStudent(student._id)}
+                        className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition"
+                        title="Mark resume as verified"
+                        disabled={verifyingStudentId === student._id}
+                      >
+                        <FaCheckCircle className={verifyingStudentId === student._id ? 'animate-pulse' : ''} />
+                      </button>
+                    )}
                     <button
                       onClick={() => handleViewStudent(student._id)}
                       className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition"
@@ -513,12 +576,16 @@ const Students = () => {
                     <button
                       onClick={() => handleDownloadResume(student._id)}
                       className={`p-2 rounded transition ${
-                        !student.resumes || student.resumes.length === 0
+                        !student.placementStatus?.resumeVerified || !student.resumes || student.resumes.length === 0
                           ? 'text-gray-400 cursor-not-allowed'
                           : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
                       }`}
                       title="Download Latest Resume"
-                      disabled={!student.resumes || student.resumes.length === 0}
+                      disabled={
+                        !student.placementStatus?.resumeVerified ||
+                        !student.resumes ||
+                        student.resumes.length === 0
+                      }
                     >
                       <FaDownload />
                     </button>

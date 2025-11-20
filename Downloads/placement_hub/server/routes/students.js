@@ -108,150 +108,34 @@ router.get('/:studentId/coding-stats', async (req, res) => {
       return res.status(404).json({ message: 'Student profile not found' });
     }
 
+    // Extract handles from personalInfo - only LeetCode and HackerRank
     const handles = {
       leetcode: student.personalInfo?.leetcode
         ? extractUsername(student.personalInfo.leetcode, 'leetcode')
         : null,
       hackerrank: student.personalInfo?.hackerrank
         ? extractUsername(student.personalInfo.hackerrank, 'hackerrank')
-        : null,
-      codechef: student.personalInfo?.codechef
-        ? extractUsername(student.personalInfo.codechef, 'codechef')
-        : null,
-      codeforces: student.personalInfo?.codeforces
-        ? extractUsername(student.personalInfo.codeforces, 'codeforces')
-        : null,
-      geeksforgeeks: student.personalInfo?.geeksforgeeks
-        ? extractUsername(student.personalInfo.geeksforgeeks, 'geeksforgeeks')
         : null
     };
 
+    // Fetch real coding stats (only LeetCode and HackerRank)
     const codingStats = await fetchCodingStats(handles);
 
-    const generateRatingHistory = (platform, currentRating) => {
-      const months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec'
-      ];
-      const history = [];
-      const now = new Date();
-
-      for (let i = 11; i >= 0; i--) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const baseRating = currentRating
-          ? currentRating - (Math.random() * 200 + 100)
-          : 1200;
-        const variation = Math.random() * 100 - 50;
-        history.push({
-          month: months[date.getMonth()],
-          rating: Math.max(0, Math.round(baseRating + variation + (11 - i) * 20))
-        });
-      }
-      return history;
-    };
-
-    if (codingStats.codechef) {
-      codingStats.codechef.ratingHistory = generateRatingHistory(
-        'codechef',
-        codingStats.codechef.contestRating
-      );
-      codingStats.codechef.highestRating = codingStats.codechef.contestRating
-        ? Math.max(
-            ...codingStats.codechef.ratingHistory.map((r) => r.rating)
-          )
-        : null;
-      codingStats.codechef.ratingChange =
-        codingStats.codechef.ratingHistory.length > 1
-          ? codingStats.codechef.ratingHistory[
-              codingStats.codechef.ratingHistory.length - 1
-            ].rating -
-            codingStats.codechef.ratingHistory[0].rating
-          : 0;
-    }
-    if (codingStats.codeforces) {
-      codingStats.codeforces.ratingHistory = generateRatingHistory(
-        'codeforces',
-        codingStats.codeforces.contestRating
-      );
-      codingStats.codeforces.highestRating =
-        codingStats.codeforces.contestRating ||
-        Math.max(...codingStats.codeforces.ratingHistory.map((r) => r.rating));
-      codingStats.codeforces.ratingChange =
-        codingStats.codeforces.ratingHistory.length > 1
-          ? codingStats.codeforces.ratingHistory[
-              codingStats.codeforces.ratingHistory.length - 1
-            ].rating -
-            codingStats.codeforces.ratingHistory[0].rating
-          : 0;
-    }
-    if (codingStats.leetcode) {
-      codingStats.leetcode.ratingHistory = generateRatingHistory(
-        'leetcode',
-        codingStats.leetcode.contestRating
-      );
-      codingStats.leetcode.highestRating =
-        codingStats.leetcode.contestRating ||
-        Math.max(...codingStats.leetcode.ratingHistory.map((r) => r.rating));
-      codingStats.leetcode.ratingChange =
-        codingStats.leetcode.ratingHistory.length > 1
-          ? codingStats.leetcode.ratingHistory[
-              codingStats.leetcode.ratingHistory.length - 1
-            ].rating -
-            codingStats.leetcode.ratingHistory[0].rating
-          : 0;
-    }
-
+    // Calculate overall score from real data only
     const overallScore = calculateOverallScore(codingStats);
-    const globalRank = Math.floor(Math.random() * 5000) + 1;
-    const globalRankingsHistory = generateRatingHistory('global', overallScore);
 
+    // Generate score distribution from real data only
     const scoreDistribution = [
+      {
+        name: 'LeetCode',
+        value: codingStats.leetcode?.points || 0,
+        color: '#f89f1b'
+      },
       {
         name: 'HackerRank',
         value: codingStats.hackerrank?.points || 0,
         color: '#16a34a'
-      },
-      {
-        name: 'InterviewBit',
-        value: 0,
-        color: '#3b82f6'
-      },
-      {
-        name: 'LeetCode',
-        value:
-          codingStats.leetcode?.points ||
-          codingStats.leetcode?.problemsSolved * 10 ||
-          0,
-        color: '#f89f1b'
-      },
-      {
-        name: 'Codeforces',
-        value:
-          codingStats.codeforces?.points ||
-          codingStats.codeforces?.contestRating ||
-          0,
-        color: '#3182ce'
-      },
-      {
-        name: 'CodeChef',
-        value:
-          codingStats.codechef?.points ||
-          codingStats.codechef?.contestRating ||
-          0,
-        color: '#8b5a2b'
-      },
-      { name: 'GitHub', value: 0, color: '#6b7280' },
-      { name: 'SPOJ', value: 0, color: '#8b5cf6' }
+      }
     ].filter((item) => item.value > 0);
 
     const studentInfo = {
@@ -267,8 +151,8 @@ router.get('/:studentId/coding-stats', async (req, res) => {
       studentInfo,
       codingStats,
       overallScore,
-      globalRank,
-      globalRankingsHistory,
+      globalRank: null, // No mock rank
+      globalRankingsHistory: [], // No mock history
       scoreDistribution
     });
   } catch (error) {
@@ -822,85 +706,29 @@ router.get('/coding-stats', authorize('student'), async (req, res) => {
       return res.status(404).json({ message: 'Student profile not found' });
     }
 
-    // Extract handles from personalInfo
+    // Extract handles from personalInfo - only LeetCode and HackerRank
     const handles = {
       leetcode: student.personalInfo?.leetcode ? extractUsername(student.personalInfo.leetcode, 'leetcode') : null,
-      hackerrank: student.personalInfo?.hackerrank ? extractUsername(student.personalInfo.hackerrank, 'hackerrank') : null,
-      codechef: student.personalInfo?.codechef ? extractUsername(student.personalInfo.codechef, 'codechef') : null,
-      codeforces: student.personalInfo?.codeforces ? extractUsername(student.personalInfo.codeforces, 'codeforces') : null,
-      geeksforgeeks: student.personalInfo?.geeksforgeeks ? extractUsername(student.personalInfo.geeksforgeeks, 'geeksforgeeks') : null
+      hackerrank: student.personalInfo?.hackerrank ? extractUsername(student.personalInfo.hackerrank, 'hackerrank') : null
     };
 
-    // Fetch coding stats
+    // Fetch real coding stats (only LeetCode and HackerRank)
     const codingStats = await fetchCodingStats(handles);
 
-    // Generate mock rating history for charts (in real app, this would come from historical data)
-    const generateRatingHistory = (platform, currentRating) => {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const history = [];
-      const now = new Date();
-      
-      for (let i = 11; i >= 0; i--) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const baseRating = currentRating ? currentRating - (Math.random() * 200 + 100) : 1200;
-        const variation = Math.random() * 100 - 50;
-        history.push({
-          month: months[date.getMonth()],
-          rating: Math.max(0, Math.round(baseRating + variation + (11 - i) * 20))
-        });
-      }
-      return history;
-    };
-
-    // Add rating history to each platform
-    if (codingStats.codechef) {
-      codingStats.codechef.ratingHistory = generateRatingHistory('codechef', codingStats.codechef.contestRating);
-      codingStats.codechef.highestRating = codingStats.codechef.contestRating ? 
-        Math.max(...codingStats.codechef.ratingHistory.map(r => r.rating)) : null;
-      codingStats.codechef.ratingChange = codingStats.codechef.ratingHistory.length > 1 ? 
-        codingStats.codechef.ratingHistory[codingStats.codechef.ratingHistory.length - 1].rating - 
-        codingStats.codechef.ratingHistory[0].rating : 0;
-    }
-    if (codingStats.codeforces) {
-      codingStats.codeforces.ratingHistory = generateRatingHistory('codeforces', codingStats.codeforces.contestRating);
-      codingStats.codeforces.highestRating = codingStats.codeforces.contestRating || 
-        Math.max(...codingStats.codeforces.ratingHistory.map(r => r.rating));
-      codingStats.codeforces.ratingChange = codingStats.codeforces.ratingHistory.length > 1 ? 
-        codingStats.codeforces.ratingHistory[codingStats.codeforces.ratingHistory.length - 1].rating - 
-        codingStats.codeforces.ratingHistory[0].rating : 0;
-    }
-    if (codingStats.leetcode) {
-      codingStats.leetcode.ratingHistory = generateRatingHistory('leetcode', codingStats.leetcode.contestRating);
-      codingStats.leetcode.highestRating = codingStats.leetcode.contestRating || 
-        Math.max(...codingStats.leetcode.ratingHistory.map(r => r.rating));
-      codingStats.leetcode.ratingChange = codingStats.leetcode.ratingHistory.length > 1 ? 
-        codingStats.leetcode.ratingHistory[codingStats.leetcode.ratingHistory.length - 1].rating - 
-        codingStats.leetcode.ratingHistory[0].rating : 0;
-    }
-
-    // Calculate overall score and global rank (mock data for now)
+    // Calculate overall score from real data only
     const overallScore = calculateOverallScore(codingStats);
-    const globalRank = Math.floor(Math.random() * 5000) + 1;
 
-    // Generate global rankings history
-    const globalRankingsHistory = generateRatingHistory('global', overallScore);
-
-    // Generate score distribution
+    // Generate score distribution from real data only
     const scoreDistribution = [
-      { name: 'HackerRank', value: codingStats.hackerrank?.points || 0, color: '#16a34a' },
-      { name: 'InterviewBit', value: 0, color: '#3b82f6' },
-      { name: 'LeetCode', value: codingStats.leetcode?.points || codingStats.leetcode?.problemsSolved * 10 || 0, color: '#f89f1b' },
-      { name: 'Codeforces', value: codingStats.codeforces?.points || codingStats.codeforces?.contestRating || 0, color: '#3182ce' },
-      { name: 'CodeChef', value: codingStats.codechef?.points || codingStats.codechef?.contestRating || 0, color: '#8b5a2b' },
-      { name: 'GitHub', value: 0, color: '#6b7280' },
-      { name: 'SPOJ', value: 0, color: '#8b5cf6' }
+      { name: 'LeetCode', value: codingStats.leetcode?.points || 0, color: '#f89f1b' },
+      { name: 'HackerRank', value: codingStats.hackerrank?.points || 0, color: '#16a34a' }
     ].filter(item => item.value > 0);
 
     res.json({
       codingStats,
       overallScore,
-      globalRank,
-      globalRankingsHistory,
+      globalRank: null, // No mock rank
+      globalRankingsHistory: [], // No mock history
       scoreDistribution
     });
   } catch (error) {
@@ -1029,78 +857,22 @@ router.get('/:studentId/coding-stats', async (req, res) => {
       return res.status(404).json({ message: 'Student profile not found' });
     }
 
-    // Extract handles from personalInfo
+    // Extract handles from personalInfo - only LeetCode and HackerRank
     const handles = {
       leetcode: student.personalInfo?.leetcode ? extractUsername(student.personalInfo.leetcode, 'leetcode') : null,
-      hackerrank: student.personalInfo?.hackerrank ? extractUsername(student.personalInfo.hackerrank, 'hackerrank') : null,
-      codechef: student.personalInfo?.codechef ? extractUsername(student.personalInfo.codechef, 'codechef') : null,
-      codeforces: student.personalInfo?.codeforces ? extractUsername(student.personalInfo.codeforces, 'codeforces') : null,
-      geeksforgeeks: student.personalInfo?.geeksforgeeks ? extractUsername(student.personalInfo.geeksforgeeks, 'geeksforgeeks') : null
+      hackerrank: student.personalInfo?.hackerrank ? extractUsername(student.personalInfo.hackerrank, 'hackerrank') : null
     };
 
-    // Fetch coding stats
+    // Fetch real coding stats (only LeetCode and HackerRank)
     const codingStats = await fetchCodingStats(handles);
 
-    // Generate rating history
-    const generateRatingHistory = (platform, currentRating) => {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const history = [];
-      const now = new Date();
-      
-      for (let i = 11; i >= 0; i--) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const baseRating = currentRating ? currentRating - (Math.random() * 200 + 100) : 1200;
-        const variation = Math.random() * 100 - 50;
-        history.push({
-          month: months[date.getMonth()],
-          rating: Math.max(0, Math.round(baseRating + variation + (11 - i) * 20))
-        });
-      }
-      return history;
-    };
-
-    // Add rating history to each platform
-    if (codingStats.codechef) {
-      codingStats.codechef.ratingHistory = generateRatingHistory('codechef', codingStats.codechef.contestRating);
-      codingStats.codechef.highestRating = codingStats.codechef.contestRating ? 
-        Math.max(...codingStats.codechef.ratingHistory.map(r => r.rating)) : null;
-      codingStats.codechef.ratingChange = codingStats.codechef.ratingHistory.length > 1 ? 
-        codingStats.codechef.ratingHistory[codingStats.codechef.ratingHistory.length - 1].rating - 
-        codingStats.codechef.ratingHistory[0].rating : 0;
-    }
-    if (codingStats.codeforces) {
-      codingStats.codeforces.ratingHistory = generateRatingHistory('codeforces', codingStats.codeforces.contestRating);
-      codingStats.codeforces.highestRating = codingStats.codeforces.contestRating || 
-        Math.max(...codingStats.codeforces.ratingHistory.map(r => r.rating));
-      codingStats.codeforces.ratingChange = codingStats.codeforces.ratingHistory.length > 1 ? 
-        codingStats.codeforces.ratingHistory[codingStats.codeforces.ratingHistory.length - 1].rating - 
-        codingStats.codeforces.ratingHistory[0].rating : 0;
-    }
-    if (codingStats.leetcode) {
-      codingStats.leetcode.ratingHistory = generateRatingHistory('leetcode', codingStats.leetcode.contestRating);
-      codingStats.leetcode.highestRating = codingStats.leetcode.contestRating || 
-        Math.max(...codingStats.leetcode.ratingHistory.map(r => r.rating));
-      codingStats.leetcode.ratingChange = codingStats.leetcode.ratingHistory.length > 1 ? 
-        codingStats.leetcode.ratingHistory[codingStats.leetcode.ratingHistory.length - 1].rating - 
-        codingStats.leetcode.ratingHistory[0].rating : 0;
-    }
-
-    // Calculate overall score and mock rank
+    // Calculate overall score from real data only
     const overallScore = calculateOverallScore(codingStats);
-    const globalRank = Math.floor(Math.random() * 5000) + 1;
 
-    // Generate global rankings history
-    const globalRankingsHistory = generateRatingHistory('global', overallScore);
-
-    // Generate score distribution
+    // Generate score distribution from real data only
     const scoreDistribution = [
-      { name: 'HackerRank', value: codingStats.hackerrank?.points || 0, color: '#16a34a' },
-      { name: 'InterviewBit', value: 0, color: '#3b82f6' },
-      { name: 'LeetCode', value: codingStats.leetcode?.points || codingStats.leetcode?.problemsSolved * 10 || 0, color: '#f89f1b' },
-      { name: 'Codeforces', value: codingStats.codeforces?.points || codingStats.codeforces?.contestRating || 0, color: '#3182ce' },
-      { name: 'CodeChef', value: codingStats.codechef?.points || codingStats.codechef?.contestRating || 0, color: '#8b5a2b' },
-      { name: 'GitHub', value: 0, color: '#6b7280' },
-      { name: 'SPOJ', value: 0, color: '#8b5cf6' }
+      { name: 'LeetCode', value: codingStats.leetcode?.points || 0, color: '#f89f1b' },
+      { name: 'HackerRank', value: codingStats.hackerrank?.points || 0, color: '#16a34a' }
     ].filter(item => item.value > 0);
 
     // Get student info for the profile
@@ -1117,8 +889,8 @@ router.get('/:studentId/coding-stats', async (req, res) => {
       studentInfo,
       codingStats,
       overallScore,
-      globalRank,
-      globalRankingsHistory,
+      globalRank: null, // No mock rank
+      globalRankingsHistory: [], // No mock history
       scoreDistribution
     });
   } catch (error) {

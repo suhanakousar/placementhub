@@ -584,6 +584,51 @@ async function fetchGitHub(username) {
   }
 }
 
+async function fetchCodingStats(handles = {}) {
+  const entries = [];
+  
+  // Only fetch LeetCode and HackerRank
+  if (handles.leetcode) {
+    entries.push({ platformId: 'leetcode', username: handles.leetcode });
+  }
+  if (handles.hackerrank) {
+    entries.push({ platformId: 'hackerrank', username: handles.hackerrank });
+  }
+  
+  if (entries.length === 0) {
+    return {
+      leetcode: null,
+      hackerrank: null
+    };
+  }
+  
+  const platforms = await fetchPlatforms(entries);
+  
+  const result = {
+    leetcode: null,
+    hackerrank: null
+  };
+  
+  platforms.forEach(platform => {
+    if (platform.platformId === 'leetcode') {
+      result.leetcode = {
+        contestRating: platform.currentRating,
+        problemsSolved: platform.solvedProblems,
+        points: platform.points || (platform.solvedProblems ? platform.solvedProblems * 10 : 0),
+        warning: platform.warning || null
+      };
+    } else if (platform.platformId === 'hackerrank') {
+      result.hackerrank = {
+        points: platform.points || platform.currentRating || 0,
+        solvedProblems: platform.solvedProblems,
+        warning: platform.warning || null
+      };
+    }
+  });
+  
+  return result;
+}
+
 module.exports = {
   PLATFORM_DEFINITIONS,
   BASE_WEIGHTS,
@@ -591,5 +636,6 @@ module.exports = {
   detectPlatformFromUrl,
   extractUsernameFromUrl,
   fetchPlatforms,
-  calculatePlatformScores
+  calculatePlatformScores,
+  fetchCodingStats
 };

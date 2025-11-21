@@ -81,57 +81,46 @@ const StudentProfileView = () => {
     [platforms]
   );
 
-  const dailyAverage = Math.max(1, Math.round(totalSolved / 30) || 1);
+  const dailyAverage = totalSolved > 0 ? Math.max(1, Math.round(totalSolved / 30)) : 0;
 
   const languageUsage = useMemo(() => {
     if (!platforms.length) {
-      return [
-        { label: 'Python', value: 12 },
-        { label: 'C++', value: 9 },
-        { label: 'Java', value: 7 },
-        { label: 'JavaScript', value: 5 },
-        { label: 'Go', value: 3 }
-      ];
+      return [];
     }
     const total = platforms.reduce(
       (sum, platform) => sum + (platform.solvedProblems || 0),
       0
     );
+    if (total === 0) {
+      return [];
+    }
     return platforms.map((platform) => ({
       label: platform.label,
-      value: platform.solvedProblems || Math.round(total / platforms.length) || 1
+      value: platform.solvedProblems || 0
     }));
   }, [platforms]);
 
   const dailyProgress = useMemo(() => {
     if (!rankingSeries.length) {
-      const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return labels.map((label, idx) => ({
-        label,
-        solved: Math.max(1, (idx % 3) + 4)
-      }));
+      return [];
     }
     const subset = rankingSeries.slice(-7);
     return subset.map((entry) => ({
       label: entry.name,
-      solved: Math.max(1, Math.round((entry.solved || 0) / 120))
+      solved: Math.max(0, Math.round((entry.solved || 0) / 120))
     }));
   }, [rankingSeries]);
 
   const submissionHistory = useMemo(() => {
     const source = rankingSeries.slice(-6);
     if (!source.length) {
-      return [
-        { label: 'Week 1', submissions: 32, accepted: 24, efficiency: 75 },
-        { label: 'Week 2', submissions: 28, accepted: 22, efficiency: 78 },
-        { label: 'Week 3', submissions: 40, accepted: 31, efficiency: 77 }
-      ];
+      return [];
     }
     return source.map((entry) => ({
       label: entry.name,
-      submissions: Math.max(10, Math.round(entry.solved / 40)),
-      accepted: Math.max(4, Math.round(entry.solved / 60)),
-      efficiency: Math.min(100, Math.round((entry.solved / 2000) * 100))
+      submissions: Math.max(0, Math.round((entry.solved || 0) / 40)),
+      accepted: Math.max(0, Math.round((entry.solved || 0) / 60)),
+      efficiency: Math.min(100, Math.max(0, Math.round(((entry.solved || 0) / 2000) * 100)))
     }));
   }, [rankingSeries]);
 
@@ -252,35 +241,39 @@ const StudentProfileView = () => {
             <p className="text-sm text-gray-500 mb-4">
               Based on solved problems and contest consistency
             </p>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={rankingSeries}>
-                  <defs>
-                    <linearGradient id="globalTrend" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#818cf8" stopOpacity={0.7} />
-                      <stop offset="95%" stopColor="#c7d2fe" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="name" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0f172a',
-                      border: '1px solid #1e293b',
-                      color: '#fff'
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="solved"
-                    stroke="#6366f1"
-                    strokeWidth={3}
-                    fill="url(#globalTrend)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            {rankingSeries.length > 0 ? (
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={rankingSeries}>
+                    <defs>
+                      <linearGradient id="globalTrend" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#818cf8" stopOpacity={0.7} />
+                        <stop offset="95%" stopColor="#c7d2fe" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="name" stroke="#94a3b8" />
+                    <YAxis stroke="#94a3b8" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#0f172a',
+                        border: '1px solid #1e293b',
+                        color: '#fff'
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="solved"
+                      stroke="#6366f1"
+                      strokeWidth={3}
+                      fill="url(#globalTrend)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">Performance data will appear once we sync coding stats.</p>
+            )}
           </div>
           <div className="bg-white rounded-2xl shadow-xl p-6 text-gray-900">
             <h3 className="text-xl font-semibold flex items-center gap-2 text-slate-900">
@@ -290,45 +283,49 @@ const StudentProfileView = () => {
             <p className="text-sm text-gray-500 mb-4">
               Weighted contribution per coding platform
             </p>
-            <div className="flex flex-col items-center">
-              <div className="w-full h-60">
-                <ResponsiveContainer>
-                  <PieChart>
-                    <Pie
-                      data={scoreDistribution}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={60}
-                      outerRadius={100}
-                    >
-                      {scoreDistribution.map((entry, index) => (
-                        <Cell
-                          key={entry.name}
-                          fill={entry.color || COLORS[index % COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => `${value.toLocaleString()} pts`} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="w-full space-y-2 mt-4">
-                {scoreDistribution.map((item, index) => (
-                  <div key={item.name} className="flex items-center gap-3">
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: item.color || COLORS[index % COLORS.length] }}
-                    />
-                    <div className="flex-1 flex justify-between text-sm text-gray-600">
-                      <span>{item.name}</span>
-                      <span className="font-semibold text-gray-900">
-                        {item.value.toLocaleString()} pts
-                      </span>
+            {scoreDistribution.length > 0 ? (
+              <div className="flex flex-col items-center">
+                <div className="w-full h-60">
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie
+                        data={scoreDistribution}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={60}
+                        outerRadius={100}
+                      >
+                        {scoreDistribution.map((entry, index) => (
+                          <Cell
+                            key={entry.name}
+                            fill={entry.color || COLORS[index % COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => `${value.toLocaleString()} pts`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="w-full space-y-2 mt-4">
+                  {scoreDistribution.map((item, index) => (
+                    <div key={item.name} className="flex items-center gap-3">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: item.color || COLORS[index % COLORS.length] }}
+                      />
+                      <div className="flex-1 flex justify-between text-sm text-gray-600">
+                        <span>{item.name}</span>
+                        <span className="font-semibold text-gray-900">
+                          {item.value.toLocaleString()} pts
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <p className="text-sm text-gray-500 text-center">Score breakdown will show once we have real stats.</p>
+            )}
           </div>
         </section>
 
@@ -338,51 +335,59 @@ const StudentProfileView = () => {
             <p className="text-sm text-gray-500 mb-4">
               Estimated share based on solved problems per platform
             </p>
-            <div className="h-64">
-              <ResponsiveContainer>
-                <BarChart data={languageUsage}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="label" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
-                  <Tooltip
-                    formatter={(value) => `${value} problems`}
-                    contentStyle={{
-                      backgroundColor: '#0f172a',
-                      border: '1px solid #1e293b',
-                      color: '#fff'
-                    }}
-                  />
-                  <Bar dataKey="value" fill="#6366f1" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {languageUsage.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer>
+                  <BarChart data={languageUsage}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="label" stroke="#94a3b8" />
+                    <YAxis stroke="#94a3b8" />
+                    <Tooltip
+                      formatter={(value) => `${value} problems`}
+                      contentStyle={{
+                        backgroundColor: '#0f172a',
+                        border: '1px solid #1e293b',
+                        color: '#fff'
+                      }}
+                    />
+                    <Bar dataKey="value" fill="#6366f1" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">Language usage will appear once we have solved-problem counts.</p>
+            )}
           </div>
           <div className="bg-white rounded-2xl shadow-xl p-6 text-gray-900">
             <h3 className="text-xl font-semibold mb-2">Daily / Weekly Progress</h3>
             <p className="text-sm text-gray-500 mb-4">
               Auto-generated from the latest sync
             </p>
-            <div className="space-y-3">
-              {dailyProgress.map((entry) => (
-                <div
-                  key={entry.label}
-                  className="flex items-center justify-between text-sm text-gray-700"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-500 w-10">{entry.label}</span>
-                    <div className="w-40 h-2 bg-gray-100 rounded-full">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-400"
-                        style={{ width: `${Math.min(entry.solved * 10, 100)}%` }}
-                      />
+            {dailyProgress.length > 0 ? (
+              <div className="space-y-3">
+                {dailyProgress.map((entry) => (
+                  <div
+                    key={entry.label}
+                    className="flex items-center justify-between text-sm text-gray-700"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-gray-500 w-10">{entry.label}</span>
+                      <div className="w-40 h-2 bg-gray-100 rounded-full">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-400"
+                          style={{ width: `${Math.min(entry.solved * 10, 100)}%` }}
+                        />
+                      </div>
                     </div>
+                    <span className="font-semibold text-gray-900">
+                      {entry.solved} solved
+                    </span>
                   </div>
-                  <span className="font-semibold text-gray-900">
-                    {entry.solved} solved
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">We’ll show weekly progress after the first data sync.</p>
+            )}
           </div>
         </section>
 
@@ -433,34 +438,38 @@ const StudentProfileView = () => {
           <p className="text-sm text-gray-500 mb-4">
             Live feed combining all tracked platforms
           </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="text-xs uppercase text-gray-500 border-b border-gray-100">
-                  <th className="py-3">Period</th>
-                  <th className="py-3">Submissions</th>
-                  <th className="py-3">Accepted</th>
-                  <th className="py-3">Efficiency</th>
-                </tr>
-              </thead>
-              <tbody>
-                {submissionHistory.map((row) => (
-                  <tr key={row.label} className="border-b border-gray-50">
-                    <td className="py-3 text-gray-700">{row.label}</td>
-                    <td className="py-3 font-semibold text-gray-900">
-                      {row.submissions}
-                    </td>
-                    <td className="py-3 text-gray-700">{row.accepted}</td>
-                    <td className="py-3">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold">
-                        {row.efficiency}%
-                      </span>
-                    </td>
+          {submissionHistory.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="text-xs uppercase text-gray-500 border-b border-gray-100">
+                    <th className="py-3">Period</th>
+                    <th className="py-3">Submissions</th>
+                    <th className="py-3">Accepted</th>
+                    <th className="py-3">Efficiency</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {submissionHistory.map((row) => (
+                    <tr key={row.label} className="border-b border-gray-50">
+                      <td className="py-3 text-gray-700">{row.label}</td>
+                      <td className="py-3 font-semibold text-gray-900">
+                        {row.submissions}
+                      </td>
+                      <td className="py-3 text-gray-700">{row.accepted}</td>
+                      <td className="py-3">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold">
+                          {row.efficiency}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">Submission history will populate after we receive data from coding platforms.</p>
+          )}
         </section>
       </div>
     </div>

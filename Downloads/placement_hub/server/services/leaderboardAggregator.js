@@ -89,14 +89,10 @@ function aggregateTieBreakers(platformSummaries = []) {
 
 function buildRankingSeries(platformSummaries = []) {
   const historySource =
-    platformSummaries.find((entry) => entry.history?.length) ||
-    platformSummaries[0];
+    platformSummaries.find((entry) => entry.history?.length);
 
   if (!historySource?.history?.length) {
-    return Array.from({ length: 12 }).map((_, idx) => ({
-      name: `P${idx + 1}`,
-      solved: Math.round(historySource?.currentRating || 1200)
-    }));
+    return [];
   }
 
   return historySource.history.map((point, index) => ({

@@ -91,23 +91,89 @@ async function sendMeetingReminder(reminder) {
   }
 
   const localTime = formatTimeInTimezone(meeting.startTime, meeting.studentTimezone);
+  const localEndTime = formatTimeInTimezone(meeting.endTime, meeting.studentTimezone);
   const reminderText = getReminderText(reminder.reminderType);
+  const studentName = meeting.studentId?.personalInfo?.firstName || 'Student';
+  const timeUntilMeeting = getTimeUntilMeeting(reminder.reminderType);
 
-  const emailContent = `
-    <h2>Meeting Reminder</h2>
-    <p>${reminderText}</p>
-    <p><strong>Meeting:</strong> ${meeting.title}</p>
-    <p><strong>Date & Time:</strong> ${localTime}</p>
-    <p><strong>Topic:</strong> ${meeting.topic}</p>
-    ${meeting.meetingLink ? `<p><strong>Join Link:</strong> <a href="${meeting.meetingLink}">${meeting.meetingLink}</a></p>` : ''}
-    <p>We look forward to meeting with you!</p>
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .reminder-badge { background: #ff9800; color: white; padding: 8px 15px; border-radius: 20px; font-size: 14px; display: inline-block; margin: 10px 0; }
+        .meeting-info { background: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #667eea; }
+        .meeting-link { display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 15px 0; font-weight: bold; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        .urgent { background: #ffebee; border: 2px solid #f44336; padding: 15px; border-radius: 5px; margin: 20px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Meeting Reminder</h1>
+        </div>
+        <div class="content">
+          <h2>Hello ${studentName},</h2>
+          <div class="reminder-badge">⏰ ${timeUntilMeeting}</div>
+          <p>${reminderText}</p>
+          
+          <div class="meeting-info">
+            <h3 style="margin-top: 0; color: #667eea;">${meeting.title}</h3>
+            <p><strong>Topic:</strong> ${meeting.topic}</p>
+            <p><strong>Date & Time:</strong> ${localTime}</p>
+            <p><strong>Duration:</strong> Until ${localEndTime}</p>
+            ${meeting.description ? `<p><strong>Description:</strong><br>${meeting.description}</p>` : ''}
+          </div>
+
+          ${meeting.meetingLink ? `
+            <div style="text-align: center;">
+              <a href="${meeting.meetingLink}" class="meeting-link">Join Meeting Now</a>
+            </div>
+          ` : ''}
+
+          ${reminder.reminderType === '10_minutes' || reminder.reminderType === '1_hour' ? `
+            <div class="urgent">
+              <strong>🚨 Important:</strong> Your meeting is starting soon! Please ensure you're ready to join on time.
+            </div>
+          ` : ''}
+
+          <p>We look forward to meeting with you!</p>
+          
+          <div class="footer">
+            <p>© ${new Date().getFullYear()} Placement Hub. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
   `;
 
   await sendEmail({
     to: reminder.recipientEmail,
-    subject: `Reminder: ${meeting.title} - ${reminderText}`,
-    html: emailContent
+    subject: `Reminder: ${meeting.title} - ${timeUntilMeeting}`,
+    html: emailHtml,
+    fromName: 'Placement Hub - Mentoring System'
   });
+}
+
+/**
+ * Get time until meeting text
+ * @param {string} type - Reminder type
+ * @returns {string} - Time until meeting
+ */
+function getTimeUntilMeeting(type) {
+  const times = {
+    '48_hours': '48 Hours Until Meeting',
+    '24_hours': '24 Hours Until Meeting',
+    '1_hour': '1 Hour Until Meeting',
+    '10_minutes': '10 Minutes Until Meeting'
+  };
+  return times[type] || 'Meeting Reminder';
 }
 
 /**
@@ -214,6 +280,7 @@ module.exports = {
   processPendingReminders,
   checkNoShows,
   sendMeetingReminder,
-  sendTaskReminder
+  sendTaskReminder,
+  getTimeUntilMeeting
 };
 

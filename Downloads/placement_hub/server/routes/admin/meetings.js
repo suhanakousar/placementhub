@@ -315,24 +315,76 @@ router.post('/', async (req, res) => {
       // Continue even if reminder creation fails
     }
 
-    // Send confirmation email to student (non-blocking)
+    // Send confirmation email to student immediately (non-blocking)
     try {
       const studentUser = await require('../../models/User').findById(student.userId);
       if (studentUser && studentUser.email) {
         const localStartTime = formatTimeInTimezone(meeting.startTime, meeting.studentTimezone);
+        const localEndTime = formatTimeInTimezone(meeting.endTime, meeting.studentTimezone);
+        const studentName = student.personalInfo?.firstName || 'Student';
+        
+        const emailHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+              .meeting-info { background: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #667eea; }
+              .meeting-link { display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 15px 0; font-weight: bold; }
+              .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+              .reminder-note { background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>Meeting Scheduled</h1>
+              </div>
+              <div class="content">
+                <h2>Hello ${studentName},</h2>
+                <p>Your meeting with your mentor has been successfully scheduled!</p>
+                
+                <div class="meeting-info">
+                  <h3 style="margin-top: 0; color: #667eea;">${meeting.title}</h3>
+                  <p><strong>Topic:</strong> ${meeting.topic}</p>
+                  <p><strong>Date & Time:</strong> ${localStartTime}</p>
+                  <p><strong>Duration:</strong> Until ${localEndTime}</p>
+                  ${meeting.description ? `<p><strong>Description:</strong><br>${meeting.description}</p>` : ''}
+                </div>
+
+                <div style="text-align: center;">
+                  <a href="${meeting.meetingLink}" class="meeting-link">Join Meeting</a>
+                </div>
+                
+                <div class="reminder-note">
+                  <strong>📅 Reminder:</strong> You will receive automatic email reminders at:
+                  <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>48 hours before the meeting</li>
+                    <li>24 hours before the meeting</li>
+                    <li>1 hour before the meeting</li>
+                    <li>10 minutes before the meeting</li>
+                  </ul>
+                </div>
+
+                <p>Please add this meeting to your calendar and prepare any questions or materials you'd like to discuss.</p>
+                
+                <div class="footer">
+                  <p>© ${new Date().getFullYear()} Placement Hub. All rights reserved.</p>
+                </div>
+              </div>
+            </div>
+          </body>
+          </html>
+        `;
         
         await sendEmail({
           to: studentUser.email,
           subject: `Meeting Scheduled: ${meeting.title}`,
-          html: `
-            <h2>Meeting Scheduled</h2>
-            <p>Your meeting with your mentor has been scheduled.</p>
-            <p><strong>Title:</strong> ${meeting.title}</p>
-            <p><strong>Date & Time:</strong> ${localStartTime}</p>
-            <p><strong>Topic:</strong> ${meeting.topic}</p>
-            <p><strong>Meeting Link:</strong> <a href="${meeting.meetingLink}">${meeting.meetingLink}</a></p>
-            ${meeting.description ? `<p><strong>Description:</strong> ${meeting.description}</p>` : ''}
-          `
+          html: emailHtml,
+          fromName: 'Placement Hub - Mentoring System'
         });
 
         // Log email
@@ -694,24 +746,100 @@ router.post('/requests/:id/approve', async (req, res) => {
     // Create reminders
     await createRemindersForMeeting(meeting, request.studentId);
 
-    // Send approval email to student
+    // Send approval email to student immediately
     try {
       const studentUser = await require('../../models/User').findById(request.studentId.userId);
       if (studentUser && studentUser.email) {
         const localStartTime = formatTimeInTimezone(meeting.startTime, meeting.studentTimezone);
+        const localEndTime = formatTimeInTimezone(meeting.endTime, meeting.studentTimezone);
+        const studentName = request.studentId?.personalInfo?.firstName || 'Student';
+        
+        const emailHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+              .approved-badge { background: #4caf50; color: white; padding: 8px 15px; border-radius: 20px; font-size: 14px; display: inline-block; margin: 10px 0; }
+              .meeting-info { background: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #667eea; }
+              .meeting-link { display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 15px 0; font-weight: bold; }
+              .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+              .reminder-note { background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 5px; margin: 20px 0; }
+              .mentor-message { background: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #2196f3; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>Meeting Request Approved</h1>
+              </div>
+              <div class="content">
+                <h2>Hello ${studentName},</h2>
+                <div class="approved-badge">✅ Approved</div>
+                <p>Great news! Your meeting request has been approved by your mentor.</p>
+                
+                <div class="meeting-info">
+                  <h3 style="margin-top: 0; color: #667eea;">${meeting.title}</h3>
+                  <p><strong>Topic:</strong> ${meeting.topic}</p>
+                  <p><strong>Date & Time:</strong> ${localStartTime}</p>
+                  <p><strong>Duration:</strong> Until ${localEndTime}</p>
+                  ${meeting.description ? `<p><strong>Description:</strong><br>${meeting.description}</p>` : ''}
+                </div>
+
+                ${request.adminResponse.message ? `
+                  <div class="mentor-message">
+                    <strong>Message from your mentor:</strong>
+                    <p>${request.adminResponse.message}</p>
+                  </div>
+                ` : ''}
+
+                <div style="text-align: center;">
+                  <a href="${meeting.meetingLink}" class="meeting-link">Join Meeting</a>
+                </div>
+                
+                <div class="reminder-note">
+                  <strong>📅 Reminder:</strong> You will receive automatic email reminders at:
+                  <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>48 hours before the meeting</li>
+                    <li>24 hours before the meeting</li>
+                    <li>1 hour before the meeting</li>
+                    <li>10 minutes before the meeting</li>
+                  </ul>
+                </div>
+
+                <p>Please add this meeting to your calendar and prepare any questions or materials you'd like to discuss.</p>
+                
+                <div class="footer">
+                  <p>© ${new Date().getFullYear()} Placement Hub. All rights reserved.</p>
+                </div>
+              </div>
+            </div>
+          </body>
+          </html>
+        `;
         
         await sendEmail({
           to: studentUser.email,
           subject: `Meeting Request Approved: ${meeting.title}`,
-          html: `
-            <h2>Meeting Request Approved</h2>
-            <p>Your meeting request has been approved!</p>
-            <p><strong>Title:</strong> ${meeting.title}</p>
-            <p><strong>Date & Time:</strong> ${localStartTime}</p>
-            <p><strong>Topic:</strong> ${meeting.topic}</p>
-            <p><strong>Meeting Link:</strong> <a href="${meeting.meetingLink}">${meeting.meetingLink}</a></p>
-            ${request.adminResponse.message ? `<p><strong>Message from mentor:</strong> ${request.adminResponse.message}</p>` : ''}
-          `
+          html: emailHtml,
+          fromName: 'Placement Hub - Mentoring System'
+        });
+
+        // Log email
+        await EmailLog.create({
+          recipientId: request.studentId._id,
+          recipientType: 'Student',
+          recipientEmail: studentUser.email,
+          sentBy: admin._id,
+          subject: `Meeting Request Approved: ${meeting.title}`,
+          body: `Meeting approved and scheduled for ${localStartTime}`,
+          status: 'sent',
+          sentAt: new Date(),
+          includesMeetingLink: true,
+          meetingId: meeting._id
         });
       }
     } catch (emailError) {

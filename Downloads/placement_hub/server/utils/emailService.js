@@ -455,6 +455,61 @@ const sendVerificationEmail = async (email, verificationUrl) => {
   }
 };
 
+// Generic sendEmail function for meeting notifications and other emails
+const sendEmail = async ({ to, subject, html, text, fromEmail, fromName = 'Placement Hub', attachments }) => {
+  try {
+    // Development mode: Log email to console instead of sending
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📧 DEVELOPMENT MODE - Email');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`To: ${to}`);
+      console.log(`Subject: ${subject}`);
+      console.log(`From: ${fromName} <${fromEmail || 'noreply@placementhub.com'}>`);
+      if (text) console.log(`Text: ${text.substring(0, 200)}...`);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      return { success: true, messageId: 'dev-mode', mode: 'development' };
+    }
+
+    const email = fromEmail || process.env.FROM_EMAIL || process.env.SMTP_USER || 'placementhub722@gmail.com';
+    
+    // Try SendGrid API first (more reliable), fall back to SMTP
+    const apiKey = process.env.SENDGRID_API_KEY || process.env.SMTP_PASSWORD;
+    if (apiKey && (process.env.SMTP_HOST === 'smtp.sendgrid.net' || !process.env.SMTP_HOST)) {
+      try {
+        const result = await sendEmailViaSendGridAPI(to, subject, html, text || '', email, fromName);
+        console.log('Email sent successfully via SendGrid API');
+        return result;
+      } catch (apiError) {
+        console.error('SendGrid API failed, falling back to SMTP:', apiError.message);
+        // Fall through to SMTP
+      }
+    }
+
+    // Fall back to SMTP
+    const transporter = createTransporter();
+    if (!transporter) {
+      throw new Error('Failed to create email transporter');
+    }
+    
+    const mailOptions = {
+      from: `"${fromName}" <${email}>`,
+      to: to,
+      subject: subject,
+      html: html,
+      text: text || html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
+      attachments: attachments || []
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully via SMTP:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending email:', error);
+    throw error;
+  }
+};
+
 const sendSupportEmail = async ({ from, subject, message, userName, userRole }) => {
   try {
     if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
@@ -532,6 +587,7 @@ const sendSupportEmail = async ({ from, subject, message, userName, userRole }) 
 };
 
 module.exports = {
+  sendEmail,
   sendOTPEmail,
   sendPasswordResetEmail,
   sendWelcomeEmail,

@@ -458,38 +458,57 @@ const sendVerificationEmail = async (email, verificationUrl) => {
 // Generic sendEmail function for meeting notifications and other emails
 const sendEmail = async ({ to, subject, html, text, fromEmail, fromName = 'Placement Hub', attachments }) => {
   try {
+    console.log(`\n📧 Attempting to send email to: ${to}`);
+    console.log(`Subject: ${subject}`);
+    
     // Development mode: Log email to console instead of sending
     if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
       console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('📧 DEVELOPMENT MODE - Email');
+      console.log('📧 DEVELOPMENT MODE - Email (SMTP not configured)');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log(`To: ${to}`);
       console.log(`Subject: ${subject}`);
       console.log(`From: ${fromName} <${fromEmail || 'noreply@placementhub.com'}>`);
       if (text) console.log(`Text: ${text.substring(0, 200)}...`);
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      console.log('⚠️  WARNING: Email not actually sent - SMTP credentials missing!');
+      console.log('   Set SMTP_USER and SMTP_PASSWORD environment variables to send emails.\n');
       return { success: true, messageId: 'dev-mode', mode: 'development' };
     }
 
     const email = fromEmail || process.env.FROM_EMAIL || process.env.SMTP_USER || 'placementhub722@gmail.com';
     
+    console.log(`Email configuration check:`);
+    console.log(`  SMTP_HOST: ${process.env.SMTP_HOST || 'not set'}`);
+    console.log(`  SMTP_USER: ${process.env.SMTP_USER ? '***configured***' : 'NOT SET'}`);
+    console.log(`  SMTP_PASSWORD: ${process.env.SMTP_PASSWORD ? '***configured***' : 'NOT SET'}`);
+    console.log(`  FROM_EMAIL: ${process.env.FROM_EMAIL || 'not set'}`);
+    console.log(`  SENDGRID_API_KEY: ${process.env.SENDGRID_API_KEY ? '***configured***' : 'not set'}`);
+    
     // Try SendGrid API first (more reliable), fall back to SMTP
     const apiKey = process.env.SENDGRID_API_KEY || process.env.SMTP_PASSWORD;
     if (apiKey && (process.env.SMTP_HOST === 'smtp.sendgrid.net' || !process.env.SMTP_HOST)) {
       try {
+        console.log('Attempting to send via SendGrid API...');
         const result = await sendEmailViaSendGridAPI(to, subject, html, text || '', email, fromName);
-        console.log('Email sent successfully via SendGrid API');
+        console.log('✅ Email sent successfully via SendGrid API');
         return result;
       } catch (apiError) {
-        console.error('SendGrid API failed, falling back to SMTP:', apiError.message);
+        console.error('❌ SendGrid API failed:', apiError.message);
+        console.error('Falling back to SMTP...');
         // Fall through to SMTP
       }
     }
 
     // Fall back to SMTP
+    console.log('Attempting to send via SMTP...');
+    if (!process.env.SMTP_HOST) {
+      throw new Error('SMTP_HOST is not configured. Please set SMTP_HOST environment variable.');
+    }
+    
     const transporter = createTransporter();
     if (!transporter) {
-      throw new Error('Failed to create email transporter');
+      throw new Error('Failed to create email transporter. Check SMTP configuration.');
     }
     
     const mailOptions = {
@@ -501,11 +520,19 @@ const sendEmail = async ({ to, subject, html, text, fromEmail, fromName = 'Place
       attachments: attachments || []
     };
 
+    console.log(`Sending email via SMTP from ${email} to ${to}...`);
     const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully via SMTP:', info.messageId);
+    console.log('✅ Email sent successfully via SMTP:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('❌ Error sending email:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode
+    });
     throw error;
   }
 };

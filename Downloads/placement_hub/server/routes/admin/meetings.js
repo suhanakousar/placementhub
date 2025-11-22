@@ -315,10 +315,19 @@ router.post('/', async (req, res) => {
       // Continue even if reminder creation fails
     }
 
-    // Send confirmation email to student immediately (non-blocking)
+    // Send confirmation email to student immediately
+    let emailSent = false;
+    let emailError = null;
     try {
       const studentUser = await require('../../models/User').findById(student.userId);
-      if (studentUser && studentUser.email) {
+      if (!studentUser) {
+        console.error('Student user not found for userId:', student.userId);
+        emailError = 'Student user not found';
+      } else if (!studentUser.email) {
+        console.error('Student email not found for user:', studentUser._id);
+        emailError = 'Student email not configured';
+      } else {
+        console.log(`Attempting to send meeting email to: ${studentUser.email}`);
         const localStartTime = formatTimeInTimezone(meeting.startTime, meeting.studentTimezone);
         const localEndTime = formatTimeInTimezone(meeting.endTime, meeting.studentTimezone);
         const studentName = student.personalInfo?.firstName || 'Student';
@@ -380,36 +389,52 @@ router.post('/', async (req, res) => {
           </html>
         `;
         
-        await sendEmail({
+        const emailResult = await sendEmail({
           to: studentUser.email,
           subject: `Meeting Scheduled: ${meeting.title}`,
           html: emailHtml,
           fromName: 'Placement Hub - Mentoring System'
         });
 
-        // Log email
-        await EmailLog.create({
-          recipientId: student._id,
-          recipientType: 'Student',
-          recipientEmail: studentUser.email,
-          sentBy: admin._id,
-          subject: `Meeting Scheduled: ${meeting.title}`,
-          body: `Meeting scheduled for ${localStartTime}`,
-          status: 'sent',
-          sentAt: new Date(),
-          includesMeetingLink: true,
-          meetingId: meeting._id
-        });
+        if (emailResult && emailResult.success) {
+          emailSent = true;
+          console.log(`✅ Meeting email sent successfully to ${studentUser.email}`);
+          
+          // Log email
+          await EmailLog.create({
+            recipientId: student._id,
+            recipientType: 'Student',
+            recipientEmail: studentUser.email,
+            sentBy: admin._id,
+            subject: `Meeting Scheduled: ${meeting.title}`,
+            body: `Meeting scheduled for ${localStartTime}`,
+            status: 'sent',
+            sentAt: new Date(),
+            includesMeetingLink: true,
+            meetingId: meeting._id
+          });
+        } else {
+          emailError = emailResult?.message || 'Email sending returned unsuccessful';
+          console.error('Email sending returned unsuccessful:', emailResult);
+        }
       }
-    } catch (emailError) {
-      console.error('Error sending confirmation email:', emailError);
-      // Continue even if email fails
+    } catch (err) {
+      emailError = err.message || err.toString();
+      console.error('❌ Error sending confirmation email:', err);
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        code: err.code,
+        response: err.response
+      });
     }
 
     res.status(201).json({
       success: true,
       message: 'Meeting created successfully',
-      meeting
+      meeting,
+      emailSent: emailSent,
+      emailError: emailError ? `Email notification failed: ${emailError}. Meeting was created successfully.` : null
     });
   } catch (error) {
     console.error('Error creating meeting:', error);

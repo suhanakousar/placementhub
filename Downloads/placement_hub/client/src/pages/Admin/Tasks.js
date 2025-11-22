@@ -25,6 +25,7 @@ const Tasks = () => {
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewAction, setReviewAction] = useState('approve'); // 'approve' or 'reject'
+  const [reviewFeedback, setReviewFeedback] = useState('');
   const [stats, setStats] = useState(null);
   const [formData, setFormData] = useState({
     studentId: '',
@@ -126,6 +127,7 @@ const Tasks = () => {
       setSelectedTask(response.data);
       setShowTaskDetail(true);
       setReviewComment('');
+      setReviewFeedback('');
       setReviewAction('approve');
     } catch (error) {
       toast.error('Failed to load task details');
@@ -156,7 +158,7 @@ const Tasks = () => {
   };
 
   const handleReviewSubmission = async (taskId) => {
-    if (!reviewComment.trim()) {
+    if (!reviewComment.trim() && !reviewFeedback.trim()) {
       toast.error('Please provide feedback');
       return;
     }
@@ -165,10 +167,13 @@ const Tasks = () => {
       const newStatus = reviewAction === 'approve' ? 'done' : 'in_progress';
       await api.put(`/admin/tasks/${taskId}`, {
         status: newStatus,
-        comment: reviewComment
+        comment: reviewComment,
+        markReviewDone: true,
+        reviewFeedback: reviewFeedback || reviewComment
       });
-      toast.success(reviewAction === 'approve' ? 'Submission approved' : 'Submission rejected - task reopened');
+      toast.success(reviewAction === 'approve' ? 'Submission approved and marked as reviewed' : 'Submission rejected and marked as reviewed');
       setReviewComment('');
+      setReviewFeedback('');
       setReviewAction('approve');
       fetchTasks();
       fetchStats();
@@ -181,6 +186,35 @@ const Tasks = () => {
       }
     } catch (error) {
       toast.error('Failed to review submission');
+    }
+  };
+
+  const handleMarkReviewDone = async (taskId) => {
+    if (!reviewFeedback.trim() && !reviewComment.trim()) {
+      toast.error('Please provide feedback');
+      return;
+    }
+
+    try {
+      await api.put(`/admin/tasks/${taskId}`, {
+        markReviewDone: true,
+        reviewFeedback: reviewFeedback || reviewComment,
+        comment: reviewComment || reviewFeedback
+      });
+      toast.success('Review marked as done');
+      setReviewComment('');
+      setReviewFeedback('');
+      fetchTasks();
+      fetchStats();
+      if (selectedTask && selectedTask._id === taskId) {
+        const updatedTasks = await api.get(`/admin/tasks`);
+        const updatedTask = updatedTasks.data.find(t => t._id === taskId);
+        if (updatedTask) {
+          setSelectedTask(updatedTask);
+        }
+      }
+    } catch (error) {
+      toast.error('Failed to mark review as done');
     }
   };
 
@@ -414,12 +448,22 @@ const Tasks = () => {
                 </td>
                 <td className="py-3 px-4">
                   {task.studentEvidence ? (
-                    <div className="flex items-center space-x-2">
-                      <FaPaperclip className="text-green-500" />
-                      <span className="text-xs text-green-600 dark:text-green-400">Submitted</span>
-                      {task.reviewRequested && (
+                    <div className="flex flex-col space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <FaPaperclip className="text-green-500" />
+                        <span className="text-xs text-green-600 dark:text-green-400">Submitted</span>
+                      </div>
+                      {task.reviewed ? (
+                        <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 rounded text-xs">
+                          Review Done
+                        </span>
+                      ) : task.reviewRequested ? (
                         <span className="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 rounded text-xs">
                           Review Requested
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 rounded text-xs">
+                          Pending Review
                         </span>
                       )}
                     </div>
@@ -574,6 +618,7 @@ const Tasks = () => {
                     setShowTaskDetail(false);
                     setSelectedTask(null);
                     setReviewComment('');
+                    setReviewFeedback('');
                     setReviewAction('approve');
                   }}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -648,80 +693,121 @@ const Tasks = () => {
                       )}
                     </div>
 
-                    {/* Review Section */}
-                    {selectedTask.status !== 'done' && selectedTask.studentEvidence && (
+                    {/* Review Status */}
+                    {selectedTask.studentEvidence && (
                       <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
-                        <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">
-                          Review Submission
-                        </h4>
-                        <div className="space-y-3">
+                        {selectedTask.reviewed ? (
+                          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <FaCheckCircle className="text-green-500" />
+                              <h4 className="text-lg font-semibold text-green-800 dark:text-green-300">
+                                Review Completed
+                              </h4>
+                            </div>
+                            {selectedTask.reviewedAt && (
+                              <p className="text-sm text-green-700 dark:text-green-400 mb-2">
+                                Reviewed on: {new Date(selectedTask.reviewedAt).toLocaleString()}
+                                {selectedTask.reviewedBy?.personalInfo && (
+                                  <span className="ml-2">
+                                    by {selectedTask.reviewedBy.personalInfo.firstName} {selectedTask.reviewedBy.personalInfo.lastName}
+                                  </span>
+                                )}
+                              </p>
+                            )}
+                            {selectedTask.reviewFeedback && (
+                              <div className="mt-2">
+                                <p className="text-sm font-medium text-green-800 dark:text-green-300 mb-1">Review Feedback:</p>
+                                <p className="text-sm text-green-700 dark:text-green-400">{selectedTask.reviewFeedback}</p>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                              Review Action
-                            </label>
-                            <div className="flex space-x-4">
-                              <label className="flex items-center space-x-2 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  value="approve"
-                                  checked={reviewAction === 'approve'}
-                                  onChange={(e) => setReviewAction(e.target.value)}
-                                  className="text-green-600"
+                            <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">
+                              Review Submission
+                            </h4>
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                  Review Action
+                                </label>
+                                <div className="flex space-x-4">
+                                  <label className="flex items-center space-x-2 cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      value="approve"
+                                      checked={reviewAction === 'approve'}
+                                      onChange={(e) => setReviewAction(e.target.value)}
+                                      className="text-green-600"
+                                    />
+                                    <span className="text-gray-700 dark:text-gray-300 flex items-center space-x-1">
+                                      <FaCheck className="text-green-500" />
+                                      <span>Approve & Mark Complete</span>
+                                    </span>
+                                  </label>
+                                  <label className="flex items-center space-x-2 cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      value="reject"
+                                      checked={reviewAction === 'reject'}
+                                      onChange={(e) => setReviewAction(e.target.value)}
+                                      className="text-red-600"
+                                    />
+                                    <span className="text-gray-700 dark:text-gray-300 flex items-center space-x-1">
+                                      <FaTimesCircle className="text-red-500" />
+                                      <span>Reject & Reopen Task</span>
+                                    </span>
+                                  </label>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                  Review Feedback
+                                </label>
+                                <textarea
+                                  value={reviewFeedback}
+                                  onChange={(e) => setReviewFeedback(e.target.value)}
+                                  placeholder="Provide feedback on the submission..."
+                                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                                  rows="4"
                                 />
-                                <span className="text-gray-700 dark:text-gray-300 flex items-center space-x-1">
-                                  <FaCheck className="text-green-500" />
-                                  <span>Approve & Mark Complete</span>
-                                </span>
-                              </label>
-                              <label className="flex items-center space-x-2 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  value="reject"
-                                  checked={reviewAction === 'reject'}
-                                  onChange={(e) => setReviewAction(e.target.value)}
-                                  className="text-red-600"
-                                />
-                                <span className="text-gray-700 dark:text-gray-300 flex items-center space-x-1">
-                                  <FaTimesCircle className="text-red-500" />
-                                  <span>Reject & Reopen Task</span>
-                                </span>
-                              </label>
+                              </div>
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleReviewSubmission(selectedTask._id)}
+                                  disabled={!reviewFeedback.trim() && !reviewComment.trim()}
+                                  className={`px-4 py-2 rounded-lg text-white font-medium flex items-center space-x-2 ${
+                                    reviewAction === 'approve'
+                                      ? 'bg-green-600 hover:bg-green-700'
+                                      : 'bg-red-600 hover:bg-red-700'
+                                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                >
+                                  {reviewAction === 'approve' ? (
+                                    <>
+                                      <FaCheck />
+                                      <span>Approve & Mark Review Done</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FaTimesCircle />
+                                      <span>Reject & Mark Review Done</span>
+                                    </>
+                                  )}
+                                </button>
+                                {selectedTask.status !== 'done' && (
+                                  <button
+                                    onClick={() => handleMarkReviewDone(selectedTask._id)}
+                                    disabled={!reviewFeedback.trim() && !reviewComment.trim()}
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <FaCheckCircle />
+                                    <span>Mark Review Done Only</span>
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                              Feedback/Comment
-                            </label>
-                            <textarea
-                              value={reviewComment}
-                              onChange={(e) => setReviewComment(e.target.value)}
-                              placeholder="Provide feedback on the submission..."
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
-                              rows="4"
-                            />
-                          </div>
-                          <button
-                            onClick={() => handleReviewSubmission(selectedTask._id)}
-                            disabled={!reviewComment.trim()}
-                            className={`px-4 py-2 rounded-lg text-white font-medium flex items-center space-x-2 ${
-                              reviewAction === 'approve'
-                                ? 'bg-green-600 hover:bg-green-700'
-                                : 'bg-red-600 hover:bg-red-700'
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
-                          >
-                            {reviewAction === 'approve' ? (
-                              <>
-                                <FaCheck />
-                                <span>Approve Submission</span>
-                              </>
-                            ) : (
-                              <>
-                                <FaTimesCircle />
-                                <span>Reject & Request Changes</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
+                        )}
                       </div>
                     )}
                   </div>

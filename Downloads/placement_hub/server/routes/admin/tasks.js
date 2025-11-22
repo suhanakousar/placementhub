@@ -38,7 +38,7 @@ router.get('/', async (req, res) => {
     }
     if (pendingReview === 'true') {
       query.studentEvidence = { $exists: true, $ne: null };
-      query.reviewRequested = true;
+      query.reviewed = false; // Only show tasks that haven't been reviewed yet
       query.status = { $ne: 'done' };
     }
 
@@ -46,6 +46,7 @@ router.get('/', async (req, res) => {
       .populate('studentId', 'personalInfo academicInfo')
       .populate('linkedMeetingId', 'title')
       .populate('linkedFeedbackId')
+      .populate('reviewedBy', 'personalInfo')
       .sort({ dueDate: 1, priority: -1 });
 
     res.json(tasks);
@@ -88,36 +89,8 @@ router.get('/:id', async (req, res) => {
       .populate('studentId', 'personalInfo academicInfo')
       .populate('createdBy', 'personalInfo')
       .populate('linkedMeetingId', 'title')
-      .populate('linkedFeedbackId');
-
-    if (!task) {
-      return res.status(404).json({ message: 'Task not found' });
-    }
-
-    res.json(task);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// @route   GET /api/admin/tasks/:id
-// @desc    Get a specific task
-// @access  Private (Admin)
-router.get('/:id', async (req, res) => {
-  try {
-    const admin = await Admin.findOne({ userId: req.user._id });
-    if (!admin) {
-      return res.status(404).json({ message: 'Admin profile not found' });
-    }
-
-    const task = await Task.findOne({
-      _id: req.params.id,
-      createdBy: admin._id
-    })
-      .populate('studentId', 'personalInfo academicInfo')
-      .populate('createdBy', 'personalInfo')
-      .populate('linkedMeetingId', 'title')
-      .populate('linkedFeedbackId');
+      .populate('linkedFeedbackId')
+      .populate('reviewedBy', 'personalInfo');
 
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -194,7 +167,7 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    const { title, description, priority, status, dueDate, comment } = req.body;
+    const { title, description, priority, status, dueDate, comment, markReviewDone, reviewFeedback } = req.body;
 
     if (title) task.title = title;
     if (description) task.description = description;
@@ -207,6 +180,16 @@ router.put('/:id', async (req, res) => {
       }
     }
     if (dueDate) task.dueDate = new Date(dueDate);
+
+    // Mark review as done
+    if (markReviewDone) {
+      task.reviewed = true;
+      task.reviewedAt = new Date();
+      task.reviewedBy = admin._id;
+      if (reviewFeedback) {
+        task.reviewFeedback = reviewFeedback;
+      }
+    }
 
     if (comment) {
       task.comments.push({

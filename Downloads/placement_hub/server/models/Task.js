@@ -113,6 +113,17 @@ const taskSchema = new mongoose.Schema({
     default: false
   },
   reviewRequestedAt: Date,
+  // Review status
+  reviewed: {
+    type: Boolean,
+    default: false
+  },
+  reviewedAt: Date,
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin'
+  },
+  reviewFeedback: String,
   // Audit trail
   createdAt: {
     type: Date,

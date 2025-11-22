@@ -124,7 +124,7 @@ const LandingPage = () => {
               <h3 className="text-xl font-bold mb-4">Quick Links</h3>
               <ul className="space-y-2 text-gray-400">
                 <li><Link to="/login" className="hover:text-white">Login</Link></li>
-                <li><Link to="/register" className="hover:text-white">Register</Link></li>
+                <li><Link to="/student-register" className="hover:text-white">Register</Link></li>
               </ul>
             </div>
             <div>

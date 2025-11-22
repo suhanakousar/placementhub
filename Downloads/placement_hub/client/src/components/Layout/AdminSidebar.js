@@ -9,7 +9,6 @@ import {
   FaBullhorn,
   FaBell,
   FaSignOutAlt,
-  FaTrophy,
   FaUserTie,
   FaTasks,
   FaCalendarCheck,
@@ -27,8 +26,7 @@ const adminMenuItems = [
   { path: '/admin/tasks', icon: FaTasks, label: 'Task Management' },
   { path: '/admin/reports', icon: FaChartBar, label: 'Reports & Analytics' },
   { path: '/admin/verification', icon: FaCheckCircle, label: 'Verification Center' },
-  { path: '/admin/notifications', icon: FaBell, label: 'Notifications' },
-  { path: '/admin/leaderboard', icon: FaTrophy, label: 'Leaderboard' }
+  { path: '/admin/notifications', icon: FaBell, label: 'Notifications' }
 ];
 
 const AdminSidebar = ({ isOpen, onClose }) => {

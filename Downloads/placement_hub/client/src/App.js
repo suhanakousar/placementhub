@@ -7,9 +7,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 // Pages
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
-import Register from './pages/Register';
 import StudentRegister from './pages/StudentRegister';
-import AdminRegister from './pages/AdminRegister';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import StudentDashboard from './pages/Student/StudentDashboard';
@@ -27,9 +25,7 @@ function App() {
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<Login />} />
-              {/* <Route path="/register" element={<Register />} /> */}
               <Route path="/student-register" element={<StudentRegister />} />
-              {/* <Route path="/admin-register" element={<AdminRegister />} /> */}
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/student-profile/:studentId" element={<StudentProfileView />} />

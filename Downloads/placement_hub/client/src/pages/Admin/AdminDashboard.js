@@ -14,7 +14,6 @@ import MentorDashboard from './MentorDashboard';
 import Tasks from './Tasks';
 import Meetings from './Meetings';
 import api from '../../utils/api';
-import LeaderboardPage from '../LeaderboardPage';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -76,7 +75,6 @@ const AdminDashboard = () => {
           <Route path="verification" element={<Verification />} />
           <Route path="posts" element={<Posts />} />
           <Route path="notifications" element={<Notifications />} />
-          <Route path="leaderboard" element={<LeaderboardPage />} />
           <Route path="mentor" element={<MentorDashboard />} />
           <Route path="meetings" element={<Meetings />} />
           <Route path="tasks" element={<Tasks />} />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaPlus, FaFilter, FaCheckCircle, FaClock, FaExclamationTriangle, FaEdit, FaTrash, FaUser, FaCalendar, FaTimes, FaTasks } from 'react-icons/fa';
+import { FaPlus, FaFilter, FaCheckCircle, FaClock, FaExclamationTriangle, FaEdit, FaTrash, FaUser, FaCalendar, FaTimes, FaTasks, FaEye, FaComment, FaCheck, FaTimesCircle, FaPaperclip, FaSpinner } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
@@ -18,8 +18,13 @@ const Tasks = () => {
     studentId: '',
     status: '',
     priority: '',
-    overdue: false
+    overdue: false,
+    pendingReview: false
   });
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewAction, setReviewAction] = useState('approve'); // 'approve' or 'reject'
   const [stats, setStats] = useState(null);
   const [formData, setFormData] = useState({
     studentId: '',
@@ -43,6 +48,7 @@ const Tasks = () => {
       if (filters.status) queryParams.append('status', filters.status);
       if (filters.priority) queryParams.append('priority', filters.priority);
       if (filters.overdue) queryParams.append('overdue', 'true');
+      if (filters.pendingReview) queryParams.append('pendingReview', 'true');
 
       const response = await api.get(`/admin/tasks?${queryParams.toString()}`);
       setTasks(response.data || []);
@@ -102,8 +108,79 @@ const Tasks = () => {
       toast.success('Task status updated');
       fetchTasks();
       fetchStats();
+      if (selectedTask && selectedTask._id === taskId) {
+        const updatedTasks = await api.get(`/admin/tasks`);
+        const updatedTask = updatedTasks.data.find(t => t._id === taskId);
+        if (updatedTask) {
+          setSelectedTask(updatedTask);
+        }
+      }
     } catch (error) {
       toast.error('Failed to update task status');
+    }
+  };
+
+  const openTaskDetail = async (task) => {
+    try {
+      const response = await api.get(`/admin/tasks/${task._id}`);
+      setSelectedTask(response.data);
+      setShowTaskDetail(true);
+      setReviewComment('');
+      setReviewAction('approve');
+    } catch (error) {
+      toast.error('Failed to load task details');
+    }
+  };
+
+  const handleAddComment = async (taskId) => {
+    if (!reviewComment.trim()) {
+      toast.error('Please enter a comment');
+      return;
+    }
+
+    try {
+      await api.put(`/admin/tasks/${taskId}`, { comment: reviewComment });
+      toast.success('Comment added');
+      setReviewComment('');
+      fetchTasks();
+      if (selectedTask && selectedTask._id === taskId) {
+        const updatedTasks = await api.get(`/admin/tasks`);
+        const updatedTask = updatedTasks.data.find(t => t._id === taskId);
+        if (updatedTask) {
+          setSelectedTask(updatedTask);
+        }
+      }
+    } catch (error) {
+      toast.error('Failed to add comment');
+    }
+  };
+
+  const handleReviewSubmission = async (taskId) => {
+    if (!reviewComment.trim()) {
+      toast.error('Please provide feedback');
+      return;
+    }
+
+    try {
+      const newStatus = reviewAction === 'approve' ? 'done' : 'in_progress';
+      await api.put(`/admin/tasks/${taskId}`, {
+        status: newStatus,
+        comment: reviewComment
+      });
+      toast.success(reviewAction === 'approve' ? 'Submission approved' : 'Submission rejected - task reopened');
+      setReviewComment('');
+      setReviewAction('approve');
+      fetchTasks();
+      fetchStats();
+      if (selectedTask && selectedTask._id === taskId) {
+        const updatedTasks = await api.get(`/admin/tasks`);
+        const updatedTask = updatedTasks.data.find(t => t._id === taskId);
+        if (updatedTask) {
+          setSelectedTask(updatedTask);
+        }
+      }
+    } catch (error) {
+      toast.error('Failed to review submission');
     }
   };
 
@@ -243,15 +320,24 @@ const Tasks = () => {
             <option value="high">High</option>
             <option value="urgent">Urgent</option>
           </select>
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={filters.overdue}
-              onChange={(e) => setFilters({ ...filters, overdue: e.target.checked })}
-              className="rounded"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Show Overdue Only</span>
-          </label>
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={filters.overdue}
+                onChange={(e) => setFilters({ ...filters, overdue: e.target.checked })}
+                className="rounded"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Show Overdue Only</span>
+            </label>
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={filters.pendingReview}
+                onChange={(e) => setFilters({ ...filters, pendingReview: e.target.checked })}
+                className="rounded"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Pending Review</span>
+            </label>
         </div>
       </div>
 
@@ -266,6 +352,7 @@ const Tasks = () => {
               <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Due Date</th>
               <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Status</th>
               <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Origin</th>
+              <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Submission</th>
               <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Actions</th>
             </tr>
           </thead>
@@ -326,7 +413,29 @@ const Tasks = () => {
                   </span>
                 </td>
                 <td className="py-3 px-4">
+                  {task.studentEvidence ? (
+                    <div className="flex items-center space-x-2">
+                      <FaPaperclip className="text-green-500" />
+                      <span className="text-xs text-green-600 dark:text-green-400">Submitted</span>
+                      {task.reviewRequested && (
+                        <span className="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 rounded text-xs">
+                          Review Requested
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">No submission</span>
+                  )}
+                </td>
+                <td className="py-3 px-4">
                   <div className="flex space-x-2">
+                    <button
+                      onClick={() => openTaskDetail(task)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition"
+                      title="View Details"
+                    >
+                      <FaEye />
+                    </button>
                     <button
                       onClick={() => openDeleteConfirm(task._id, task.title)}
                       className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
@@ -447,6 +556,245 @@ const Tasks = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Task Detail Modal */}
+      {showTaskDetail && selectedTask && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+                  Task Details
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowTaskDetail(false);
+                    setSelectedTask(null);
+                    setReviewComment('');
+                    setReviewAction('approve');
+                  }}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <FaTimes className="text-xl" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Task Info */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+                    {selectedTask.title}
+                  </h3>
+                  {selectedTask.description && (
+                    <p className="text-gray-600 dark:text-gray-400">{selectedTask.description}</p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Student</p>
+                    <p className="text-gray-800 dark:text-white font-medium">
+                      {selectedTask.studentId?.personalInfo?.firstName} {selectedTask.studentId?.personalInfo?.lastName}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Priority</p>
+                    <span className={`inline-block px-2 py-1 rounded text-sm font-medium ${getPriorityColor(selectedTask.priority)}`}>
+                      {selectedTask.priority}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Status</p>
+                    <span className={`inline-block px-2 py-1 rounded text-sm font-medium ${getStatusColor(selectedTask.status)}`}>
+                      {selectedTask.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                  {selectedTask.dueDate && (
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Due Date</p>
+                      <p className="text-gray-800 dark:text-white flex items-center space-x-1">
+                        <FaCalendar className="text-sm" />
+                        <span>{new Date(selectedTask.dueDate).toLocaleDateString()}</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Student Evidence/Submission */}
+                {selectedTask.studentEvidence && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center space-x-2">
+                        <FaPaperclip className="text-green-500" />
+                        <span>Student Submission</span>
+                      </h4>
+                      {selectedTask.reviewRequested && (
+                        <span className="px-3 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-full text-sm font-medium">
+                          Review Requested
+                        </span>
+                      )}
+                    </div>
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                      <p className="text-gray-800 dark:text-white whitespace-pre-wrap">
+                        {selectedTask.studentEvidence.text}
+                      </p>
+                      {selectedTask.studentEvidence.submittedAt && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          Submitted: {new Date(selectedTask.studentEvidence.submittedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Review Section */}
+                    {selectedTask.status !== 'done' && selectedTask.studentEvidence && (
+                      <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+                        <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">
+                          Review Submission
+                        </h4>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Review Action
+                            </label>
+                            <div className="flex space-x-4">
+                              <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  value="approve"
+                                  checked={reviewAction === 'approve'}
+                                  onChange={(e) => setReviewAction(e.target.value)}
+                                  className="text-green-600"
+                                />
+                                <span className="text-gray-700 dark:text-gray-300 flex items-center space-x-1">
+                                  <FaCheck className="text-green-500" />
+                                  <span>Approve & Mark Complete</span>
+                                </span>
+                              </label>
+                              <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  value="reject"
+                                  checked={reviewAction === 'reject'}
+                                  onChange={(e) => setReviewAction(e.target.value)}
+                                  className="text-red-600"
+                                />
+                                <span className="text-gray-700 dark:text-gray-300 flex items-center space-x-1">
+                                  <FaTimesCircle className="text-red-500" />
+                                  <span>Reject & Reopen Task</span>
+                                </span>
+                              </label>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Feedback/Comment
+                            </label>
+                            <textarea
+                              value={reviewComment}
+                              onChange={(e) => setReviewComment(e.target.value)}
+                              placeholder="Provide feedback on the submission..."
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                              rows="4"
+                            />
+                          </div>
+                          <button
+                            onClick={() => handleReviewSubmission(selectedTask._id)}
+                            disabled={!reviewComment.trim()}
+                            className={`px-4 py-2 rounded-lg text-white font-medium flex items-center space-x-2 ${
+                              reviewAction === 'approve'
+                                ? 'bg-green-600 hover:bg-green-700'
+                                : 'bg-red-600 hover:bg-red-700'
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            {reviewAction === 'approve' ? (
+                              <>
+                                <FaCheck />
+                                <span>Approve Submission</span>
+                              </>
+                            ) : (
+                              <>
+                                <FaTimesCircle />
+                                <span>Reject & Request Changes</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Comments Section */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3 flex items-center space-x-2">
+                    <FaComment />
+                    <span>Comments</span>
+                  </h4>
+                  {selectedTask.comments && selectedTask.comments.length > 0 ? (
+                    <div className="space-y-2 mb-3">
+                      {selectedTask.comments.map((comment, idx) => (
+                        <div key={idx} className="bg-gray-50 dark:bg-gray-700 rounded p-3">
+                          <div className="flex justify-between items-start mb-1">
+                            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                              {comment.author === 'admin' ? 'You' : 'Student'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(comment.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-800 dark:text-white">{comment.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 mb-3">No comments yet</p>
+                  )}
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      placeholder="Add a comment..."
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && reviewComment.trim()) {
+                          handleAddComment(selectedTask._id);
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => handleAddComment(selectedTask._id)}
+                      disabled={!reviewComment.trim()}
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                    >
+                      <FaComment />
+                      <span>Add</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Status Update */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Update Status
+                  </label>
+                  <select
+                    value={selectedTask.status}
+                    onChange={(e) => handleUpdateStatus(selectedTask._id, e.target.value)}
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                  >
+                    <option value="open">Open</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="blocked">Blocked</option>
+                    <option value="done">Done</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

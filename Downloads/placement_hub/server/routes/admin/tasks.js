@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
       return res.status(404).json({ message: 'Admin profile not found' });
     }
 
-    const { studentId, status, priority, overdue } = req.query;
+    const { studentId, status, priority, overdue, pendingReview } = req.query;
     let query = { createdBy: admin._id };
 
     if (studentId) {
@@ -34,6 +34,11 @@ router.get('/', async (req, res) => {
     }
     if (overdue === 'true') {
       query.dueDate = { $lt: new Date() };
+      query.status = { $ne: 'done' };
+    }
+    if (pendingReview === 'true') {
+      query.studentEvidence = { $exists: true, $ne: null };
+      query.reviewRequested = true;
       query.status = { $ne: 'done' };
     }
 
@@ -61,6 +66,64 @@ router.get('/stats', async (req, res) => {
 
     const stats = await getAdminTaskStats(admin._id);
     res.json(stats);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   GET /api/admin/tasks/:id
+// @desc    Get a specific task
+// @access  Private (Admin)
+router.get('/:id', async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ userId: req.user._id });
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin profile not found' });
+    }
+
+    const task = await Task.findOne({
+      _id: req.params.id,
+      createdBy: admin._id
+    })
+      .populate('studentId', 'personalInfo academicInfo')
+      .populate('createdBy', 'personalInfo')
+      .populate('linkedMeetingId', 'title')
+      .populate('linkedFeedbackId');
+
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    res.json(task);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   GET /api/admin/tasks/:id
+// @desc    Get a specific task
+// @access  Private (Admin)
+router.get('/:id', async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ userId: req.user._id });
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin profile not found' });
+    }
+
+    const task = await Task.findOne({
+      _id: req.params.id,
+      createdBy: admin._id
+    })
+      .populate('studentId', 'personalInfo academicInfo')
+      .populate('createdBy', 'personalInfo')
+      .populate('linkedMeetingId', 'title')
+      .populate('linkedFeedbackId');
+
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    res.json(task);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

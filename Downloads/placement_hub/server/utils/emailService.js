@@ -83,22 +83,37 @@ const sendEmailViaSendGridAPI = async (to, subject, html, text, fromEmail, fromN
 const createTransporter = () => {
   const port = Number(process.env.SMTP_PORT) || 587;
   const isSecure = port === 465;
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASSWORD;
+  
+  if (!user || !pass) {
+    throw new Error('SMTP_USER and SMTP_PASSWORD must be set in environment variables');
+  }
+  
+  console.log(`Creating SMTP transporter:`);
+  console.log(`  Host: ${host}`);
+  console.log(`  Port: ${port}`);
+  console.log(`  User: ${user}`);
+  console.log(`  Secure: ${isSecure}`);
   
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    host: host,
     port: port,
     secure: isSecure, // true for 465, false for other ports
     requireTLS: !isSecure, // Require TLS for non-SSL ports
     auth: {
-      user: process.env.SMTP_USER, // For SendGrid: "apikey", for Gmail: your email
-      pass: process.env.SMTP_PASSWORD, // API key or app password
+      user: user, // For SendGrid: "apikey", for Gmail: your email
+      pass: pass, // API key or app password
     },
-    connectionTimeout: 10000, // 10 seconds connection timeout
-    greetingTimeout: 10000, // 10 seconds greeting timeout
-    socketTimeout: 10000, // 10 seconds socket timeout
+    connectionTimeout: 15000, // 15 seconds connection timeout
+    greetingTimeout: 15000, // 15 seconds greeting timeout
+    socketTimeout: 15000, // 15 seconds socket timeout
     pool: true, // Use connection pooling for better performance
     maxConnections: 1,
     maxMessages: 3,
+    debug: process.env.NODE_ENV === 'development', // Enable debug in development
+    logger: process.env.NODE_ENV === 'development' // Enable logger in development
   });
 };
 
@@ -478,12 +493,14 @@ const sendEmail = async ({ to, subject, html, text, fromEmail, fromName = 'Place
 
     const email = fromEmail || process.env.FROM_EMAIL || process.env.SMTP_USER || 'placementhub722@gmail.com';
     
-    console.log(`Email configuration check:`);
-    console.log(`  SMTP_HOST: ${process.env.SMTP_HOST || 'not set'}`);
-    console.log(`  SMTP_USER: ${process.env.SMTP_USER ? '***configured***' : 'NOT SET'}`);
-    console.log(`  SMTP_PASSWORD: ${process.env.SMTP_PASSWORD ? '***configured***' : 'NOT SET'}`);
-    console.log(`  FROM_EMAIL: ${process.env.FROM_EMAIL || 'not set'}`);
+    console.log(`\n📧 Email Configuration Check:`);
+    console.log(`  SMTP_HOST: ${process.env.SMTP_HOST || 'smtp.gmail.com (default)'}`);
+    console.log(`  SMTP_PORT: ${process.env.SMTP_PORT || '587 (default)'}`);
+    console.log(`  SMTP_USER: ${process.env.SMTP_USER ? '***configured***' : '❌ NOT SET'}`);
+    console.log(`  SMTP_PASSWORD: ${process.env.SMTP_PASSWORD ? '***configured***' : '❌ NOT SET'}`);
+    console.log(`  FROM_EMAIL: ${process.env.FROM_EMAIL || process.env.SMTP_USER || 'not set'}`);
     console.log(`  SENDGRID_API_KEY: ${process.env.SENDGRID_API_KEY ? '***configured***' : 'not set'}`);
+    console.log(`  Using email: ${email}\n`);
     
     // Try SendGrid API first (more reliable), fall back to SMTP
     const apiKey = process.env.SENDGRID_API_KEY || process.env.SMTP_PASSWORD;

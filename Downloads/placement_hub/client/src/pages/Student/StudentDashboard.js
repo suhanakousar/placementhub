@@ -14,6 +14,7 @@ import Notifications from './Notifications';
 import Support from './Support';
 import CompetitiveProfile from './CompetitiveProfile';
 import Meetings from './Meetings';
+import Tasks from './Tasks';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
 
@@ -80,6 +81,7 @@ const StudentDashboard = () => {
           <Route path="competitive-profile" element={<CompetitiveProfile studentData={studentData} />} />
           <Route path="posts" element={<Posts />} />
           <Route path="meetings" element={<Meetings />} />
+          <Route path="tasks" element={<Tasks />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="support" element={<Support />} />
         </Routes>

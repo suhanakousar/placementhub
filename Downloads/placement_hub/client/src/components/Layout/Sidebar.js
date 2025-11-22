@@ -13,7 +13,8 @@ import {
   FaSignOutAlt,
   FaCertificate,
   FaCode,
-  FaCalendarCheck
+  FaCalendarCheck,
+  FaTasks
 } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -28,6 +29,7 @@ const studentMenuItems = [
   { path: '/student/resumes', icon: FaFileAlt, label: 'Resume Manager' },
   { path: '/student/posts', icon: FaBullhorn, label: 'Posts & Drives' },
   { path: '/student/meetings', icon: FaCalendarCheck, label: 'Meetings & Mentoring' },
+  { path: '/student/tasks', icon: FaTasks, label: 'Tasks' },
   { path: '/student/notifications', icon: FaBell, label: 'Notifications' },
   { path: '/student/support', icon: FaHeadset, label: 'Support' }
 ];

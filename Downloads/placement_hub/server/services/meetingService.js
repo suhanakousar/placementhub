@@ -102,8 +102,6 @@ RAaBfizkPIZWBuLM3E8vbHo=
 
     // Use the already sanitized title from meetingData
     // (Title was sanitized at the start of the function)
-    let meetingTitle = meetingData.title; // This is already sanitized
-    
     // Final safety check - ensure title is never empty or invalid
     if (!meetingTitle || typeof meetingTitle !== 'string' || meetingTitle.trim().length === 0) {
       meetingTitle = 'Placement Hub Meeting';

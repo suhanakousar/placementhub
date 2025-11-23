@@ -747,10 +747,28 @@ router.post('/bulk', async (req, res) => {
           }
         }
       } catch (meetingError) {
-        console.error('Error creating meeting link for bulk session:', meetingError);
+        console.error('❌ Error creating meeting link for bulk session:', meetingError);
+        console.error('Error details:', {
+          message: meetingError.message,
+          stack: meetingError.stack,
+          code: meetingError.code,
+          response: meetingError.response?.data
+        });
+        
+        // Provide more helpful error messages
+        let errorMessage = meetingError.message;
+        if (meetingError.message?.includes('Calendar API not configured')) {
+          errorMessage = 'Google Calendar API is not configured. Please add GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY, and GOOGLE_CALENDAR_ID environment variables in Render.';
+        } else if (meetingError.message?.includes('Permission') || meetingError.code === 403) {
+          errorMessage = 'Permission denied. Please ensure the calendar "placementhub722@gmail.com" is shared with the service account "placementhub@placmenthub.iam.gserviceaccount.com" with "Make changes to events" permission.';
+        } else if (meetingError.message?.includes('Invalid meeting link format')) {
+          errorMessage = 'Invalid meeting link format received from Google Calendar API. Please check your Google Calendar API configuration.';
+        }
+        
         return res.status(500).json({
           message: 'Failed to create meeting link',
-          error: meetingError.message
+          error: errorMessage,
+          details: process.env.NODE_ENV === 'development' ? meetingError.stack : undefined
         });
       }
     } else {
@@ -769,6 +787,16 @@ router.post('/bulk', async (req, res) => {
 
     // 🔒 Create or get session for group meeting (ONE SESSION = ONE LINK)
     let session = null;
+    
+    // Validate meeting link exists before creating session
+    if (!meetingDetails || !meetingDetails.meetingLink) {
+      console.error('❌ CRITICAL: No meeting link available for session creation');
+      return res.status(500).json({
+        message: 'Failed to create meeting link. Cannot proceed with session creation.',
+        error: 'Missing meeting link'
+      });
+    }
+
     try {
       const participantUserIds = [];
       
@@ -791,7 +819,7 @@ router.post('/bulk', async (req, res) => {
         mentorId: admin._id,
         startTime: start,
         endTime: end,
-        meetingLink: meetingDetails?.meetingLink || '',
+        meetingLink: meetingDetails.meetingLink,
         meetingPlatform,
         meetingDetails: {
           meetingId: meetingDetails?.meetingId || null,
@@ -809,8 +837,11 @@ router.post('/bulk', async (req, res) => {
       });
       console.log(`✅ Session created/linked for group session ${groupSessionId}`);
     } catch (sessionError) {
-      console.error('⚠️ Error creating session (non-blocking):', sessionError);
-      // Continue even if session creation fails (backward compatibility)
+      console.error('⚠️ Error creating session:', sessionError);
+      console.error('Session error stack:', sessionError.stack);
+      // For now, log but continue - session creation is not critical for meeting creation
+      // But we should investigate why it's failing
+      console.warn('⚠️ Continuing without session (backward compatibility mode)');
     }
 
     const successfulMeetings = [];
@@ -1113,7 +1144,19 @@ router.post('/bulk', async (req, res) => {
     });
   } catch (error) {
     console.error('Bulk meeting scheduling error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      code: error.code,
+      stack: error.stack
+    });
+    
+    res.status(500).json({ 
+      message: 'Server error while creating bulk meeting',
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

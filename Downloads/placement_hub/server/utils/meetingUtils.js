@@ -419,8 +419,13 @@ async function createOrGetSession(options) {
     groupFilters
   } = options;
 
-  if (!meetingLink) {
-    throw new Error('Meeting link is required to create a session');
+  if (!meetingLink || meetingLink.trim() === '') {
+    throw new Error('Meeting link is required to create a session. Cannot create session without a valid meeting link.');
+  }
+
+  // Validate meeting link format (validateGoogleMeetLink is defined above in this file)
+  if (!validateGoogleMeetLink(meetingLink)) {
+    throw new Error(`Invalid meeting link format: ${meetingLink}. Meeting link must be a valid Google Meet URL (format: https://meet.google.com/abc-defg-hij).`);
   }
 
   // For group sessions, check if session with same groupSessionId and link exists

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "test:email": "node -e \"require('./utils/testEmail').testEmailConfig(process.argv[1])\""
+    "test:email": "node -e \"require('./utils/testEmail').testEmailConfig(process.argv[1])\"",
+    "diagnose:meeting": "node utils/diagnoseMeetingEmail.js"
   },
   "dependencies": {
     "archiver": "^7.0.1",

@@ -223,11 +223,20 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'End time must be after start time' });
     }
 
-    // Validate student exists
-    const student = await Student.findById(studentId);
+    // Validate student exists and populate userId
+    const student = await Student.findById(studentId).populate('userId', 'email');
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
+    
+    // Log student info for debugging
+    console.log('Student found:', {
+      studentId: student._id,
+      hasUserId: !!student.userId,
+      userId: student.userId?._id || student.userId,
+      hasEmail: !!student.userId?.email,
+      email: student.userId?.email || 'NO EMAIL'
+    });
 
     // Check for conflicts
     const hasConflict = await checkMeetingConflicts(
@@ -319,15 +328,27 @@ router.post('/', async (req, res) => {
     let emailSent = false;
     let emailError = null;
     try {
-      const studentUser = await require('../../models/User').findById(student.userId);
-      if (!studentUser) {
-        console.error('Student user not found for userId:', student.userId);
-        emailError = 'Student user not found';
+      // Use populated userId if available, otherwise fetch it
+      let studentUser = student.userId;
+      if (!studentUser && student.userId) {
+        // If userId is an ObjectId, fetch the User
+        const User = require('../../models/User');
+        studentUser = await User.findById(student.userId);
+      }
+      
+      if (!student.userId) {
+        console.error('❌ Student has no userId field. Student ID:', student._id);
+        emailError = 'Student user not linked - userId is missing';
+      } else if (!studentUser) {
+        console.error('❌ Student user not found for userId:', student.userId);
+        emailError = `Student user not found for userId: ${student.userId}`;
       } else if (!studentUser.email) {
-        console.error('Student email not found for user:', studentUser._id);
-        emailError = 'Student email not configured';
+        console.error('❌ Student email not found for user:', studentUser._id);
+        emailError = `Student email not configured for user: ${studentUser._id}`;
       } else {
-        console.log(`Attempting to send meeting email to: ${studentUser.email}`);
+        console.log(`\n📧 Attempting to send meeting email to: ${studentUser.email}`);
+        console.log(`   Student: ${student.personalInfo?.firstName} ${student.personalInfo?.lastName}`);
+        console.log(`   Meeting: ${meeting.title}`);
         const localStartTime = formatTimeInTimezone(meeting.startTime, meeting.studentTimezone);
         const localEndTime = formatTimeInTimezone(meeting.endTime, meeting.studentTimezone);
         const studentName = student.personalInfo?.firstName || 'Student';
@@ -454,12 +475,29 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Populate meeting with student info for response
+    const populatedMeeting = await Meeting.findById(meeting._id)
+      .populate({
+        path: 'studentId',
+        select: 'personalInfo academicInfo userId',
+        populate: {
+          path: 'userId',
+          select: 'email',
+          model: 'User'
+        }
+      });
+
     res.status(201).json({
       success: true,
       message: 'Meeting created successfully',
-      meeting,
+      meeting: populatedMeeting || meeting,
       emailSent: emailSent,
-      emailError: emailError ? `Email notification failed: ${emailError}. Meeting was created successfully.` : null
+      emailError: emailError ? `Email notification failed: ${emailError}. Meeting was created successfully.` : null,
+      debug: {
+        studentEmail: student.userId?.email || 'not found',
+        emailAttempted: emailSent,
+        emailError: emailError
+      }
     });
   } catch (error) {
     console.error('Error creating meeting:', error);

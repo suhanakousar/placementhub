@@ -810,8 +810,6 @@ router.post('/bulk', async (req, res) => {
                 console.error('Failed to log email error:', logError);
               }
             }
-          } else {
-            console.warn(`Student ${student._id} does not have a valid email address`);
           }
         } catch (emailError) {
           console.error('Email notification failed for student', student._id, emailError);

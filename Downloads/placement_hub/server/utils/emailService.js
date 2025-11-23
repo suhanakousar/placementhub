@@ -106,14 +106,17 @@ const createTransporter = () => {
       user: user, // For SendGrid: "apikey", for Gmail: your email
       pass: pass, // API key or app password
     },
-    connectionTimeout: 15000, // 15 seconds connection timeout
-    greetingTimeout: 15000, // 15 seconds greeting timeout
-    socketTimeout: 15000, // 15 seconds socket timeout
+    connectionTimeout: 30000, // 30 seconds connection timeout (increased for cloud)
+    greetingTimeout: 30000, // 30 seconds greeting timeout
+    socketTimeout: 30000, // 30 seconds socket timeout
     pool: true, // Use connection pooling for better performance
     maxConnections: 1,
     maxMessages: 3,
     debug: process.env.NODE_ENV === 'development', // Enable debug in development
-    logger: process.env.NODE_ENV === 'development' // Enable logger in development
+    logger: process.env.NODE_ENV === 'development', // Enable logger in development
+    tls: {
+      rejectUnauthorized: false // Allow self-signed certificates if needed
+    }
   });
 };
 
@@ -515,16 +518,39 @@ const sendEmail = async ({ to, subject, html, text, fromEmail, fromName = 'Place
     console.log(`  Using email: ${email}\n`);
     
     // Try SendGrid API first (more reliable), fall back to SMTP
-    const apiKey = process.env.SENDGRID_API_KEY || process.env.SMTP_PASSWORD;
-    if (apiKey && (process.env.SMTP_HOST === 'smtp.sendgrid.net' || !process.env.SMTP_HOST)) {
+    // Check if SendGrid API key is available (preferred method for cloud deployments)
+    const sendGridApiKey = process.env.SENDGRID_API_KEY;
+    if (sendGridApiKey) {
       try {
-        console.log('Attempting to send via SendGrid API...');
+        console.log('📧 SendGrid API key detected. Using SendGrid API (recommended for cloud deployments)...');
         const result = await sendEmailViaSendGridAPI(to, subject, html, text || '', email, fromName);
         console.log('✅ Email sent successfully via SendGrid API');
         return result;
       } catch (apiError) {
         console.error('❌ SendGrid API failed:', apiError.message);
-        console.error('Falling back to SMTP...');
+        console.error('Error details:', {
+          statusCode: apiError.statusCode,
+          response: apiError.response
+        });
+        // Don't fall through to SMTP if SendGrid API key is explicitly set
+        // This prevents trying SMTP on cloud platforms where it's blocked
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error(`SendGrid API failed: ${apiError.message}. Check your SENDGRID_API_KEY.`);
+        }
+        console.error('Falling back to SMTP (development mode only)...');
+        // Fall through to SMTP only in development
+      }
+    }
+    
+    // Also try SendGrid if SMTP_HOST is set to sendgrid.net
+    if (process.env.SMTP_HOST === 'smtp.sendgrid.net' && process.env.SMTP_PASSWORD && process.env.SMTP_PASSWORD.startsWith('SG.')) {
+      try {
+        console.log('📧 SendGrid SMTP detected. Attempting SendGrid API instead (more reliable)...');
+        const result = await sendEmailViaSendGridAPI(to, subject, html, text || '', email, fromName);
+        console.log('✅ Email sent successfully via SendGrid API');
+        return result;
+      } catch (apiError) {
+        console.error('❌ SendGrid API failed, will try SMTP:', apiError.message);
         // Fall through to SMTP
       }
     }
@@ -535,24 +561,81 @@ const sendEmail = async ({ to, subject, html, text, fromEmail, fromName = 'Place
       throw new Error('SMTP_HOST is not configured. Please set SMTP_HOST environment variable.');
     }
     
-    const transporter = createTransporter();
-    if (!transporter) {
-      throw new Error('Failed to create email transporter. Check SMTP configuration.');
-    }
+    // Try port 465 (SSL) first if port 587 fails (better for cloud providers)
+    let transporter = null;
+    let lastError = null;
     
-    const mailOptions = {
-      from: `"${fromName}" <${email}>`,
-      to: to,
-      subject: subject,
-      html: html,
-      text: text || html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
-      attachments: attachments || []
-    };
+    // First try with configured port
+    try {
+      transporter = createTransporter();
+      if (!transporter) {
+        throw new Error('Failed to create email transporter. Check SMTP configuration.');
+      }
+      
+      const mailOptions = {
+        from: `"${fromName}" <${email}>`,
+        to: to,
+        subject: subject,
+        html: html,
+        text: text || html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
+        attachments: attachments || []
+      };
 
-    console.log(`Sending email via SMTP from ${email} to ${to}...`);
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email sent successfully via SMTP:', info.messageId);
-    return { success: true, messageId: info.messageId };
+      console.log(`Sending email via SMTP from ${email} to ${to}...`);
+      const info = await transporter.sendMail(mailOptions);
+      console.log('✅ Email sent successfully via SMTP:', info.messageId);
+      return { success: true, messageId: info.messageId };
+    } catch (smtpError) {
+      lastError = smtpError;
+      console.error('❌ SMTP send failed:', smtpError.message);
+      
+      // If connection timeout and using port 587, try port 465 (SSL)
+      if ((smtpError.code === 'ETIMEDOUT' || smtpError.code === 'ECONNREFUSED') && 
+          process.env.SMTP_PORT === '587' && 
+          process.env.SMTP_HOST === 'smtp.gmail.com') {
+        console.log('⚠️  Connection timeout on port 587. Trying port 465 (SSL)...');
+        try {
+          // Temporarily override port to 465
+          const originalPort = process.env.SMTP_PORT;
+          process.env.SMTP_PORT = '465';
+          transporter = createTransporter();
+          process.env.SMTP_PORT = originalPort;
+          
+          const mailOptions = {
+            from: `"${fromName}" <${email}>`,
+            to: to,
+            subject: subject,
+            html: html,
+            text: text || html.replace(/<[^>]*>/g, ''),
+            attachments: attachments || []
+          };
+          
+          const info = await transporter.sendMail(mailOptions);
+          console.log('✅ Email sent successfully via SMTP (port 465):', info.messageId);
+          return { success: true, messageId: info.messageId };
+        } catch (sslError) {
+          console.error('❌ SMTP port 465 also failed:', sslError.message);
+          lastError = sslError;
+        }
+      }
+      
+      // If still failing, provide helpful error message
+      if (lastError.code === 'ETIMEDOUT' || lastError.code === 'ECONNREFUSED') {
+        const errorMsg = `SMTP connection failed. This is common on cloud hosting (like Render). Consider using SendGrid API instead. Error: ${lastError.message}`;
+        console.error('❌', errorMsg);
+        console.error('\n💡 SOLUTION: Use SendGrid API for cloud deployments:');
+        console.error('   1. Sign up at https://sendgrid.com (free tier available)');
+        console.error('   2. Create an API key');
+        console.error('   3. Set environment variables:');
+        console.error('      SMTP_HOST=smtp.sendgrid.net');
+        console.error('      SMTP_USER=apikey');
+        console.error('      SMTP_PASSWORD=your_sendgrid_api_key');
+        console.error('      SENDGRID_API_KEY=your_sendgrid_api_key\n');
+        throw new Error(errorMsg);
+      }
+      
+      throw lastError;
+    }
   } catch (error) {
     console.error('❌ Error sending email:', error);
     console.error('Error details:', {

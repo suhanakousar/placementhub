@@ -664,8 +664,41 @@ router.post('/bulk', async (req, res) => {
 
         // Send confirmation email to student immediately
         try {
-          const studentUser = await require('../../models/User').findById(student.userId);
-          if (studentUser && studentUser.email) {
+          // Check if userId is populated (object) or just an ObjectId
+          let studentUser = null;
+          const User = require('../../models/User');
+          
+          if (student.userId) {
+            // Check if userId is already populated (has email property) or is an ObjectId
+            if (student.userId.email) {
+              // Already populated
+              studentUser = student.userId;
+            } else if (student.userId._id || typeof student.userId === 'object') {
+              // It's an object but might not have email, try to get it
+              studentUser = await User.findById(student.userId._id || student.userId);
+            } else {
+              // It's an ObjectId string
+              studentUser = await User.findById(student.userId);
+            }
+          }
+          
+          // Log student info for debugging
+          console.log(`\n📧 Processing email for student: ${student._id}`);
+          console.log(`   Name: ${student.personalInfo?.firstName} ${student.personalInfo?.lastName}`);
+          console.log(`   Has userId: ${!!student.userId}`);
+          console.log(`   userId type: ${typeof student.userId}`);
+          console.log(`   Has studentUser: ${!!studentUser}`);
+          console.log(`   Has email: ${!!studentUser?.email}`);
+          console.log(`   Email: ${studentUser?.email || 'NO EMAIL'}`);
+          
+          if (!student.userId) {
+            console.error(`❌ Student ${student._id} has no userId field`);
+          } else if (!studentUser) {
+            console.error(`❌ Student user not found for userId: ${student.userId}`);
+          } else if (!studentUser.email) {
+            console.error(`❌ Student user has no email: ${studentUser._id}`);
+          } else {
+            console.log(`✅ Attempting to send group meeting email to: ${studentUser.email}`);
             const localStartTime = formatTimeInTimezone(meeting.startTime, studentTz);
             const localEndTime = formatTimeInTimezone(meeting.endTime, studentTz);
             const studentName = student.personalInfo?.firstName || 'Student';

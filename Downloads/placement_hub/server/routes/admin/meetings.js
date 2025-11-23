@@ -213,6 +213,19 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Validate title format
+    const titleTrimmed = (title || '').trim();
+    if (titleTrimmed.length === 0) {
+      return res.status(400).json({ 
+        message: 'Meeting title cannot be empty or only whitespace' 
+      });
+    }
+    if (titleTrimmed.length > 1024) {
+      return res.status(400).json({ 
+        message: 'Meeting title cannot exceed 1024 characters' 
+      });
+    }
+
     // Validate dates
     const start = new Date(startTime);
     const end = new Date(endTime);
@@ -565,6 +578,19 @@ router.post('/bulk', async (req, res) => {
     if (!startTime || !endTime || !title || !topic) {
       return res.status(400).json({
         message: 'Missing required fields: startTime, endTime, title, and topic are required'
+      });
+    }
+
+    // Validate title format
+    const titleTrimmed = (title || '').trim();
+    if (titleTrimmed.length === 0) {
+      return res.status(400).json({ 
+        message: 'Meeting title cannot be empty or only whitespace' 
+      });
+    }
+    if (titleTrimmed.length > 1024) {
+      return res.status(400).json({ 
+        message: 'Meeting title cannot exceed 1024 characters' 
       });
     }
 

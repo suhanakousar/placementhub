@@ -68,9 +68,33 @@ RAaBfizkPIZWBuLM3E8vbHo=
       throw new Error(`Authentication failed: ${authError.message || authError.toString()}`);
     }
 
+    // 🔒 Validate and sanitize meeting title for Google Calendar API
+    // Google Calendar API requires:
+    // - Summary cannot be empty
+    // - Maximum length: 1024 characters
+    // - Should not contain only whitespace
+    let meetingTitle = (meetingData.title || '').trim();
+    
+    if (!meetingTitle || meetingTitle.length === 0) {
+      meetingTitle = 'Placement Hub Meeting'; // Default title if empty
+      console.warn('⚠️ Meeting title is empty, using default title');
+    }
+    
+    // Truncate if too long (Google Calendar API limit is 1024 characters)
+    if (meetingTitle.length > 1024) {
+      console.warn(`⚠️ Meeting title is too long (${meetingTitle.length} chars), truncating to 1024 characters`);
+      meetingTitle = meetingTitle.substring(0, 1021) + '...';
+    }
+    
+    // Remove or replace problematic characters that might cause issues
+    // Google Calendar API generally handles most characters, but we'll sanitize for safety
+    meetingTitle = meetingTitle.replace(/\0/g, ''); // Remove null characters
+    
+    console.log(`📝 Using meeting title: "${meetingTitle}" (${meetingTitle.length} characters)`);
+
     // Create calendar event with Google Meet
     const event = {
-      summary: meetingData.title,
+      summary: meetingTitle,
       description: meetingData.description || '',
       start: {
         dateTime: new Date(meetingData.startTime).toISOString(),
@@ -110,15 +134,30 @@ RAaBfizkPIZWBuLM3E8vbHo=
       console.error('Calendar API insert error:', insertError);
       console.error('Error response:', insertError.response?.data);
       console.error('Error code:', insertError.code);
+      console.error('Error message:', insertError.message);
+      
+      // Check for specific error about invalid summary/title
+      const errorMessage = insertError.response?.data?.error?.message || insertError.message || '';
+      const errorDetails = insertError.response?.data?.error || {};
+      
+      if (errorMessage.toLowerCase().includes('invalid') && 
+          (errorMessage.toLowerCase().includes('summary') || 
+           errorMessage.toLowerCase().includes('title') ||
+           errorMessage.toLowerCase().includes('video') ||
+           errorMessage.toLowerCase().includes('name'))) {
+        throw new Error(`Invalid meeting title: ${errorMessage}. Please ensure the title is not empty, is under 1024 characters, and contains valid characters.`);
+      }
       
       // Provide more helpful error messages
       if (insertError.code === 403) {
-        const errorDetails = insertError.response?.data?.error?.message || insertError.message;
-        throw new Error(`Permission denied (403): ${errorDetails}. Solutions: 1) Enable Calendar API in Google Cloud Console, 2) Use service account email "${GOOGLE_CLIENT_EMAIL}" as calendar ID, 3) Share a calendar with "${GOOGLE_CLIENT_EMAIL}" and use that calendar ID.`);
+        throw new Error(`Permission denied (403): ${errorMessage}. Solutions: 1) Enable Calendar API in Google Cloud Console, 2) Use service account email "${GOOGLE_CLIENT_EMAIL}" as calendar ID, 3) Share a calendar with "${GOOGLE_CLIENT_EMAIL}" and use that calendar ID.`);
       } else if (insertError.code === 404) {
         throw new Error(`Calendar not found (404): "${GOOGLE_CALENDAR_ID}". For service accounts, use the service account email as calendar ID, or share a calendar with "${GOOGLE_CLIENT_EMAIL}".`);
-      } else if (insertError.message) {
-        throw new Error(`Failed to create calendar event: ${insertError.message}`);
+      } else if (insertError.code === 400) {
+        // Bad request - often related to invalid data
+        throw new Error(`Invalid request (400): ${errorMessage}. Please check your meeting data (title, dates, etc.).`);
+      } else if (errorMessage) {
+        throw new Error(`Failed to create calendar event: ${errorMessage}`);
       } else {
         throw new Error(`Failed to create calendar event: ${insertError.toString()}`);
       }

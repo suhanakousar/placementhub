@@ -88,6 +88,7 @@ app.use('/api/leaderboard', require('./routes/leaderboard'));
 app.use('/api/users', require('./routes/leaderboardUsers'));
 app.use('/api/leaderboard-public', require('./routes/leaderboardPublic'));
 app.use('/api/meetings', require('./routes/meetings'));
+app.use('/api/sessions', require('./routes/sessions'));
 app.use('/api/tasks', require('./routes/tasks'));
 
 // Health check

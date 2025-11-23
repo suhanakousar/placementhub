@@ -8,7 +8,7 @@ const Reminder = require('../../models/Reminder');
 const Task = require('../../models/Task');
 const EmailLog = require('../../models/EmailLog');
 const { protect, authorize } = require('../../middleware/auth');
-const { checkMeetingConflicts, generateICSFile, generateMeetingLink, formatTimeInTimezone, getExistingGroupSessionLink, getExistingSingleMeetingLink, validateMeetingLinkUniqueness, findExistingGroupSession } = require('../../utils/meetingUtils');
+const { checkMeetingConflicts, generateICSFile, generateMeetingLink, formatTimeInTimezone, getExistingGroupSessionLink, getExistingSingleMeetingLink, validateMeetingLinkUniqueness, findExistingGroupSession, createOrGetSession } = require('../../utils/meetingUtils');
 const { sendEmail } = require('../../utils/emailService');
 const { createRemindersForMeeting } = require('../../utils/reminderUtils');
 const { createTasksFromFeedback } = require('../../utils/taskUtils');
@@ -338,6 +338,41 @@ router.post('/', async (req, res) => {
       createdBy: 'admin',
       attachments: attachments || []
     });
+
+    // 🔒 Create or get session for this meeting (ONE SESSION = ONE LINK)
+    try {
+      const studentUser = await require('../../models/User').findById(student.userId);
+      const participantUserIds = [];
+      if (studentUser) {
+        participantUserIds.push(studentUser._id);
+      }
+      if (admin.userId) {
+        participantUserIds.push(admin.userId);
+      }
+
+      await createOrGetSession({
+        type: 'one_to_one',
+        title,
+        description: description || '',
+        mentorId: admin._id,
+        startTime,
+        endTime,
+        meetingLink,
+        meetingPlatform: 'google_meet',
+        meetingDetails: {
+          meetingId: meetingDetails?.meetingId || null,
+          password: meetingDetails?.password || null,
+          dialInNumber: meetingDetails?.dialInNumber || null,
+          startUrl: meetingDetails?.startUrl || null
+        },
+        participantUserIds,
+        meetingId: meeting._id
+      });
+      console.log(`✅ Session created/linked for meeting ${meeting._id}`);
+    } catch (sessionError) {
+      console.error('⚠️ Error creating session (non-blocking):', sessionError);
+      // Continue even if session creation fails (backward compatibility)
+    }
 
     // Generate ICS file (non-blocking)
     try {
@@ -689,6 +724,53 @@ router.post('/bulk', async (req, res) => {
     } else {
       console.log(`✅ REUSING existing meeting link for group session: ${groupSessionId}`);
     }
+
+    // 🔒 Create or get session for group meeting (ONE SESSION = ONE LINK)
+    let session = null;
+    try {
+      const participantUserIds = [];
+      
+      // Add mentor
+      if (admin.userId) {
+        participantUserIds.push(admin.userId);
+      }
+
+      // Add all students
+      for (const student of targetStudents) {
+        if (student.userId) {
+          participantUserIds.push(student.userId);
+        }
+      }
+
+      session = await createOrGetSession({
+        type: 'group',
+        title,
+        description: description || '',
+        mentorId: admin._id,
+        startTime: start,
+        endTime: end,
+        meetingLink: meetingDetails?.meetingLink || '',
+        meetingPlatform,
+        meetingDetails: {
+          meetingId: meetingDetails?.meetingId || null,
+          password: meetingDetails?.password || null,
+          dialInNumber: meetingDetails?.dialInNumber || null,
+          startUrl: meetingDetails?.startUrl || null
+        },
+        participantUserIds,
+        groupSessionId,
+        groupFilters: {
+          department: filters?.department || null,
+          specialization: filters?.specialization || null,
+          year: filters?.year ? parseInt(filters.year, 10) || null : null
+        }
+      });
+      console.log(`✅ Session created/linked for group session ${groupSessionId}`);
+    } catch (sessionError) {
+      console.error('⚠️ Error creating session (non-blocking):', sessionError);
+      // Continue even if session creation fails (backward compatibility)
+    }
+
     const successfulMeetings = [];
     const failedMeetings = [];
     const emailResults = {
@@ -698,6 +780,7 @@ router.post('/bulk', async (req, res) => {
 
     console.log(`\n📧 Creating group meeting for ${targetStudents.length} students`);
     console.log(`   Group Session ID: ${groupSessionId}`);
+    console.log(`   Session ID: ${session?._id || 'N/A'}`);
     console.log(`   Shared Meeting Link: ${meetingDetails?.meetingLink || 'N/A'}`);
     console.log(`   Note: All students will receive SEPARATE emails with the SAME meeting link (correct for group sessions)\n`);
 
@@ -733,6 +816,27 @@ router.post('/bulk', async (req, res) => {
             year: filters?.year ? parseInt(filters.year, 10) || null : null
           }
         });
+
+        // Link meeting to session
+        if (session) {
+          if (!session.meetingIds.includes(meeting._id)) {
+            session.meetingIds.push(meeting._id);
+            await session.save();
+          }
+          // Update participant's meetingId
+          const SessionParticipant = require('../../models/SessionParticipant');
+          const studentUser = await require('../../models/User').findById(student.userId);
+          if (studentUser) {
+            const participant = await SessionParticipant.findOne({
+              sessionId: session._id,
+              userId: studentUser._id
+            });
+            if (participant && !participant.meetingId) {
+              participant.meetingId = meeting._id;
+              await participant.save();
+            }
+          }
+        }
 
         try {
           const icsContent = generateICSFile(meeting, student);
@@ -1083,6 +1187,41 @@ router.post('/requests/:id/approve', async (req, res) => {
       createdBy: 'admin',
       attachments: request.attachments || []
     });
+
+    // 🔒 Create or get session for this meeting (ONE SESSION = ONE LINK)
+    try {
+      const studentUser = await require('../../models/User').findById(request.studentId.userId);
+      const participantUserIds = [];
+      if (studentUser) {
+        participantUserIds.push(studentUser._id);
+      }
+      if (admin.userId) {
+        participantUserIds.push(admin.userId);
+      }
+
+      await createOrGetSession({
+        type: 'one_to_one',
+        title: request.title,
+        description: request.description || '',
+        mentorId: admin._id,
+        startTime,
+        endTime,
+        meetingLink,
+        meetingPlatform: 'google_meet',
+        meetingDetails: {
+          meetingId: meetingDetails?.meetingId || null,
+          password: meetingDetails?.password || null,
+          dialInNumber: meetingDetails?.dialInNumber || null,
+          startUrl: meetingDetails?.startUrl || null
+        },
+        participantUserIds,
+        meetingId: meeting._id
+      });
+      console.log(`✅ Session created/linked for approved meeting ${meeting._id}`);
+    } catch (sessionError) {
+      console.error('⚠️ Error creating session (non-blocking):', sessionError);
+      // Continue even if session creation fails (backward compatibility)
+    }
 
     // Update request
     request.status = 'approved';
@@ -1781,6 +1920,85 @@ router.get('/requests', async (req, res) => {
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
+  }
+});
+
+// @route   GET /api/admin/meetings/:id/join-link
+// @desc    Get join link for a meeting (via session)
+// @access  Private (Admin)
+// @note    This endpoint finds the session associated with the meeting and returns its join link
+router.get('/:id/join-link', async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ userId: req.user._id });
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin profile not found' });
+    }
+
+    const meeting = await Meeting.findById(req.params.id);
+    if (!meeting) {
+      return res.status(404).json({ message: 'Meeting not found' });
+    }
+
+    // Check if admin is the mentor
+    if (meeting.mentorId.toString() !== admin._id.toString()) {
+      return res.status(403).json({ message: 'You are not authorized to access this meeting' });
+    }
+
+    // Find session by meeting ID
+    const Session = require('../../models/Session');
+    const session = await Session.findOne({ meetingIds: meeting._id });
+
+    if (!session) {
+      // Fallback to meeting's own link (backward compatibility)
+      if (meeting.meetingLink) {
+        return res.json({
+          success: true,
+          meetingLink: meeting.meetingLink,
+          meetingPlatform: meeting.meetingPlatform,
+          meetingId: meeting.meetingId,
+          meetingPassword: meeting.meetingPassword,
+          meetingDialIn: meeting.meetingDialIn,
+          meetingStartUrl: meeting.meetingStartUrl,
+          note: 'Using meeting link (session not found - backward compatibility)'
+        });
+      }
+      return res.status(404).json({ 
+        message: 'Meeting link not available',
+        note: 'Session not found and meeting has no link'
+      });
+    }
+
+    // Use session join-link endpoint logic
+    if (session.status === 'cancelled') {
+      return res.status(400).json({ 
+        message: 'This session has been cancelled',
+        sessionId: session._id
+      });
+    }
+
+    if (!session.meetingLink) {
+      return res.status(404).json({ 
+        message: 'Meeting link not available yet',
+        note: 'Meeting link will be generated when the session is scheduled.',
+        sessionId: session._id
+      });
+    }
+
+    res.json({
+      success: true,
+      meetingLink: session.meetingLink,
+      meetingPlatform: session.meetingPlatform,
+      meetingId: session.meetingId,
+      meetingPassword: session.meetingPassword,
+      meetingDialIn: session.meetingDialIn,
+      meetingStartUrl: session.meetingStartUrl,
+      sessionId: session._id,
+      type: session.type,
+      note: 'This is the official meeting link stored in the session. All participants use this same link.'
+    });
+  } catch (error) {
+    console.error('Error getting join link:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 

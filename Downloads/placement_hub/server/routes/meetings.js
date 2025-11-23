@@ -239,9 +239,9 @@ router.get('/:id/feedback', protect, authorize('student'), async (req, res) => {
 });
 
 // @route   GET /api/meetings/:id/link
-// @desc    🔒 UNIFIED MEETING LINK POLICY: Get meeting link (always from database, never creates new)
+// @desc    🔒 UNIFIED MEETING LINK POLICY: Get meeting link (via session, always from database, never creates new)
 // @access  Private (Student)
-// @note    This endpoint ALWAYS returns the stored meeting link from the database.
+// @note    This endpoint finds the session associated with the meeting and returns its join link.
 //          It NEVER creates a new link. Meeting links are created ONLY during scheduling by admin.
 router.get('/:id/link', protect, authorize('student'), async (req, res) => {
   try {
@@ -253,31 +253,88 @@ router.get('/:id/link', protect, authorize('student'), async (req, res) => {
     const meeting = await Meeting.findOne({
       _id: req.params.id,
       studentId: student._id
-    }).select('meetingLink meetingPlatform meetingId meetingPassword meetingDialIn meetingStartUrl isGroupMeeting groupSessionId');
+    });
 
     if (!meeting) {
       return res.status(404).json({ message: 'Meeting not found' });
     }
 
-    if (!meeting.meetingLink) {
+    // Find session by meeting ID
+    const Session = require('../models/Session');
+    const session = await Session.findOne({ meetingIds: meeting._id });
+
+    if (!session) {
+      // Fallback to meeting's own link (backward compatibility)
+      if (meeting.meetingLink) {
+        return res.json({
+          success: true,
+          meetingLink: meeting.meetingLink,
+          meetingPlatform: meeting.meetingPlatform,
+          meetingId: meeting.meetingId,
+          meetingPassword: meeting.meetingPassword,
+          meetingDialIn: meeting.meetingDialIn,
+          meetingStartUrl: meeting.meetingStartUrl,
+          isGroupMeeting: meeting.isGroupMeeting,
+          groupSessionId: meeting.groupSessionId,
+          note: 'Using meeting link (session not found - backward compatibility)'
+        });
+      }
       return res.status(404).json({ 
         message: 'Meeting link not available yet',
-        note: 'Meeting link will be generated when the meeting is scheduled by the admin.'
+        note: 'Session not found and meeting has no link. Meeting link will be generated when the meeting is scheduled by the admin.'
       });
     }
 
-    // 🔒 Return the stored link from database - NEVER create a new one
+    // Check if student is a participant
+    const SessionParticipant = require('../models/SessionParticipant');
+    const participant = await SessionParticipant.findOne({
+      sessionId: session._id,
+      userId: req.user._id
+    });
+
+    if (!participant) {
+      return res.status(403).json({ 
+        message: 'You are not a participant in this session',
+        sessionId: session._id
+      });
+    }
+
+    if (session.status === 'cancelled') {
+      return res.status(400).json({ 
+        message: 'This session has been cancelled',
+        sessionId: session._id
+      });
+    }
+
+    if (!session.meetingLink) {
+      return res.status(404).json({ 
+        message: 'Meeting link not available yet',
+        note: 'Meeting link will be generated when the session is scheduled by the admin.',
+        sessionId: session._id
+      });
+    }
+
+    // Update participant join status
+    if (participant.joinStatus !== 'joined') {
+      participant.joinStatus = 'joined';
+      participant.joinTime = new Date();
+      await participant.save();
+    }
+
+    // 🔒 Return the stored link from session - NEVER create a new one
     res.json({
       success: true,
-      meetingLink: meeting.meetingLink,
-      meetingPlatform: meeting.meetingPlatform,
-      meetingId: meeting.meetingId,
-      meetingPassword: meeting.meetingPassword,
-      meetingDialIn: meeting.meetingDialIn,
-      meetingStartUrl: meeting.meetingStartUrl,
-      isGroupMeeting: meeting.isGroupMeeting,
-      groupSessionId: meeting.groupSessionId,
-      note: 'This is the official meeting link stored in the database. All participants use this same link.'
+      meetingLink: session.meetingLink,
+      meetingPlatform: session.meetingPlatform,
+      meetingId: session.meetingId,
+      meetingPassword: session.meetingPassword,
+      meetingDialIn: session.meetingDialIn,
+      meetingStartUrl: session.meetingStartUrl,
+      sessionId: session._id,
+      type: session.type,
+      isGroupMeeting: session.type === 'group',
+      groupSessionId: session.groupSessionId,
+      note: 'This is the official meeting link stored in the session. All participants use this same link.'
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

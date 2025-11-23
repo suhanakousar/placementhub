@@ -337,6 +337,184 @@ async function validateMeetingLinkUniqueness(meetingLink, excludeMeetingId = nul
   return true; // Link is unique
 }
 
+/**
+ * Create or get existing session for a meeting
+ * This ensures ONE session = ONE meeting link
+ * @param {Object} options - Session creation options
+ * @param {string} options.type - 'group' or 'one_to_one'
+ * @param {string} options.title - Session title
+ * @param {string} options.description - Session description
+ * @param {ObjectId} options.mentorId - Mentor/Admin ID
+ * @param {Date} options.startTime - Session start time
+ * @param {Date} options.endTime - Session end time
+ * @param {string} options.meetingLink - Meeting link (must be provided)
+ * @param {string} options.meetingPlatform - Meeting platform
+ * @param {Object} options.meetingDetails - Additional meeting details (meetingId, password, etc.)
+ * @param {Array} options.participantUserIds - Array of user IDs to add as participants
+ * @param {ObjectId} options.meetingId - Meeting ID to link to session
+ * @param {string} options.groupSessionId - Group session ID (for group sessions)
+ * @param {Object} options.groupFilters - Group filters (for group sessions)
+ * @returns {Promise<Object>} - Created or existing session
+ */
+async function createOrGetSession(options) {
+  const Session = require('../models/Session');
+  const SessionParticipant = require('../models/SessionParticipant');
+  const User = require('../models/User');
+  
+  const {
+    type,
+    title,
+    description,
+    mentorId,
+    startTime,
+    endTime,
+    meetingLink,
+    meetingPlatform = 'google_meet',
+    meetingDetails = {},
+    participantUserIds = [],
+    meetingId,
+    groupSessionId,
+    groupFilters
+  } = options;
+
+  if (!meetingLink) {
+    throw new Error('Meeting link is required to create a session');
+  }
+
+  // For group sessions, check if session with same groupSessionId and link exists
+  if (type === 'group' && groupSessionId) {
+    const existingSession = await Session.findOne({
+      type: 'group',
+      groupSessionId: groupSessionId,
+      meetingLink: meetingLink
+    });
+
+    if (existingSession) {
+      console.log(`✅ Reusing existing session for group: ${groupSessionId}`);
+      
+      // Add meeting to session if provided
+      if (meetingId && !existingSession.meetingIds.includes(meetingId)) {
+        existingSession.meetingIds.push(meetingId);
+        await existingSession.save();
+      }
+
+      // Ensure participants are added
+      for (const userId of participantUserIds) {
+        const existingParticipant = await SessionParticipant.findOne({
+          sessionId: existingSession._id,
+          userId: userId
+        });
+
+        if (!existingParticipant) {
+          const user = await User.findById(userId);
+          await SessionParticipant.create({
+            sessionId: existingSession._id,
+            userId: userId,
+            role: user?.role || 'student',
+            meetingId: meetingId || null
+          });
+        } else if (meetingId && !existingParticipant.meetingId) {
+          existingParticipant.meetingId = meetingId;
+          await existingParticipant.save();
+        }
+      }
+
+      return existingSession;
+    }
+  }
+
+  // For one-to-one, check if session with same participants and time exists
+  if (type === 'one_to_one' && participantUserIds.length >= 2) {
+    const timeTolerance = 60 * 1000; // 1 minute
+    const startTimeMin = new Date(new Date(startTime).getTime() - timeTolerance);
+    const startTimeMax = new Date(new Date(startTime).getTime() + timeTolerance);
+
+    const existingSession = await Session.findOne({
+      type: 'one_to_one',
+      mentorId: mentorId,
+      startTime: { $gte: startTimeMin, $lte: startTimeMax },
+      meetingLink: meetingLink
+    });
+
+    if (existingSession) {
+      console.log(`✅ Reusing existing one-to-one session`);
+      
+      // Add meeting to session if provided
+      if (meetingId && !existingSession.meetingIds.includes(meetingId)) {
+        existingSession.meetingIds.push(meetingId);
+        await existingSession.save();
+      }
+
+      return existingSession;
+    }
+  }
+
+  // Create new session
+  console.log(`🔒 Creating NEW session (type: ${type}, link: ${meetingLink})`);
+  
+  const session = await Session.create({
+    type,
+    title,
+    description: description || '',
+    mentorId,
+    meetingLink,
+    meetingPlatform,
+    meetingId: meetingDetails?.meetingId || null,
+    meetingPassword: meetingDetails?.password || null,
+    meetingDialIn: meetingDetails?.dialInNumber || null,
+    meetingStartUrl: meetingDetails?.startUrl || null,
+    startTime: new Date(startTime),
+    endTime: new Date(endTime),
+    status: 'scheduled',
+    meetingIds: meetingId ? [meetingId] : [],
+    groupSessionId: groupSessionId || null,
+    groupFilters: groupFilters || {}
+  });
+
+  // Add mentor as participant
+  const Admin = require('../models/Admin');
+  const admin = await Admin.findById(mentorId);
+  if (admin && admin.userId) {
+    const mentorUserRecord = await User.findById(admin.userId);
+    if (mentorUserRecord) {
+      // Check if participant already exists
+      const existingMentorParticipant = await SessionParticipant.findOne({
+        sessionId: session._id,
+        userId: mentorUserRecord._id
+      });
+      
+      if (!existingMentorParticipant) {
+        await SessionParticipant.create({
+          sessionId: session._id,
+          userId: mentorUserRecord._id,
+          role: 'admin',
+          meetingId: meetingId || null
+        });
+      }
+    }
+  }
+
+  // Add all participants
+  for (const userId of participantUserIds) {
+    const existingParticipant = await SessionParticipant.findOne({
+      sessionId: session._id,
+      userId: userId
+    });
+
+    if (!existingParticipant) {
+      const user = await User.findById(userId);
+      await SessionParticipant.create({
+        sessionId: session._id,
+        userId: userId,
+        role: user?.role || 'student',
+        meetingId: meetingId || null
+      });
+    }
+  }
+
+  return session;
+}
+
 module.exports = {
   checkMeetingConflicts,
   generateICSFile,
@@ -346,6 +524,7 @@ module.exports = {
   getExistingGroupSessionLink,
   getExistingSingleMeetingLink,
   validateMeetingLinkUniqueness,
-  findExistingGroupSession
+  findExistingGroupSession,
+  createOrGetSession
 };
 

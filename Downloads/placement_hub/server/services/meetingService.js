@@ -95,9 +95,18 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
     // Authorize the client
     try {
       const token = await jwtClient.authorize();
-      console.log('JWT Authorization successful');
+      console.log('✅ JWT Authorization successful');
+      console.log('   Using Client Email:', GOOGLE_CLIENT_EMAIL);
+      console.log('   Using Calendar ID:', GOOGLE_CALENDAR_ID);
     } catch (authError) {
-      console.error('JWT Authorization error:', authError);
+      console.error('❌ JWT Authorization error:', authError);
+      console.error('   Client Email:', GOOGLE_CLIENT_EMAIL);
+      console.error('   Calendar ID:', GOOGLE_CALENDAR_ID);
+      console.error('   Error details:', {
+        message: authError.message,
+        code: authError.code,
+        response: authError.response?.data
+      });
       throw new Error(`Authentication failed: ${authError.message || authError.toString()}`);
     }
 
@@ -146,10 +155,12 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
       },
     };
 
-    // Add attendee if email is provided
-    if (meetingData.attendeeEmail) {
-      event.attendees = [{ email: meetingData.attendeeEmail }];
-    }
+    // ❌ Service accounts cannot invite attendees without Domain-Wide Delegation
+    // We skip adding attendees - they can join using the meeting link directly
+    // The meeting link will still be created and work perfectly
+    // if (meetingData.attendeeEmail) {
+    //   event.attendees = [{ email: meetingData.attendeeEmail }];
+    // }
 
     // Insert the event with Meet link
     let response;
@@ -169,6 +180,7 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
       // Check for specific error about invalid summary/title
       const errorMessage = insertError.response?.data?.error?.message || insertError.message || '';
       const errorDetails = insertError.response?.data?.error || {};
+      const errorReason = errorDetails.reason || '';
       
       if (errorMessage.toLowerCase().includes('invalid') && 
           (errorMessage.toLowerCase().includes('summary') || 
@@ -178,9 +190,27 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
         throw new Error(`Invalid meeting title: ${errorMessage}. Please ensure the title is not empty, is under 1024 characters, and contains valid characters.`);
       }
       
+      // Check for API not enabled error
+      if (errorReason === 'accessNotConfigured' || errorMessage.includes('has not been used') || errorMessage.includes('is disabled')) {
+        const projectId = errorMessage.match(/project (\d+)/)?.[1] || 'your project';
+        const enableUrl = errorMessage.match(/https:\/\/[^\s]+/)?.[0] || `https://console.cloud.google.com/apis/library/calendar-json.googleapis.com?project=${projectId}`;
+        throw new Error(`Google Calendar API is not enabled. Please enable it by visiting: ${enableUrl}\n\nSteps:\n1. Click the link above\n2. Click "Enable" button\n3. Wait 1-2 minutes for it to propagate\n4. Try again`);
+      }
+      
+      // Check for service account attendee invitation error
+      if (errorReason === 'forbiddenForServiceAccounts' || errorMessage.includes('cannot invite attendees') || errorMessage.includes('Domain-Wide Delegation')) {
+        throw new Error(`Service accounts cannot invite attendees. The meeting link will be created without attendees - participants can join using the link directly. This is a Google limitation for service accounts.`);
+      }
+      
       // Provide more helpful error messages
       if (insertError.code === 403) {
-        throw new Error(`Permission denied (403): ${errorMessage}. Solutions: 1) Enable Calendar API in Google Cloud Console, 2) Use service account email "${GOOGLE_CLIENT_EMAIL}" as calendar ID, 3) Share a calendar with "${GOOGLE_CLIENT_EMAIL}" and use that calendar ID.`);
+        if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+          throw new Error(`Calendar "${GOOGLE_CALENDAR_ID}" not found or not accessible. Please ensure: 1) The calendar exists, 2) It is shared with "${GOOGLE_CLIENT_EMAIL}" with "Make changes to events" permission.`);
+        } else if (errorMessage.includes('insufficient') || errorMessage.includes('permission')) {
+          throw new Error(`Permission denied. Please share the calendar "${GOOGLE_CALENDAR_ID}" with the service account "${GOOGLE_CLIENT_EMAIL}" with "Make changes to events" permission in Google Calendar settings.`);
+        } else {
+          throw new Error(`Permission denied (403): ${errorMessage}. Solutions: 1) Enable Calendar API in Google Cloud Console, 2) Share calendar "${GOOGLE_CALENDAR_ID}" with "${GOOGLE_CLIENT_EMAIL}" with "Make changes to events" permission.`);
+        }
       } else if (insertError.code === 404) {
         throw new Error(`Calendar not found (404): "${GOOGLE_CALENDAR_ID}". For service accounts, use the service account email as calendar ID, or share a calendar with "${GOOGLE_CLIENT_EMAIL}".`);
       } else if (insertError.code === 400) {
@@ -233,13 +263,20 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
     // Google Meet links MUST be created via Google Calendar API
     // If API fails, we must throw an error instead of creating fake links
     if (error.code === 403 || error.message?.includes('Permission') || error.message?.includes('403')) {
-      console.error('❌ CRITICAL ERROR: Google Calendar API permission denied.');
-      console.error('   Cannot create valid Google Meet link without API access.');
-      console.error('   Solution: Configure Google Calendar API credentials in environment variables:');
-      console.error('   - GOOGLE_CLIENT_EMAIL');
-      console.error('   - GOOGLE_PRIVATE_KEY');
-      console.error('   - GOOGLE_CALENDAR_ID');
-      throw new Error('Google Calendar API not configured. Cannot create valid Google Meet link. Please configure GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY, and GOOGLE_CALENDAR_ID environment variables.');
+      console.error('❌ CRITICAL ERROR: Google Calendar API permission denied (403).');
+      console.error('   Client Email:', GOOGLE_CLIENT_EMAIL);
+      console.error('   Calendar ID:', GOOGLE_CALENDAR_ID);
+      console.error('   Error Response:', error.response?.data);
+      
+      // Check if it's a calendar sharing issue
+      const errorMessage = error.response?.data?.error?.message || error.message || '';
+      if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+        throw new Error(`Calendar "${GOOGLE_CALENDAR_ID}" not found or not accessible. Please ensure: 1) The calendar exists, 2) It is shared with "${GOOGLE_CLIENT_EMAIL}" with "Make changes to events" permission.`);
+      } else if (errorMessage.includes('insufficient') || errorMessage.includes('permission')) {
+        throw new Error(`Permission denied. Please share the calendar "${GOOGLE_CALENDAR_ID}" with the service account "${GOOGLE_CLIENT_EMAIL}" with "Make changes to events" permission in Google Calendar settings.`);
+      } else {
+        throw new Error(`Google Calendar API permission denied (403). Please ensure: 1) Google Calendar API is enabled in Google Cloud Console, 2) Calendar "${GOOGLE_CALENDAR_ID}" is shared with "${GOOGLE_CLIENT_EMAIL}" with "Make changes to events" permission, 3) Environment variables GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY, and GOOGLE_CALENDAR_ID are set correctly in Render.`);
+      }
     }
     
     throw new Error(`Failed to create Google Meet meeting: ${error.message || error.toString()}`);

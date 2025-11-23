@@ -599,39 +599,106 @@ router.post('/bulk', async (req, res) => {
           console.error('Reminder creation failed for student', student._id, reminderError);
         }
 
+        // Send confirmation email to student immediately
         try {
-          if (student.userId?.email) {
+          const studentUser = await require('../../models/User').findById(student.userId);
+          if (studentUser && studentUser.email) {
             const localStartTime = formatTimeInTimezone(meeting.startTime, studentTz);
-            await sendEmail({
-              to: student.userId.email,
+            const localEndTime = formatTimeInTimezone(meeting.endTime, studentTz);
+            const studentName = student.personalInfo?.firstName || 'Student';
+            
+            const emailHtml = `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <style>
+                  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                  .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+                  .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                  .meeting-info { background: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #667eea; }
+                  .meeting-link { display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 15px 0; font-weight: bold; }
+                  .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+                  .reminder-note { background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                  .group-badge { background: #4caf50; color: white; padding: 8px 15px; border-radius: 20px; font-size: 14px; display: inline-block; margin: 10px 0; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <div class="header">
+                    <h1>Group Meeting Scheduled</h1>
+                  </div>
+                  <div class="content">
+                    <h2>Hello ${studentName},</h2>
+                    <div class="group-badge">👥 Group Session</div>
+                    <p>A new mentor group session has been scheduled for you!</p>
+                    
+                    <div class="meeting-info">
+                      <h3 style="margin-top: 0; color: #667eea;">${meeting.title}</h3>
+                      <p><strong>Topic:</strong> ${meeting.topic}</p>
+                      <p><strong>Date & Time:</strong> ${localStartTime}</p>
+                      <p><strong>Duration:</strong> Until ${localEndTime}</p>
+                      ${meeting.description ? `<p><strong>Description:</strong><br>${meeting.description}</p>` : ''}
+                      <p><strong>Group:</strong> This is a group meeting scheduled for students${filters?.department ? ` in ${filters.department}` : ''}${filters?.year ? `, batch ${filters.year}` : ''}${filters?.specialization ? `, specialization ${filters.specialization}` : ''}.</p>
+                    </div>
+
+                    <div style="text-align: center;">
+                      <a href="${meeting.meetingLink}" class="meeting-link">Join Meeting</a>
+                    </div>
+                    
+                    <div class="reminder-note">
+                      <strong>📅 Reminder:</strong> You will receive automatic email reminders at:
+                      <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li>48 hours before the meeting</li>
+                        <li>24 hours before the meeting</li>
+                        <li>1 hour before the meeting</li>
+                        <li>10 minutes before the meeting</li>
+                      </ul>
+                    </div>
+
+                    <p>Please add this meeting to your calendar and prepare any questions or materials you'd like to discuss.</p>
+                    
+                    <div class="footer">
+                      <p>© ${new Date().getFullYear()} Placement Hub. All rights reserved.</p>
+                    </div>
+                  </div>
+                </div>
+              </body>
+              </html>
+            `;
+            
+            const emailResult = await sendEmail({
+              to: studentUser.email,
               subject: `Group Meeting Scheduled: ${meeting.title}`,
-              html: `
-                <h2>Group Meeting Scheduled</h2>
-                <p>A new mentor session has been scheduled for you.</p>
-                <p><strong>Title:</strong> ${meeting.title}</p>
-                <p><strong>Date & Time:</strong> ${localStartTime}</p>
-                <p><strong>Topic:</strong> ${meeting.topic}</p>
-                <p><strong>Meeting Link:</strong> <a href="${meeting.meetingLink}">${meeting.meetingLink}</a></p>
-                ${meeting.description ? `<p><strong>Description:</strong> ${meeting.description}</p>` : ''}
-                <p>This is a group meeting scheduled for students${filters?.department ? ` in ${filters.department}` : ''}${filters?.year ? `, batch ${filters.year}` : ''}${filters?.specialization ? `, specialization ${filters.specialization}` : ''}.</p>
-              `
+              html: emailHtml,
+              fromName: 'Placement Hub - Mentoring System'
             });
 
-            await EmailLog.create({
-              recipientId: student._id,
-              recipientType: 'Student',
-              recipientEmail: student.userId.email,
-              sentBy: admin._id,
-              subject: `Group Meeting Scheduled: ${meeting.title}`,
-              body: meeting.description || '',
-              status: 'sent',
-              sentAt: new Date(),
-              includesMeetingLink: true,
-              meetingId: meeting._id
-            });
+            if (emailResult && emailResult.success) {
+              console.log(`✅ Group meeting email sent successfully to ${studentUser.email}`);
+              
+              // Log email
+              await EmailLog.create({
+                recipientId: student._id,
+                recipientType: 'Student',
+                recipientEmail: studentUser.email,
+                sentBy: admin._id,
+                subject: `Group Meeting Scheduled: ${meeting.title}`,
+                body: `Group meeting scheduled for ${localStartTime}`,
+                status: 'sent',
+                sentAt: new Date(),
+                includesMeetingLink: true,
+                meetingId: meeting._id
+              });
+            } else {
+              console.error('Email sending returned unsuccessful for student', student._id, emailResult);
+            }
+          } else {
+            console.warn(`Student ${student._id} does not have a valid email address`);
           }
         } catch (emailError) {
           console.error('Email notification failed for student', student._id, emailError);
+          // Continue processing other students even if one email fails
         }
 
         successfulMeetings.push(meeting._id);

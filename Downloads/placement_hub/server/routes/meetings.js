@@ -266,6 +266,18 @@ router.get('/:id/link', protect, authorize('student'), async (req, res) => {
     if (!session) {
       // Fallback to meeting's own link (backward compatibility)
       if (meeting.meetingLink) {
+        // 🔒 Validate Google Meet link format before returning
+        const { validateGoogleMeetLink } = require('../utils/meetingUtils');
+        if (!validateGoogleMeetLink(meeting.meetingLink)) {
+          console.error(`❌ CRITICAL: Invalid Google Meet link in meeting ${meeting._id}: ${meeting.meetingLink}`);
+          return res.status(500).json({
+            message: 'Invalid meeting link detected',
+            error: 'The meeting link stored in the database is not a valid Google Meet link. Please contact support to recreate this meeting.',
+            meetingId: meeting._id,
+            invalidLink: meeting.meetingLink
+          });
+        }
+
         return res.json({
           success: true,
           meetingLink: meeting.meetingLink,
@@ -311,6 +323,18 @@ router.get('/:id/link', protect, authorize('student'), async (req, res) => {
         message: 'Meeting link not available yet',
         note: 'Meeting link will be generated when the session is scheduled by the admin.',
         sessionId: session._id
+      });
+    }
+
+    // 🔒 Validate Google Meet link format before returning
+    const { validateGoogleMeetLink } = require('../utils/meetingUtils');
+    if (!validateGoogleMeetLink(session.meetingLink)) {
+      console.error(`❌ CRITICAL: Invalid Google Meet link in session ${session._id}: ${session.meetingLink}`);
+      return res.status(500).json({
+        message: 'Invalid meeting link detected',
+        error: 'The meeting link stored in the database is not a valid Google Meet link. Please contact support to recreate this session.',
+        sessionId: session._id,
+        invalidLink: session.meetingLink
       });
     }
 

@@ -304,6 +304,42 @@ async function getExistingSingleMeetingLink(studentId, mentorId, startTime, endT
 }
 
 /**
+ * 🔒 GOOGLE MEET LINK VALIDATION
+ * Validate that a Google Meet link has the correct format
+ * Valid format: https://meet.google.com/abc-defg-hij (3-4-3 lowercase letters/numbers)
+ * @param {string} meetingLink - Meeting link to validate
+ * @returns {boolean} - True if link is valid, false otherwise
+ */
+function validateGoogleMeetLink(meetingLink) {
+  if (!meetingLink || typeof meetingLink !== 'string') {
+    return false;
+  }
+
+  const trimmedLink = meetingLink.trim();
+  
+  // Must start with https://meet.google.com/
+  if (!trimmedLink.startsWith('https://meet.google.com/')) {
+    return false;
+  }
+
+  // Extract the meeting code (part after the domain)
+  const meetingCode = trimmedLink.replace('https://meet.google.com/', '').split('?')[0].split('#')[0];
+  
+  // Google Meet codes follow pattern: abc-defg-hij (3-4-3 alphanumeric, lowercase)
+  // Or sometimes: abc-def-ghi (3-3-3)
+  // Pattern: 3-4-3 or 3-3-3 lowercase alphanumeric characters separated by hyphens
+  const validPattern = /^[a-z0-9]{3}-[a-z0-9]{3,4}-[a-z0-9]{3}$/;
+  
+  if (!validPattern.test(meetingCode)) {
+    console.warn(`⚠️ Invalid Google Meet link format: ${meetingLink}`);
+    console.warn(`   Meeting code: "${meetingCode}" does not match pattern: abc-defg-hij or abc-def-ghi`);
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * 🔒 UNIFIED MEETING LINK POLICY
  * Validate that a meeting link is not being duplicated
  * This is a safety check to prevent accidental duplicate link creation
@@ -316,6 +352,12 @@ async function validateMeetingLinkUniqueness(meetingLink, excludeMeetingId = nul
   
   if (!meetingLink || meetingLink.trim() === '') {
     return true; // Empty links are allowed (will be created)
+  }
+
+  // First validate the format
+  if (!validateGoogleMeetLink(meetingLink)) {
+    console.error(`❌ CRITICAL: Invalid Google Meet link format detected: ${meetingLink}`);
+    return false; // Invalid format
   }
   
   const query = {
@@ -524,6 +566,7 @@ module.exports = {
   getExistingGroupSessionLink,
   getExistingSingleMeetingLink,
   validateMeetingLinkUniqueness,
+  validateGoogleMeetLink,
   findExistingGroupSession,
   createOrGetSession
 };

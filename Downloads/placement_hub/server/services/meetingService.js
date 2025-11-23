@@ -45,39 +45,40 @@ async function createGoogleMeetMeeting(meetingData) {
       timezone: meetingData.timezone
     });
 
-    // Google Service Account credentials from environment or use provided
-    const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL || 'meet-service@factcheckapp-476109.iam.gserviceaccount.com';
+    // Google Service Account credentials from environment
+    // Default to provided credentials if env vars not set
+    const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL || 'placementhub@placmenthub.iam.gserviceaccount.com';
     const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY || `-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCs0HOQLNfa9xLM
-3S5rwlPipZDWbJL6KOyKMNbRZePBy+cZhgSnBzdtHfBuu9emlti8EIPg2q48Xi7e
-i1tHvOrQChk/yk4Kc00fB9/snWK0L3zpEileezpMgoO7rUY+7iTag7ZWhIko6vWx
-cN1Hzyw7RF0l8NYhWuFz9QyyBJBT3l/B7yNva+bpYM3gwE2DO5esu1ONEXdnLkWE
-fQntl+BX75pogdPzaCt8mY4mtp3bpsiZpUJ7Ez6uPR0bzaztgznoVwa5eT6f5sL3
-vertE9asYTLFPwitg+kXXsy6WZuZKHFhhY9foUNgPHH8iwMd1SEIgPwlBSH/5VS8
-+ysp+3DLAgMBAAECggEANbSmZWT6RCtKpW4LciO3TBVmGK0vVB0JvbyF1heTG3QR
-wuXaZkog2IFYaiFoWHZCrtd3FJcBVPN0H2cxm+7DDppE1IU7kZXZns4ksfULarHj
-YM9rGdiz+nkJFXc5AG+j9mC+ds7DjXrPljBcJGfm+Bg71oGtGjqTHCVIp74xWE6d
-h3EwUXr6exYz98EVCr6wOfWx5cZpUSYmmOEsKaQVKDuElgM+mLNditwaPOgObWda
-MLlzo5ZQuujHzwt18rbIMRGTmMSw7loVygHjUghe62OEnZJs1/9GZD2X3ZA4W1Z3
-KW9NBeSVvzY0DnLNjwNh2IjhihEgIUznBHmoHBOiSQKBgQDeNfOViZCMb1CN7hqK
-i/c9dd4O1xm5Twdzpmuz54q9l6k9C8C3qbaDlAgJ4g+qYJfv7tQVcEY+W6iYP1Ha
-RoVPv4RLjQKlld+pNRuCz1JiTggg0De1+I4bsrTs2PSJAj3r8cv3L3OxZzo2d43o
-Tsq8Bkjckh21QLE4SF2eAKsdhQKBgQDHF6G2KWNkWwIyUr1U6SrmWrz9+icQpI7Y
-0WNc86JWJKhlNiS3B6R664BlX2Iq2wCsWMTUCcITEr8evMr/Txw+52cQ975pCUkz
-edymImkEZ14ChVY6bh4oWeRO4ODegfcYzP8PPh9SMscw3XQce5fqKCgvOSz0urdE
-sqY3h5y+DwKBgBAZQIh46uwBtIhT08Bt23+sZmYU11xBiXyrdeoWwEp0DmLJ0zB7
-LynhM6PjqNbjIJ7VYrAa7jveUByXmcqCiW35phADK0nrzcRogJG9i25r0NLvwtmA
-JGuFSu5N2YmDjBDn96r02SDlJaaEitdlvfJZUjYIr/ZNtYkqVP35dmwxAoGAOntb
-mjnQI2OEYqnhSbbwThgrWeOIZCAigdgH+v7qGanM+WYNJOKO0zioT57UJEiOixHM
-R4jSRG4GTA4jBxoC7wtkQBy2Bv6eTQun3/lNpeiDOfRW3vUH0MyO/wiZpWLB5bwZ
-1C1oX+ngjx8OA2vetP60xyJhbUYHnZtorfkc9ssCgYEAjPRtmvnBk7r5d01zQk0e
-8ZoL4Ifr8CuvJUAeBH3rdUrYayU+yu/zv35WUPIXkpf3ofsVa54gBxbTiLRBVp/A
-SrbJ9MVM0TZuNkb+iREbMoVEJYHVxhcmFzcyRK1f31/4Bpe98fRLeVeLhN4EBhHl
-RAaBfizkPIZWBuLM3E8vbHo=
+MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDB+JtLIxi1VZJ2
+NDgYHyEGS+64SrB1NZqZ+dU7foHbwQnS+srTOMOA5+zYv0LFOclsUzJia+P1gB3a
+GuZebM29uA6jtT3jInjt+7rmabACXt20h9YWpSW+MIoZxQbJeijnj9u68YPn0gvf
+aWrc4mOOYCaa/N5h68d9mR3If5qv/sVju2TCzI3GfCUNErsz6gvpcFExJOuRpBXm
+6mxGARR3ErtvQyB77YusxaKUpBZ29uMmFbxuXB4UsZRJ6siPhJ5rzmJWAC1x1gl5
+zDEQfqnIFeSaBzayDcCclkGvQOU6Re99KHWBEHk4nszfYAdGZ58QQ5ES8upYg8bm
+IDnmXUD1AgMBAAECggEAL+P2TYcRCOZjhqEub1AyOmiBfEleh1XQga80BSAfJjdj
+Ok62yI81f8xjRwFz1heGImNpJ3EtY3X6CNlG4u3YnzyECsnLCZr/gfx6oPxbmz46
+XWIDSuyD5ND9q86gNhrd4gw760xJbbFHwqV3n6kafPLC3VXM/x60To+BEbllowll
+FVYYAeocK93bFaW7iviOG90PL9ou2DRC/IL2dMp2iepBGn72Tah01tNBHm2jqFsF
+QDRPRHWQ6W7HEfJiPDWQx5b/vBQna6Lt1efDvUhhVzBeu0xz0Il/EUHRuzvBZbiE
+wPfLH3Dq/IU/YoQodMPOOp452UHIIRdk5gzUiuRAiQKBgQDrb6aVfWFOuMqQSvPZ
+cA+FFJWYd2QSS+ZP82JKkH5SzLJTj833iSnx4b9g3j2m+YJFzn26O5YcNQusUmgc
+6nWUHQYiE+SM+LqsoWRreAYAg9meQzzNO5q1Mq4kE4EHnzFzFWqhcxecfB0ONxgy
+1sB8g73HZ0+1RKjZ/2grDAWKTQKBgQDS6cxyFXFqTSHwyFtrQa69dKeJ+qZ3tFaU
+eEv3xU9AyJAZQs1k9uGjMcEhaBKnEfyaypf7OY0y+pm+VGHLguNRgEFAOrSQKypw
+15K6b9gpDsu4NLuDss9+mLAi4ESEWrt3zi/8Op59BMZQzVlhSEH6UhJXKxJjny1J
+gQcxzXKVSQKBgQDqQCnYPWrvP6/UR68+XmAiwmthyxDXn4sla30VwZTe32pi+Acv
+ztrcHwgi4p0nIMR8nkq8XIMrx5+4sjmC48lfOE2c5HwXw3dBQke/Iimeo5GIBVBe
+x3pT5XwcywcrxToXTmzM/M22Vks2lJzQIJpeiVnvKBzHt+vlE1na0thEVQKBgQCQ
+H0EcJ/jzKbfqoA6QMTblsUQW7hc4rxuGotlOex6X5zVIfbR6rJUs/f+6AzLTxV+2
+qn/GJOKOll3eiCy3cz5AYAK2kCb4aPa8WyKhkXHFRJ4Cxs3nxZUyLcYWXueTBaka
+yeNSWQAZ79xQNLJB3q1vDwwHUqBjQM8ibi/rYTdOOQKBgQDNTBnuJgeEIDIN3Jxm
++zFB0JVf9uGWvkPW+jXnNX72svePlFavB4pyuxWg3aGxAnMivRSsZIzhKCT1YlTb
+JqFq9GcNgiRBIKDjsyvXKs10B3nnrlfbR9pNm5XNMWC6x0GVgDT0j1E5JS8GI9QN
+Ag4K95ooWn0LT8pYY8uM5HD8cA==
 -----END PRIVATE KEY-----`;
-    // For service accounts, use the service account email as the calendar ID
-    // Alternatively, you can share a calendar with the service account and use that calendar ID
-    const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || GOOGLE_CLIENT_EMAIL;
+    // Use the provided calendar ID (placementhub722@gmail.com)
+    // Make sure this calendar is shared with the service account email
+    const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'placementhub722@gmail.com';
 
     const calendar = google.calendar('v3');
 
@@ -198,8 +199,17 @@ RAaBfizkPIZWBuLM3E8vbHo=
                      response.data.conferenceData?.entryPoints?.[0]?.uri;
 
     if (!meetLink) {
-      throw new Error('Failed to create Google Meet link');
+      throw new Error('Failed to create Google Meet link: No link returned from Google Calendar API');
     }
+
+    // 🔒 Validate the link format before returning
+    const { validateGoogleMeetLink } = require('../utils/meetingUtils');
+    if (!validateGoogleMeetLink(meetLink)) {
+      console.error('❌ CRITICAL: Invalid Google Meet link format received from API:', meetLink);
+      throw new Error(`Invalid Google Meet link format received from API: ${meetLink}. Expected format: https://meet.google.com/abc-defg-hij`);
+    }
+
+    console.log(`✅ Valid Google Meet link created: ${meetLink}`);
 
     return {
       meetingLink: meetLink,
@@ -219,35 +229,17 @@ RAaBfizkPIZWBuLM3E8vbHo=
       stack: error.stack
     });
     
-    // If it's a permission/API error, provide a fallback instant meeting link
+    // ❌ CRITICAL: Do NOT generate fallback links - they are invalid and cause "Invalid video call name" errors
+    // Google Meet links MUST be created via Google Calendar API
+    // If API fails, we must throw an error instead of creating fake links
     if (error.code === 403 || error.message?.includes('Permission') || error.message?.includes('403')) {
-      console.log('Calendar API permission denied. Using fallback instant meeting link.');
-      
-      // 🔒 UNIFIED MEETING LINK POLICY: Generate deterministic link based on meeting data
-      // This ensures the same meeting data always generates the same link
-      // Use a hash of title + startTime to create a consistent link
-      const crypto = require('crypto');
-      // Use sanitized title (meetingData.title was sanitized at function start)
-      const safeTitle = meetingData.title || 'meeting';
-      const linkSeed = `${safeTitle}-${meetingData.startTime || Date.now()}`;
-      const hash = crypto.createHash('md5').update(linkSeed).digest('hex').substring(0, 12);
-      
-      // Format as Google Meet code (3 groups of 3-4 characters separated by hyphens)
-      const meetCode = `${hash.substring(0, 3)}-${hash.substring(3, 6)}-${hash.substring(6, 9)}`;
-      const instantLink = `https://meet.google.com/${meetCode}`;
-      const meetingId = `fallback-${hash}`;
-      
-      console.log(`🔒 Generated deterministic fallback link: ${instantLink} (seed: ${linkSeed})`);
-      
-      return {
-        meetingLink: instantLink,
-        meetingId: meetingId,
-        joinUrl: instantLink,
-        dialInNumber: null,
-        password: null,
-        startUrl: instantLink,
-        note: 'Instant meeting link (Calendar API not configured)'
-      };
+      console.error('❌ CRITICAL ERROR: Google Calendar API permission denied.');
+      console.error('   Cannot create valid Google Meet link without API access.');
+      console.error('   Solution: Configure Google Calendar API credentials in environment variables:');
+      console.error('   - GOOGLE_CLIENT_EMAIL');
+      console.error('   - GOOGLE_PRIVATE_KEY');
+      console.error('   - GOOGLE_CALENDAR_ID');
+      throw new Error('Google Calendar API not configured. Cannot create valid Google Meet link. Please configure GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY, and GOOGLE_CALENDAR_ID environment variables.');
     }
     
     throw new Error(`Failed to create Google Meet meeting: ${error.message || error.toString()}`);

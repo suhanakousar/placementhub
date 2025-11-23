@@ -121,6 +121,18 @@ router.get('/:id/join-link', protect, async (req, res) => {
       });
     }
 
+    // 🔒 Validate Google Meet link format before returning
+    const { validateGoogleMeetLink } = require('../utils/meetingUtils');
+    if (!validateGoogleMeetLink(session.meetingLink)) {
+      console.error(`❌ CRITICAL: Invalid Google Meet link in session ${session._id}: ${session.meetingLink}`);
+      return res.status(500).json({
+        message: 'Invalid meeting link detected',
+        error: 'The meeting link stored in the database is not a valid Google Meet link. Please contact support to recreate this session.',
+        sessionId: session._id,
+        invalidLink: session.meetingLink
+      });
+    }
+
     // Update participant join status if participant exists
     if (participant) {
       if (participant.joinStatus !== 'joined') {

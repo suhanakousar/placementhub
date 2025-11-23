@@ -8,7 +8,7 @@ const Reminder = require('../../models/Reminder');
 const Task = require('../../models/Task');
 const EmailLog = require('../../models/EmailLog');
 const { protect, authorize } = require('../../middleware/auth');
-const { checkMeetingConflicts, generateICSFile, generateMeetingLink, formatTimeInTimezone, getExistingGroupSessionLink, getExistingSingleMeetingLink, validateMeetingLinkUniqueness, findExistingGroupSession, createOrGetSession } = require('../../utils/meetingUtils');
+const { checkMeetingConflicts, generateICSFile, generateMeetingLink, formatTimeInTimezone, getExistingGroupSessionLink, getExistingSingleMeetingLink, validateMeetingLinkUniqueness, validateGoogleMeetLink, findExistingGroupSession, createOrGetSession } = require('../../utils/meetingUtils');
 const { sendEmail } = require('../../utils/emailService');
 const { createRemindersForMeeting } = require('../../utils/reminderUtils');
 const { createTasksFromFeedback } = require('../../utils/taskUtils');
@@ -287,8 +287,19 @@ router.post('/', async (req, res) => {
           attendeeEmail: studentUser?.email
         });
         
-        // 🔒 Validate link uniqueness (safety check)
+        // 🔒 Validate link format and uniqueness (safety check)
         if (meetingDetails?.meetingLink) {
+          // First validate format
+          if (!validateGoogleMeetLink(meetingDetails.meetingLink)) {
+            console.error(`❌ CRITICAL: Invalid Google Meet link format received: ${meetingDetails.meetingLink}`);
+            return res.status(500).json({ 
+              message: 'Failed to create Google Meet meeting. Invalid link format received from Google Calendar API.',
+              error: 'Invalid meeting link format',
+              receivedLink: meetingDetails.meetingLink
+            });
+          }
+
+          // Then check uniqueness
           const isUnique = await validateMeetingLinkUniqueness(meetingDetails.meetingLink);
           if (!isUnique) {
             console.warn(`⚠️ WARNING: Meeting link may be duplicate: ${meetingDetails.meetingLink}`);
@@ -302,6 +313,16 @@ router.post('/', async (req, res) => {
           return res.status(500).json({ 
             message: 'Failed to create Google Meet meeting. No meeting link was generated.',
             error: 'Missing meeting link'
+          });
+        }
+
+        // Final validation before saving
+        if (!validateGoogleMeetLink(meetingLink)) {
+          console.error(`❌ CRITICAL: Invalid Google Meet link format before saving: ${meetingLink}`);
+          return res.status(500).json({ 
+            message: 'Failed to create Google Meet meeting. Invalid link format.',
+            error: 'Invalid meeting link format',
+            receivedLink: meetingLink
           });
         }
       } catch (meetingError) {
@@ -706,8 +727,19 @@ router.post('/bulk', async (req, res) => {
           attendeeEmail: primaryStudentEmail
         });
         
-        // 🔒 Validate link uniqueness (safety check)
+        // 🔒 Validate link format and uniqueness (safety check)
         if (meetingDetails?.meetingLink) {
+          // First validate format
+          if (!validateGoogleMeetLink(meetingDetails.meetingLink)) {
+            console.error(`❌ CRITICAL: Invalid Google Meet link format received: ${meetingDetails.meetingLink}`);
+            return res.status(500).json({
+              message: 'Failed to create Google Meet meeting. Invalid link format received from Google Calendar API.',
+              error: 'Invalid meeting link format',
+              receivedLink: meetingDetails.meetingLink
+            });
+          }
+
+          // Then check uniqueness
           const isUnique = await validateMeetingLinkUniqueness(meetingDetails.meetingLink);
           if (!isUnique) {
             console.warn(`⚠️ WARNING: Meeting link may be duplicate: ${meetingDetails.meetingLink}`);
@@ -723,6 +755,16 @@ router.post('/bulk', async (req, res) => {
       }
     } else {
       console.log(`✅ REUSING existing meeting link for group session: ${groupSessionId}`);
+      
+      // Validate existing link format
+      if (meetingDetails?.meetingLink && !validateGoogleMeetLink(meetingDetails.meetingLink)) {
+        console.error(`❌ CRITICAL: Invalid Google Meet link format in existing group session: ${meetingDetails.meetingLink}`);
+        return res.status(500).json({
+          message: 'Invalid meeting link format detected in existing group session. Please recreate the session.',
+          error: 'Invalid meeting link format',
+          receivedLink: meetingDetails.meetingLink
+        });
+      }
     }
 
     // 🔒 Create or get session for group meeting (ONE SESSION = ONE LINK)
@@ -1135,8 +1177,19 @@ router.post('/requests/:id/approve', async (req, res) => {
           description: request.description
         });
         
-        // 🔒 Validate link uniqueness (safety check)
+        // 🔒 Validate link format and uniqueness (safety check)
         if (meetingDetails?.meetingLink) {
+          // First validate format
+          if (!validateGoogleMeetLink(meetingDetails.meetingLink)) {
+            console.error(`❌ CRITICAL: Invalid Google Meet link format received: ${meetingDetails.meetingLink}`);
+            return res.status(500).json({ 
+              message: 'Failed to create Google Meet meeting. Invalid link format received from Google Calendar API.',
+              error: 'Invalid meeting link format',
+              receivedLink: meetingDetails.meetingLink
+            });
+          }
+
+          // Then check uniqueness
           const isUnique = await validateMeetingLinkUniqueness(meetingDetails.meetingLink);
           if (!isUnique) {
             console.warn(`⚠️ WARNING: Meeting link may be duplicate: ${meetingDetails.meetingLink}`);
@@ -1150,6 +1203,16 @@ router.post('/requests/:id/approve', async (req, res) => {
           return res.status(500).json({ 
             message: 'Failed to create Google Meet meeting. No meeting link was generated.',
             error: 'Missing meeting link'
+          });
+        }
+
+        // Final validation before saving
+        if (!validateGoogleMeetLink(meetingLink)) {
+          console.error(`❌ CRITICAL: Invalid Google Meet link format before saving: ${meetingLink}`);
+          return res.status(500).json({ 
+            message: 'Failed to create Google Meet meeting. Invalid link format.',
+            error: 'Invalid meeting link format',
+            receivedLink: meetingLink
           });
         }
       } catch (meetingError) {
@@ -1951,6 +2014,18 @@ router.get('/:id/join-link', async (req, res) => {
     if (!session) {
       // Fallback to meeting's own link (backward compatibility)
       if (meeting.meetingLink) {
+        // 🔒 Validate Google Meet link format before returning
+        const { validateGoogleMeetLink } = require('../../utils/meetingUtils');
+        if (!validateGoogleMeetLink(meeting.meetingLink)) {
+          console.error(`❌ CRITICAL: Invalid Google Meet link in meeting ${meeting._id}: ${meeting.meetingLink}`);
+          return res.status(500).json({
+            message: 'Invalid meeting link detected',
+            error: 'The meeting link stored in the database is not a valid Google Meet link. Please recreate this meeting.',
+            meetingId: meeting._id,
+            invalidLink: meeting.meetingLink
+          });
+        }
+
         return res.json({
           success: true,
           meetingLink: meeting.meetingLink,
@@ -1981,6 +2056,18 @@ router.get('/:id/join-link', async (req, res) => {
         message: 'Meeting link not available yet',
         note: 'Meeting link will be generated when the session is scheduled.',
         sessionId: session._id
+      });
+    }
+
+    // 🔒 Validate Google Meet link format before returning
+    const { validateGoogleMeetLink } = require('../../utils/meetingUtils');
+    if (!validateGoogleMeetLink(session.meetingLink)) {
+      console.error(`❌ CRITICAL: Invalid Google Meet link in session ${session._id}: ${session.meetingLink}`);
+      return res.status(500).json({
+        message: 'Invalid meeting link detected',
+        error: 'The meeting link stored in the database is not a valid Google Meet link. Please recreate this session.',
+        sessionId: session._id,
+        invalidLink: session.meetingLink
       });
     }
 

@@ -199,6 +199,63 @@ async function getExistingGroupSessionLink(groupSessionId) {
 
 /**
  * 🔒 UNIFIED MEETING LINK POLICY
+ * Find existing group session with same criteria (mentor, time, filters)
+ * This prevents creating duplicate group sessions with different links
+ * @param {ObjectId} mentorId - Mentor ID
+ * @param {Date} startTime - Meeting start time
+ * @param {Date} endTime - Meeting end time
+ * @param {Object} filters - Group filters (department, year, specialization)
+ * @returns {Promise<Object|null>} - Existing group session with link or null
+ */
+async function findExistingGroupSession(mentorId, startTime, endTime, filters = {}) {
+  const Meeting = require('../models/Meeting');
+  
+  // Check for existing group session with same mentor, time (within 1 minute), and filters
+  const timeTolerance = 60 * 1000; // 1 minute
+  const startTimeMin = new Date(new Date(startTime).getTime() - timeTolerance);
+  const startTimeMax = new Date(new Date(startTime).getTime() + timeTolerance);
+  
+  const query = {
+    mentorId: mentorId,
+    isGroupMeeting: true,
+    startTime: { $gte: startTimeMin, $lte: startTimeMax },
+    endTime: { $gte: new Date(new Date(endTime).getTime() - timeTolerance), $lte: new Date(new Date(endTime).getTime() + timeTolerance) },
+    meetingLink: { $exists: true, $ne: '' }
+  };
+  
+  // Match group filters if provided
+  if (filters.department) {
+    query['groupFilters.department'] = filters.department;
+  }
+  if (filters.year) {
+    query['groupFilters.year'] = parseInt(filters.year, 10);
+  }
+  if (filters.specialization) {
+    query['groupFilters.specialization'] = filters.specialization;
+  }
+  
+  const existingMeeting = await Meeting.findOne(query)
+    .select('meetingLink meetingId meetingPlatform meetingPassword meetingDialIn meetingStartUrl groupSessionId');
+  
+  if (existingMeeting && existingMeeting.meetingLink) {
+    console.log(`✅ Found existing group session with same criteria: ${existingMeeting.groupSessionId}`);
+    console.log(`   Reusing link: ${existingMeeting.meetingLink}`);
+    return {
+      meetingLink: existingMeeting.meetingLink,
+      meetingId: existingMeeting.meetingId,
+      meetingPlatform: existingMeeting.meetingPlatform,
+      meetingPassword: existingMeeting.meetingPassword,
+      meetingDialIn: existingMeeting.meetingDialIn,
+      meetingStartUrl: existingMeeting.meetingStartUrl,
+      groupSessionId: existingMeeting.groupSessionId
+    };
+  }
+  
+  return null;
+}
+
+/**
+ * 🔒 UNIFIED MEETING LINK POLICY
  * Check if an existing meeting link exists for a single meeting session
  * This ensures ONE link per meeting, preventing duplicate links
  * @param {ObjectId} studentId - Student ID
@@ -288,6 +345,7 @@ module.exports = {
   formatTimeInTimezone,
   getExistingGroupSessionLink,
   getExistingSingleMeetingLink,
-  validateMeetingLinkUniqueness
+  validateMeetingLinkUniqueness,
+  findExistingGroupSession
 };
 

@@ -82,7 +82,9 @@ RAaBfizkPIZWBuLM3E8vbHo=
       },
       conferenceData: {
         createRequest: {
-          requestId: `meet-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+          // 🔒 UNIFIED MEETING LINK POLICY: Use deterministic requestId based on meeting data
+          // This ensures the same meeting data generates the same requestId, which helps with link consistency
+          requestId: `meet-${require('crypto').createHash('md5').update(`${meetingData.title || 'meeting'}-${meetingData.startTime || Date.now()}`).digest('hex').substring(0, 16)}`,
           conferenceSolutionKey: {
             type: 'hangoutsMeet'
           }
@@ -152,9 +154,20 @@ RAaBfizkPIZWBuLM3E8vbHo=
     // If it's a permission/API error, provide a fallback instant meeting link
     if (error.code === 403 || error.message?.includes('Permission') || error.message?.includes('403')) {
       console.log('Calendar API permission denied. Using fallback instant meeting link.');
-      // Generate a unique instant meeting link that works without Calendar API
-      const meetingId = `new-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      const instantLink = `https://meet.google.com/new?hs=${meetingId}`;
+      
+      // 🔒 UNIFIED MEETING LINK POLICY: Generate deterministic link based on meeting data
+      // This ensures the same meeting data always generates the same link
+      // Use a hash of title + startTime to create a consistent link
+      const crypto = require('crypto');
+      const linkSeed = `${meetingData.title || 'meeting'}-${meetingData.startTime || Date.now()}`;
+      const hash = crypto.createHash('md5').update(linkSeed).digest('hex').substring(0, 12);
+      
+      // Format as Google Meet code (3 groups of 3-4 characters separated by hyphens)
+      const meetCode = `${hash.substring(0, 3)}-${hash.substring(3, 6)}-${hash.substring(6, 9)}`;
+      const instantLink = `https://meet.google.com/${meetCode}`;
+      const meetingId = `fallback-${hash}`;
+      
+      console.log(`🔒 Generated deterministic fallback link: ${instantLink} (seed: ${linkSeed})`);
       
       return {
         meetingLink: instantLink,

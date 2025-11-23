@@ -8,7 +8,7 @@ const Reminder = require('../../models/Reminder');
 const Task = require('../../models/Task');
 const EmailLog = require('../../models/EmailLog');
 const { protect, authorize } = require('../../middleware/auth');
-const { checkMeetingConflicts, generateICSFile, generateMeetingLink, formatTimeInTimezone, getExistingGroupSessionLink, getExistingSingleMeetingLink, validateMeetingLinkUniqueness } = require('../../utils/meetingUtils');
+const { checkMeetingConflicts, generateICSFile, generateMeetingLink, formatTimeInTimezone, getExistingGroupSessionLink, getExistingSingleMeetingLink, validateMeetingLinkUniqueness, findExistingGroupSession } = require('../../utils/meetingUtils');
 const { sendEmail } = require('../../utils/emailService');
 const { createRemindersForMeeting } = require('../../utils/reminderUtils');
 const { createTasksFromFeedback } = require('../../utils/taskUtils');
@@ -612,11 +612,24 @@ router.post('/bulk', async (req, res) => {
       return res.status(400).json({ message: 'Meeting time conflicts with existing meeting' });
     }
 
-    // 🔒 UNIFIED MEETING LINK POLICY: Generate group session ID first
-    const groupSessionId = `group-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    // 🔒 UNIFIED MEETING LINK POLICY: Check for existing group session with same criteria FIRST
+    // This prevents creating duplicate group sessions with different links
+    let meetingDetails = await findExistingGroupSession(admin._id, start, end, filters);
+    let groupSessionId;
     
-    // 🔒 Check if a meeting link already exists for this group session (safety check)
-    let meetingDetails = await getExistingGroupSessionLink(groupSessionId);
+    if (meetingDetails && meetingDetails.groupSessionId) {
+      // Found existing group session - reuse its link and session ID
+      groupSessionId = meetingDetails.groupSessionId;
+      console.log(`✅ Found existing group session: ${groupSessionId}`);
+      console.log(`   Reusing meeting link: ${meetingDetails.meetingLink}`);
+    } else {
+      // No existing group session found - create new one
+      groupSessionId = `group-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      console.log(`🔒 Creating NEW group session: ${groupSessionId}`);
+      
+      // Check if a meeting link already exists for this new group session (shouldn't happen, but safety check)
+      meetingDetails = await getExistingGroupSessionLink(groupSessionId);
+    }
     
     // If no existing link found, create a new one
     if (!meetingDetails || !meetingDetails.meetingLink) {

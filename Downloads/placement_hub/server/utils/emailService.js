@@ -10,6 +10,38 @@ const sendEmailViaSendGridAPI = async (to, subject, html, text, fromEmail, fromN
       return reject(new Error('SendGrid API key not configured'));
     }
 
+    // Generate text version from HTML if text is empty
+    let textContent = text || '';
+    if (!textContent && html) {
+      // Strip HTML tags and create plain text version
+      textContent = html
+        .replace(/<style[^>]*>.*?<\/style>/gi, '')
+        .replace(/<script[^>]*>.*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    
+    // Ensure text content is not empty (SendGrid requires at least 1 character)
+    if (!textContent || textContent.length === 0) {
+      textContent = 'This is an HTML email. Please enable HTML viewing in your email client.';
+    }
+
+    const content = [
+      {
+        type: 'text/html',
+        value: html
+      }
+    ];
+    
+    // Only add text/plain if we have text content
+    if (textContent && textContent.length > 0) {
+      content.unshift({
+        type: 'text/plain',
+        value: textContent
+      });
+    }
+
     const postData = JSON.stringify({
       personalizations: [{
         to: [{ email: to }],
@@ -19,16 +51,7 @@ const sendEmailViaSendGridAPI = async (to, subject, html, text, fromEmail, fromN
         email: fromEmail,
         name: fromName
       },
-      content: [
-        {
-          type: 'text/plain',
-          value: text
-        },
-        {
-          type: 'text/html',
-          value: html
-        }
-      ]
+      content: content
     });
 
     const options = {

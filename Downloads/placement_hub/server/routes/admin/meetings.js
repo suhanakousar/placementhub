@@ -612,6 +612,15 @@ router.post('/bulk', async (req, res) => {
     const groupSessionId = `group-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     const successfulMeetings = [];
     const failedMeetings = [];
+    const emailResults = {
+      sent: [],
+      failed: []
+    };
+
+    console.log(`\n📧 Creating group meeting for ${targetStudents.length} students`);
+    console.log(`   Group Session ID: ${groupSessionId}`);
+    console.log(`   Shared Meeting Link: ${meetingDetails?.meetingLink || 'N/A'}`);
+    console.log(`   Note: All students will receive SEPARATE emails with the SAME meeting link (correct for group sessions)\n`);
 
     for (const student of targetStudents) {
       try {
@@ -736,11 +745,13 @@ router.post('/bulk', async (req, res) => {
                       <p><strong>Duration:</strong> Until ${localEndTime}</p>
                       ${meeting.description ? `<p><strong>Description:</strong><br>${meeting.description}</p>` : ''}
                       <p><strong>Group:</strong> This is a group meeting scheduled for students${filters?.department ? ` in ${filters.department}` : ''}${filters?.year ? `, batch ${filters.year}` : ''}${filters?.specialization ? `, specialization ${filters.specialization}` : ''}.</p>
+                    <p style="background: #e3f2fd; padding: 10px; border-radius: 5px; margin-top: 15px;"><strong>📌 Note:</strong> This is a group session. All students will join the same meeting using the link below.</p>
                     </div>
 
                     <div style="text-align: center;">
-                      <a href="${meeting.meetingLink}" class="meeting-link">Join Meeting</a>
+                      <a href="${meeting.meetingLink}" class="meeting-link">Join Group Meeting</a>
                     </div>
+                    <p style="text-align: center; color: #666; font-size: 14px; margin-top: 10px;">This meeting link is shared with all participants in this group session.</p>
                     
                     <div class="reminder-note">
                       <strong>📅 Reminder:</strong> You will receive automatic email reminders at:
@@ -772,6 +783,11 @@ router.post('/bulk', async (req, res) => {
 
             if (emailResult && emailResult.success && emailResult.mode !== 'development') {
               console.log(`✅ Group meeting email sent successfully to ${studentUser.email}`);
+              emailResults.sent.push({
+                studentId: student._id,
+                email: studentUser.email,
+                name: studentName
+              });
               
               // Log email
               await EmailLog.create({
@@ -790,6 +806,12 @@ router.post('/bulk', async (req, res) => {
               const errorMsg = emailResult?.message || emailResult?.error || 'Email sending failed';
               console.error('❌ Email sending failed for student', student._id, errorMsg);
               console.error('Email result:', emailResult);
+              emailResults.failed.push({
+                studentId: student._id,
+                email: studentUser.email,
+                name: studentName,
+                error: errorMsg
+              });
               
               // Log failed email attempt
               try {
@@ -813,6 +835,12 @@ router.post('/bulk', async (req, res) => {
           }
         } catch (emailError) {
           console.error('Email notification failed for student', student._id, emailError);
+          emailResults.failed.push({
+            studentId: student._id,
+            email: 'unknown',
+            name: student.personalInfo?.firstName || 'Student',
+            error: emailError.message
+          });
           // Continue processing other students even if one email fails
         }
 
@@ -826,6 +854,19 @@ router.post('/bulk', async (req, res) => {
       }
     }
 
+    // Summary of email sending
+    console.log(`\n📊 Group Meeting Email Summary:`);
+    console.log(`   Total students: ${targetStudents.length}`);
+    console.log(`   Emails sent: ${emailResults.sent.length}`);
+    console.log(`   Emails failed: ${emailResults.failed.length}`);
+    if (emailResults.sent.length > 0) {
+      console.log(`   ✅ Sent to: ${emailResults.sent.map(s => s.email).join(', ')}`);
+    }
+    if (emailResults.failed.length > 0) {
+      console.log(`   ❌ Failed for: ${emailResults.failed.map(f => f.email).join(', ')}`);
+    }
+    console.log(`   📧 All students received the SAME meeting link (correct for group sessions)\n`);
+
     res.status(201).json({
       success: true,
       message: `Meeting scheduled for ${successfulMeetings.length} students`,
@@ -834,7 +875,16 @@ router.post('/bulk', async (req, res) => {
         failed: failedMeetings.length,
         failures: failedMeetings
       },
-      groupSessionId
+      emailSummary: {
+        total: targetStudents.length,
+        sent: emailResults.sent.length,
+        failed: emailResults.failed.length,
+        sentTo: emailResults.sent.map(s => ({ email: s.email, name: s.name })),
+        failedFor: emailResults.failed.map(f => ({ email: f.email, name: f.name, error: f.error }))
+      },
+      groupSessionId,
+      meetingLink: meetingDetails?.meetingLink || '',
+      note: 'All students in this group session share the same meeting link. Each student received a separate email with their personalized meeting details.'
     });
   } catch (error) {
     console.error('Bulk meeting scheduling error:', error);

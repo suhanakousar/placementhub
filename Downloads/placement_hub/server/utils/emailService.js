@@ -476,19 +476,31 @@ const sendEmail = async ({ to, subject, html, text, fromEmail, fromName = 'Place
     console.log(`\n📧 Attempting to send email to: ${to}`);
     console.log(`Subject: ${subject}`);
     
-    // Development mode: Log email to console instead of sending
+    // Check if SMTP is configured
     if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+      const errorMsg = 'SMTP credentials not configured. Set SMTP_USER and SMTP_PASSWORD environment variables.';
       console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('📧 DEVELOPMENT MODE - Email (SMTP not configured)');
+      console.log('📧 EMAIL NOT SENT - SMTP not configured');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log(`To: ${to}`);
       console.log(`Subject: ${subject}`);
       console.log(`From: ${fromName} <${fromEmail || 'noreply@placementhub.com'}>`);
       if (text) console.log(`Text: ${text.substring(0, 200)}...`);
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-      console.log('⚠️  WARNING: Email not actually sent - SMTP credentials missing!');
-      console.log('   Set SMTP_USER and SMTP_PASSWORD environment variables to send emails.\n');
-      return { success: true, messageId: 'dev-mode', mode: 'development' };
+      console.error('❌ ERROR: Email not sent - SMTP credentials missing!');
+      console.error('   Set SMTP_USER and SMTP_PASSWORD environment variables to send emails.\n');
+      
+      // In production, throw error. In development, return error status
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(errorMsg);
+      }
+      return { 
+        success: false, 
+        messageId: 'not-sent', 
+        mode: 'development',
+        error: errorMsg,
+        message: errorMsg
+      };
     }
 
     const email = fromEmail || process.env.FROM_EMAIL || process.env.SMTP_USER || 'placementhub722@gmail.com';

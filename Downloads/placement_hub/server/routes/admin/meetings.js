@@ -396,7 +396,7 @@ router.post('/', async (req, res) => {
           fromName: 'Placement Hub - Mentoring System'
         });
 
-        if (emailResult && emailResult.success) {
+        if (emailResult && emailResult.success && emailResult.mode !== 'development') {
           emailSent = true;
           console.log(`✅ Meeting email sent successfully to ${studentUser.email}`);
           
@@ -414,8 +414,33 @@ router.post('/', async (req, res) => {
             meetingId: meeting._id
           });
         } else {
-          emailError = emailResult?.message || 'Email sending returned unsuccessful';
-          console.error('Email sending returned unsuccessful:', emailResult);
+          emailError = emailResult?.message || emailResult?.error || 'Email sending failed';
+          console.error('❌ Email sending failed:', emailResult);
+          console.error('Email error details:', {
+            success: emailResult?.success,
+            mode: emailResult?.mode,
+            error: emailResult?.error,
+            message: emailResult?.message
+          });
+          
+          // Log failed email attempt
+          try {
+            await EmailLog.create({
+              recipientId: student._id,
+              recipientType: 'Student',
+              recipientEmail: studentUser.email,
+              sentBy: admin._id,
+              subject: `Meeting Scheduled: ${meeting.title}`,
+              body: `Meeting scheduled for ${localStartTime}`,
+              status: 'failed',
+              sentAt: new Date(),
+              error: emailError,
+              includesMeetingLink: true,
+              meetingId: meeting._id
+            });
+          } catch (logError) {
+            console.error('Failed to log email error:', logError);
+          }
         }
       }
     } catch (err) {
@@ -674,7 +699,7 @@ router.post('/bulk', async (req, res) => {
               fromName: 'Placement Hub - Mentoring System'
             });
 
-            if (emailResult && emailResult.success) {
+            if (emailResult && emailResult.success && emailResult.mode !== 'development') {
               console.log(`✅ Group meeting email sent successfully to ${studentUser.email}`);
               
               // Log email
@@ -691,7 +716,28 @@ router.post('/bulk', async (req, res) => {
                 meetingId: meeting._id
               });
             } else {
-              console.error('Email sending returned unsuccessful for student', student._id, emailResult);
+              const errorMsg = emailResult?.message || emailResult?.error || 'Email sending failed';
+              console.error('❌ Email sending failed for student', student._id, errorMsg);
+              console.error('Email result:', emailResult);
+              
+              // Log failed email attempt
+              try {
+                await EmailLog.create({
+                  recipientId: student._id,
+                  recipientType: 'Student',
+                  recipientEmail: studentUser.email,
+                  sentBy: admin._id,
+                  subject: `Group Meeting Scheduled: ${meeting.title}`,
+                  body: `Group meeting scheduled for ${localStartTime}`,
+                  status: 'failed',
+                  sentAt: new Date(),
+                  error: errorMsg,
+                  includesMeetingLink: true,
+                  meetingId: meeting._id
+                });
+              } catch (logError) {
+                console.error('Failed to log email error:', logError);
+              }
             }
           } else {
             console.warn(`Student ${student._id} does not have a valid email address`);
@@ -913,7 +959,7 @@ router.post('/requests/:id/approve', async (req, res) => {
           </html>
         `;
         
-        await sendEmail({
+        const emailResult = await sendEmail({
           to: studentUser.email,
           subject: `Meeting Request Approved: ${meeting.title}`,
           html: emailHtml,
@@ -921,18 +967,37 @@ router.post('/requests/:id/approve', async (req, res) => {
         });
 
         // Log email
-        await EmailLog.create({
-          recipientId: request.studentId._id,
-          recipientType: 'Student',
-          recipientEmail: studentUser.email,
-          sentBy: admin._id,
-          subject: `Meeting Request Approved: ${meeting.title}`,
-          body: `Meeting approved and scheduled for ${localStartTime}`,
-          status: 'sent',
-          sentAt: new Date(),
-          includesMeetingLink: true,
-          meetingId: meeting._id
-        });
+        if (emailResult && emailResult.success && emailResult.mode !== 'development') {
+          console.log(`✅ Approval email sent successfully to ${studentUser.email}`);
+          await EmailLog.create({
+            recipientId: request.studentId._id,
+            recipientType: 'Student',
+            recipientEmail: studentUser.email,
+            sentBy: admin._id,
+            subject: `Meeting Request Approved: ${meeting.title}`,
+            body: `Meeting approved and scheduled for ${localStartTime}`,
+            status: 'sent',
+            sentAt: new Date(),
+            includesMeetingLink: true,
+            meetingId: meeting._id
+          });
+        } else {
+          const errorMsg = emailResult?.message || emailResult?.error || 'Email sending failed';
+          console.error('❌ Approval email sending failed:', errorMsg);
+          await EmailLog.create({
+            recipientId: request.studentId._id,
+            recipientType: 'Student',
+            recipientEmail: studentUser.email,
+            sentBy: admin._id,
+            subject: `Meeting Request Approved: ${meeting.title}`,
+            body: `Meeting approved and scheduled for ${localStartTime}`,
+            status: 'failed',
+            sentAt: new Date(),
+            error: errorMsg,
+            includesMeetingLink: true,
+            meetingId: meeting._id
+          });
+        }
       }
     } catch (emailError) {
       console.error('Error sending approval email:', emailError);

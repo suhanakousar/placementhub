@@ -8,7 +8,7 @@ const Reminder = require('../../models/Reminder');
 const Task = require('../../models/Task');
 const EmailLog = require('../../models/EmailLog');
 const { protect, authorize } = require('../../middleware/auth');
-const { checkMeetingConflicts, generateICSFile, generateMeetingLink, formatTimeInTimezone } = require('../../utils/meetingUtils');
+const { checkMeetingConflicts, generateICSFile, generateMeetingLink, formatTimeInTimezone, getExistingGroupSessionLink, getExistingSingleMeetingLink, validateMeetingLinkUniqueness } = require('../../utils/meetingUtils');
 const { sendEmail } = require('../../utils/emailService');
 const { createRemindersForMeeting } = require('../../utils/reminderUtils');
 const { createTasksFromFeedback } = require('../../utils/taskUtils');
@@ -252,33 +252,55 @@ router.post('/', async (req, res) => {
     // Get student user email for meeting creation
     const studentUser = await require('../../models/User').findById(student.userId);
     
-    // Create real Google Meet meeting
-    let meetingLink = '';
-    let meetingDetails = null;
+    // 🔒 UNIFIED MEETING LINK POLICY: Check if meeting link already exists for this session
+    let meetingDetails = await getExistingSingleMeetingLink(
+      studentId,
+      admin._id,
+      startTime,
+      endTime
+    );
     
-    try {
-      meetingDetails = await createRealMeeting('google_meet', {
-        title,
-        startTime,
-        endTime,
-        timezone: studentTimezone || 'UTC',
-        attendeeEmail: studentUser?.email
-      });
-      
-      meetingLink = meetingDetails.joinUrl || meetingDetails.meetingLink || '';
-      
-      if (!meetingLink) {
+    let meetingLink = '';
+    
+    // If no existing link found, create a new one
+    if (!meetingDetails || !meetingDetails.meetingLink) {
+      console.log(`🔒 Creating NEW meeting link for single meeting (student: ${studentId}, mentor: ${admin._id})`);
+      try {
+        meetingDetails = await createRealMeeting('google_meet', {
+          title,
+          startTime,
+          endTime,
+          timezone: studentTimezone || 'UTC',
+          attendeeEmail: studentUser?.email
+        });
+        
+        // 🔒 Validate link uniqueness (safety check)
+        if (meetingDetails?.meetingLink) {
+          const isUnique = await validateMeetingLinkUniqueness(meetingDetails.meetingLink);
+          if (!isUnique) {
+            console.warn(`⚠️ WARNING: Meeting link may be duplicate: ${meetingDetails.meetingLink}`);
+            // Still proceed, but log the warning
+          }
+        }
+        
+        meetingLink = meetingDetails.joinUrl || meetingDetails.meetingLink || '';
+        
+        if (!meetingLink) {
+          return res.status(500).json({ 
+            message: 'Failed to create Google Meet meeting. No meeting link was generated.',
+            error: 'Missing meeting link'
+          });
+        }
+      } catch (meetingError) {
+        console.error('Error creating Google Meet meeting:', meetingError);
         return res.status(500).json({ 
-          message: 'Failed to create Google Meet meeting. No meeting link was generated.',
-          error: 'Missing meeting link'
+          message: 'Failed to create Google Meet meeting.',
+          error: meetingError.message
         });
       }
-    } catch (meetingError) {
-      console.error('Error creating Google Meet meeting:', meetingError);
-      return res.status(500).json({ 
-        message: 'Failed to create Google Meet meeting.',
-        error: meetingError.message
-      });
+    } else {
+      console.log(`✅ REUSING existing meeting link for single meeting (student: ${studentId}, mentor: ${admin._id})`);
+      meetingLink = meetingDetails.meetingLink;
     }
 
     // Create meeting
@@ -590,26 +612,44 @@ router.post('/bulk', async (req, res) => {
       return res.status(400).json({ message: 'Meeting time conflicts with existing meeting' });
     }
 
-    let meetingDetails;
-    const primaryStudentEmail = targetStudents[0]?.userId?.email || null;
-    try {
-      meetingDetails = await createRealMeeting(meetingPlatform, {
-        title,
-        description,
-        startTime,
-        endTime,
-        timezone: studentTimezone || 'UTC',
-        attendeeEmail: primaryStudentEmail
-      });
-    } catch (meetingError) {
-      console.error('Error creating meeting link for bulk session:', meetingError);
-      return res.status(500).json({
-        message: 'Failed to create meeting link',
-        error: meetingError.message
-      });
-    }
-
+    // 🔒 UNIFIED MEETING LINK POLICY: Generate group session ID first
     const groupSessionId = `group-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    // 🔒 Check if a meeting link already exists for this group session (safety check)
+    let meetingDetails = await getExistingGroupSessionLink(groupSessionId);
+    
+    // If no existing link found, create a new one
+    if (!meetingDetails || !meetingDetails.meetingLink) {
+      console.log(`🔒 Creating NEW meeting link for group session: ${groupSessionId}`);
+      const primaryStudentEmail = targetStudents[0]?.userId?.email || null;
+      try {
+        meetingDetails = await createRealMeeting(meetingPlatform, {
+          title,
+          description,
+          startTime,
+          endTime,
+          timezone: studentTimezone || 'UTC',
+          attendeeEmail: primaryStudentEmail
+        });
+        
+        // 🔒 Validate link uniqueness (safety check)
+        if (meetingDetails?.meetingLink) {
+          const isUnique = await validateMeetingLinkUniqueness(meetingDetails.meetingLink);
+          if (!isUnique) {
+            console.warn(`⚠️ WARNING: Meeting link may be duplicate: ${meetingDetails.meetingLink}`);
+            // Still proceed, but log the warning
+          }
+        }
+      } catch (meetingError) {
+        console.error('Error creating meeting link for bulk session:', meetingError);
+        return res.status(500).json({
+          message: 'Failed to create meeting link',
+          error: meetingError.message
+        });
+      }
+    } else {
+      console.log(`✅ REUSING existing meeting link for group session: ${groupSessionId}`);
+    }
     const successfulMeetings = [];
     const failedMeetings = [];
     const emailResults = {
@@ -929,34 +969,56 @@ router.post('/requests/:id/approve', async (req, res) => {
     // Get student user email for meeting creation
     const studentUser = await require('../../models/User').findById(request.studentId.userId);
 
-    // Create real Google Meet meeting
-    let meetingLink = '';
-    let meetingDetails = null;
+    // 🔒 UNIFIED MEETING LINK POLICY: Check if meeting link already exists for this session
+    let meetingDetails = await getExistingSingleMeetingLink(
+      request.studentId._id,
+      admin._id,
+      startTime,
+      endTime
+    );
     
-    try {
-      meetingDetails = await createRealMeeting('google_meet', {
-        title: request.title,
-        startTime,
-        endTime,
-        timezone: request.studentTimezone || 'UTC',
-        attendeeEmail: studentUser?.email,
-        description: request.description
-      });
-      
-      meetingLink = meetingDetails.joinUrl || meetingDetails.meetingLink || '';
-      
-      if (!meetingLink) {
+    let meetingLink = '';
+    
+    // If no existing link found, create a new one
+    if (!meetingDetails || !meetingDetails.meetingLink) {
+      console.log(`🔒 Creating NEW meeting link for approved request (student: ${request.studentId._id}, mentor: ${admin._id})`);
+      try {
+        meetingDetails = await createRealMeeting('google_meet', {
+          title: request.title,
+          startTime,
+          endTime,
+          timezone: request.studentTimezone || 'UTC',
+          attendeeEmail: studentUser?.email,
+          description: request.description
+        });
+        
+        // 🔒 Validate link uniqueness (safety check)
+        if (meetingDetails?.meetingLink) {
+          const isUnique = await validateMeetingLinkUniqueness(meetingDetails.meetingLink);
+          if (!isUnique) {
+            console.warn(`⚠️ WARNING: Meeting link may be duplicate: ${meetingDetails.meetingLink}`);
+            // Still proceed, but log the warning
+          }
+        }
+        
+        meetingLink = meetingDetails.joinUrl || meetingDetails.meetingLink || '';
+        
+        if (!meetingLink) {
+          return res.status(500).json({ 
+            message: 'Failed to create Google Meet meeting. No meeting link was generated.',
+            error: 'Missing meeting link'
+          });
+        }
+      } catch (meetingError) {
+        console.error('Error creating Google Meet meeting:', meetingError);
         return res.status(500).json({ 
-          message: 'Failed to create Google Meet meeting. No meeting link was generated.',
-          error: 'Missing meeting link'
+          message: 'Failed to create Google Meet meeting.',
+          error: meetingError.message
         });
       }
-    } catch (meetingError) {
-      console.error('Error creating Google Meet meeting:', meetingError);
-      return res.status(500).json({ 
-        message: 'Failed to create Google Meet meeting.',
-        error: meetingError.message
-      });
+    } else {
+      console.log(`✅ REUSING existing meeting link for approved request (student: ${request.studentId._id}, mentor: ${admin._id})`);
+      meetingLink = meetingDetails.meetingLink;
     }
 
     // Create meeting
@@ -1389,7 +1451,15 @@ router.put('/:id', async (req, res) => {
       if (title) meeting.title = title;
       if (description) meeting.description = description;
       if (notes) meeting.notes = notes;
-      if (meetingLink) meeting.meetingLink = meetingLink;
+      // 🔒 UNIFIED MEETING LINK POLICY: Only allow updating meeting link if it's empty
+      // This prevents accidental overwriting of existing links
+      if (meetingLink && (!meeting.meetingLink || meeting.meetingLink.trim() === '')) {
+        console.log(`🔒 Updating empty meeting link for meeting ${meeting._id}`);
+        meeting.meetingLink = meetingLink;
+      } else if (meetingLink && meeting.meetingLink !== meeting.meetingLink) {
+        console.warn(`⚠️ WARNING: Attempted to change existing meeting link for meeting ${meeting._id}. Link remains unchanged.`);
+        // Don't update - keep existing link to maintain consistency
+      }
       if (status) meeting.status = status;
     }
 

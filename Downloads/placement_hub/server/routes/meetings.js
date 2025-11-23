@@ -238,5 +238,51 @@ router.get('/:id/feedback', protect, authorize('student'), async (req, res) => {
   }
 });
 
+// @route   GET /api/meetings/:id/link
+// @desc    🔒 UNIFIED MEETING LINK POLICY: Get meeting link (always from database, never creates new)
+// @access  Private (Student)
+// @note    This endpoint ALWAYS returns the stored meeting link from the database.
+//          It NEVER creates a new link. Meeting links are created ONLY during scheduling by admin.
+router.get('/:id/link', protect, authorize('student'), async (req, res) => {
+  try {
+    const student = await Student.findOne({ userId: req.user._id });
+    if (!student) {
+      return res.status(404).json({ message: 'Student profile not found' });
+    }
+
+    const meeting = await Meeting.findOne({
+      _id: req.params.id,
+      studentId: student._id
+    }).select('meetingLink meetingPlatform meetingId meetingPassword meetingDialIn meetingStartUrl isGroupMeeting groupSessionId');
+
+    if (!meeting) {
+      return res.status(404).json({ message: 'Meeting not found' });
+    }
+
+    if (!meeting.meetingLink) {
+      return res.status(404).json({ 
+        message: 'Meeting link not available yet',
+        note: 'Meeting link will be generated when the meeting is scheduled by the admin.'
+      });
+    }
+
+    // 🔒 Return the stored link from database - NEVER create a new one
+    res.json({
+      success: true,
+      meetingLink: meeting.meetingLink,
+      meetingPlatform: meeting.meetingPlatform,
+      meetingId: meeting.meetingId,
+      meetingPassword: meeting.meetingPassword,
+      meetingDialIn: meeting.meetingDialIn,
+      meetingStartUrl: meeting.meetingStartUrl,
+      isGroupMeeting: meeting.isGroupMeeting,
+      groupSessionId: meeting.groupSessionId,
+      note: 'This is the official meeting link stored in the database. All participants use this same link.'
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;
 

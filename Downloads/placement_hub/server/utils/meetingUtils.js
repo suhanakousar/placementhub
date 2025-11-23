@@ -162,11 +162,132 @@ function formatTimeInTimezone(date, timezone) {
   });
 }
 
+/**
+ * 🔒 UNIFIED MEETING LINK POLICY
+ * Check if an existing meeting link exists for a group session
+ * This ensures ONE link per group session, preventing duplicate links
+ * @param {string} groupSessionId - Group session ID
+ * @returns {Promise<string|null>} - Existing meeting link or null
+ */
+async function getExistingGroupSessionLink(groupSessionId) {
+  const Meeting = require('../models/Meeting');
+  
+  if (!groupSessionId) {
+    return null;
+  }
+  
+  // Find the first meeting in this group session that has a meeting link
+  const existingMeeting = await Meeting.findOne({
+    groupSessionId: groupSessionId,
+    meetingLink: { $exists: true, $ne: '' }
+  }).select('meetingLink meetingId meetingPlatform meetingPassword meetingDialIn meetingStartUrl');
+  
+  if (existingMeeting && existingMeeting.meetingLink) {
+    console.log(`✅ Found existing meeting link for group session ${groupSessionId}: ${existingMeeting.meetingLink}`);
+    return {
+      meetingLink: existingMeeting.meetingLink,
+      meetingId: existingMeeting.meetingId,
+      meetingPlatform: existingMeeting.meetingPlatform,
+      meetingPassword: existingMeeting.meetingPassword,
+      meetingDialIn: existingMeeting.meetingDialIn,
+      meetingStartUrl: existingMeeting.meetingStartUrl
+    };
+  }
+  
+  return null;
+}
+
+/**
+ * 🔒 UNIFIED MEETING LINK POLICY
+ * Check if an existing meeting link exists for a single meeting session
+ * This ensures ONE link per meeting, preventing duplicate links
+ * @param {ObjectId} studentId - Student ID
+ * @param {ObjectId} mentorId - Mentor ID
+ * @param {Date} startTime - Meeting start time
+ * @param {Date} endTime - Meeting end time
+ * @param {ObjectId} excludeMeetingId - Meeting ID to exclude from check
+ * @returns {Promise<string|null>} - Existing meeting link or null
+ */
+async function getExistingSingleMeetingLink(studentId, mentorId, startTime, endTime, excludeMeetingId = null) {
+  const Meeting = require('../models/Meeting');
+  
+  // Check for existing meeting with same participants and time (within 1 minute tolerance)
+  const timeTolerance = 60 * 1000; // 1 minute in milliseconds
+  const startTimeMin = new Date(new Date(startTime).getTime() - timeTolerance);
+  const startTimeMax = new Date(new Date(startTime).getTime() + timeTolerance);
+  
+  const query = {
+    studentId: studentId,
+    mentorId: mentorId,
+    startTime: { $gte: startTimeMin, $lte: startTimeMax },
+    endTime: { $gte: new Date(new Date(endTime).getTime() - timeTolerance), $lte: new Date(new Date(endTime).getTime() + timeTolerance) },
+    isGroupMeeting: false,
+    meetingLink: { $exists: true, $ne: '' }
+  };
+  
+  if (excludeMeetingId) {
+    query._id = { $ne: excludeMeetingId };
+  }
+  
+  const existingMeeting = await Meeting.findOne(query).select('meetingLink meetingId meetingPlatform meetingPassword meetingDialIn meetingStartUrl');
+  
+  if (existingMeeting && existingMeeting.meetingLink) {
+    console.log(`✅ Found existing meeting link for single meeting (student: ${studentId}, mentor: ${mentorId}): ${existingMeeting.meetingLink}`);
+    return {
+      meetingLink: existingMeeting.meetingLink,
+      meetingId: existingMeeting.meetingId,
+      meetingPlatform: existingMeeting.meetingPlatform,
+      meetingPassword: existingMeeting.meetingPassword,
+      meetingDialIn: existingMeeting.meetingDialIn,
+      meetingStartUrl: existingMeeting.meetingStartUrl
+    };
+  }
+  
+  return null;
+}
+
+/**
+ * 🔒 UNIFIED MEETING LINK POLICY
+ * Validate that a meeting link is not being duplicated
+ * This is a safety check to prevent accidental duplicate link creation
+ * @param {string} meetingLink - Meeting link to validate
+ * @param {ObjectId} excludeMeetingId - Meeting ID to exclude from check
+ * @returns {Promise<boolean>} - True if link is unique, false if duplicate exists
+ */
+async function validateMeetingLinkUniqueness(meetingLink, excludeMeetingId = null) {
+  const Meeting = require('../models/Meeting');
+  
+  if (!meetingLink || meetingLink.trim() === '') {
+    return true; // Empty links are allowed (will be created)
+  }
+  
+  const query = {
+    meetingLink: meetingLink
+  };
+  
+  if (excludeMeetingId) {
+    query._id = { $ne: excludeMeetingId };
+  }
+  
+  const existingMeeting = await Meeting.findOne(query);
+  
+  if (existingMeeting) {
+    console.warn(`⚠️ WARNING: Meeting link already exists: ${meetingLink}`);
+    console.warn(`   Existing meeting ID: ${existingMeeting._id}`);
+    return false; // Link is not unique
+  }
+  
+  return true; // Link is unique
+}
+
 module.exports = {
   checkMeetingConflicts,
   generateICSFile,
   generateMeetingLink,
   convertToTimezone,
-  formatTimeInTimezone
+  formatTimeInTimezone,
+  getExistingGroupSessionLink,
+  getExistingSingleMeetingLink,
+  validateMeetingLinkUniqueness
 };
 

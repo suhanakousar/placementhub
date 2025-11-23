@@ -6,8 +6,40 @@ const { google } = require('googleapis');
  */
 async function createGoogleMeetMeeting(meetingData) {
   try {
+    // 🔒 Validate and sanitize title FIRST, before any processing
+    let meetingTitle = meetingData.title;
+    
+    // Handle null, undefined, or empty title
+    if (!meetingTitle || typeof meetingTitle !== 'string') {
+      meetingTitle = 'Placement Hub Meeting';
+      console.warn('⚠️ Meeting title is missing or invalid, using default title');
+    }
+    
+    // Trim whitespace
+    meetingTitle = meetingTitle.trim();
+    
+    // If still empty after trim, use default
+    if (meetingTitle.length === 0) {
+      meetingTitle = 'Placement Hub Meeting';
+      console.warn('⚠️ Meeting title is empty after trim, using default title');
+    }
+    
+    // Truncate if too long (Google Calendar API limit is 1024 characters)
+    if (meetingTitle.length > 1024) {
+      console.warn(`⚠️ Meeting title is too long (${meetingTitle.length} chars), truncating to 1024 characters`);
+      meetingTitle = meetingTitle.substring(0, 1021) + '...';
+    }
+    
+    // Remove null characters and other problematic characters
+    meetingTitle = meetingTitle.replace(/\0/g, ''); // Remove null characters
+    meetingTitle = meetingTitle.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, ''); // Remove control characters
+    
+    // Update meetingData with sanitized title
+    meetingData.title = meetingTitle;
+    
     console.log('Creating Google Meet meeting with data:', {
       title: meetingData.title,
+      titleLength: meetingData.title.length,
       startTime: meetingData.startTime,
       endTime: meetingData.endTime,
       timezone: meetingData.timezone
@@ -68,29 +100,28 @@ RAaBfizkPIZWBuLM3E8vbHo=
       throw new Error(`Authentication failed: ${authError.message || authError.toString()}`);
     }
 
-    // 🔒 Validate and sanitize meeting title for Google Calendar API
-    // Google Calendar API requires:
-    // - Summary cannot be empty
-    // - Maximum length: 1024 characters
-    // - Should not contain only whitespace
-    let meetingTitle = (meetingData.title || '').trim();
+    // Use the already sanitized title from meetingData
+    // (Title was sanitized at the start of the function)
+    let meetingTitle = meetingData.title; // This is already sanitized
     
-    if (!meetingTitle || meetingTitle.length === 0) {
-      meetingTitle = 'Placement Hub Meeting'; // Default title if empty
-      console.warn('⚠️ Meeting title is empty, using default title');
+    // Final safety check - ensure title is never empty or invalid
+    if (!meetingTitle || typeof meetingTitle !== 'string' || meetingTitle.trim().length === 0) {
+      meetingTitle = 'Placement Hub Meeting';
+      console.error('⚠️ CRITICAL: Title became invalid after sanitization, using default');
     }
     
-    // Truncate if too long (Google Calendar API limit is 1024 characters)
+    // Ensure it's a string and trim again (safety)
+    meetingTitle = String(meetingTitle).trim();
+    if (meetingTitle.length === 0) {
+      meetingTitle = 'Placement Hub Meeting';
+    }
+    
+    // Final length check
     if (meetingTitle.length > 1024) {
-      console.warn(`⚠️ Meeting title is too long (${meetingTitle.length} chars), truncating to 1024 characters`);
       meetingTitle = meetingTitle.substring(0, 1021) + '...';
     }
     
-    // Remove or replace problematic characters that might cause issues
-    // Google Calendar API generally handles most characters, but we'll sanitize for safety
-    meetingTitle = meetingTitle.replace(/\0/g, ''); // Remove null characters
-    
-    console.log(`📝 Using meeting title: "${meetingTitle}" (${meetingTitle.length} characters)`);
+    console.log(`📝 Final meeting title: "${meetingTitle}" (${meetingTitle.length} characters, type: ${typeof meetingTitle})`);
 
     // Create calendar event with Google Meet
     const event = {
@@ -108,7 +139,7 @@ RAaBfizkPIZWBuLM3E8vbHo=
         createRequest: {
           // 🔒 UNIFIED MEETING LINK POLICY: Use deterministic requestId based on meeting data
           // This ensures the same meeting data generates the same requestId, which helps with link consistency
-          requestId: `meet-${require('crypto').createHash('md5').update(`${meetingData.title || 'meeting'}-${meetingData.startTime || Date.now()}`).digest('hex').substring(0, 16)}`,
+          requestId: `meet-${require('crypto').createHash('md5').update(`${meetingTitle || 'meeting'}-${meetingData.startTime || Date.now()}`).digest('hex').substring(0, 16)}`,
           conferenceSolutionKey: {
             type: 'hangoutsMeet'
           }
@@ -198,7 +229,9 @@ RAaBfizkPIZWBuLM3E8vbHo=
       // This ensures the same meeting data always generates the same link
       // Use a hash of title + startTime to create a consistent link
       const crypto = require('crypto');
-      const linkSeed = `${meetingData.title || 'meeting'}-${meetingData.startTime || Date.now()}`;
+      // Use sanitized title (meetingData.title was sanitized at function start)
+      const safeTitle = meetingData.title || 'meeting';
+      const linkSeed = `${safeTitle}-${meetingData.startTime || Date.now()}`;
       const hash = crypto.createHash('md5').update(linkSeed).digest('hex').substring(0, 12);
       
       // Format as Google Meet code (3 groups of 3-4 characters separated by hyphens)

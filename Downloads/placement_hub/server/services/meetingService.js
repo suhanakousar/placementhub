@@ -147,10 +147,10 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
         createRequest: {
           // 🔒 UNIFIED MEETING LINK POLICY: Use deterministic requestId based on meeting data
           // This ensures the same meeting data generates the same requestId, which helps with link consistency
-          requestId: `meet-${require('crypto').createHash('md5').update(`${meetingTitle || 'meeting'}-${meetingData.startTime || Date.now()}`).digest('hex').substring(0, 16)}`,
-          conferenceSolutionKey: {
-            type: 'hangoutsMeet'
-          }
+          requestId: `meet-${require('crypto').createHash('md5').update(`${meetingTitle || 'meeting'}-${meetingData.startTime || Date.now()}`).digest('hex').substring(0, 16)}`
+          // Note: conferenceSolutionKey is optional - Google will default to Google Meet
+          // If specified, it should be: { type: 'hangoutsMeet' } but this sometimes causes errors
+          // So we omit it and let Google default to Google Meet
         }
       },
     };

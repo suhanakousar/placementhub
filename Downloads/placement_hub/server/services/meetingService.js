@@ -172,6 +172,14 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
     //   event.attendees = [{ email: meetingData.attendeeEmail }];
     // }
 
+    // Helper to extract meet link from response
+    const extractMeetLink = (data) => {
+      if (!data) return null;
+      const entryPoints = data.conferenceData?.entryPoints || [];
+      const videoEntry = entryPoints.find(ep => ep.entryPointType === 'video');
+      return videoEntry?.uri || data.hangoutLink || entryPoints[0]?.uri || null;
+    };
+
     // Insert the event with Meet link
     const conferenceTypeFallbacks = [null, 'hangoutsMeet', 'eventHangout', 'eventNamedHangout'];
     const invalidConferenceType = (error) => {
@@ -232,7 +240,10 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
     };
 
     let response;
+    let meetingLink = null;
     let lastError = null;
+    const createdEventsToCleanup = [];
+
     for (const conferenceType of conferenceTypeFallbacks) {
       try {
         const eventRequest = buildEventRequest(conferenceType);
@@ -247,7 +258,24 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
         } else {
           console.log('✅ Conference creation succeeded without explicit conference type (Google default).');
         }
-        break;
+
+        meetingLink = extractMeetLink(response.data);
+        if (meetingLink) {
+          console.log(`🔗 Meet link returned (conference type: ${conferenceType || 'default'}) -> ${meetingLink}`);
+          break;
+        } else {
+          console.warn(`⚠️ No Meet link returned (conference type: ${conferenceType || 'default'}). Response data:`, response.data);
+          if (response?.data?.id) {
+            createdEventsToCleanup.push(response.data.id);
+            try {
+              await calendar.events.delete({ calendarId: GOOGLE_CALENDAR_ID, eventId: response.data.id });
+              console.log(`🧹 Deleted event without meet link (ID: ${response.data.id})`);
+            } catch (deleteError) {
+              console.error('⚠️ Failed to delete event without meet link:', deleteError);
+            }
+          }
+          continue;
+        }
       } catch (insertError) {
         lastError = insertError;
         if (invalidConferenceType(insertError)) {
@@ -258,21 +286,13 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
       }
     }
 
-    if (!response) {
-      // All attempts failed, throw the last error
+    if (!meetingLink) {
       if (lastError) {
         handleInsertError(lastError);
       }
-      throw new Error('Failed to create Google Calendar event due to unknown error.');
-    }
-
-    // Extract the Meet link from the response
-    const meetLink = response.data.conferenceData?.entryPoints?.[0]?.uri || 
-                     response.data.hangoutLink ||
-                     response.data.conferenceData?.entryPoints?.[0]?.uri;
-
-    if (!meetLink) {
-      throw new Error('Failed to create Google Meet link: No link returned from Google Calendar API');
+      console.error('❌ Unable to obtain Meet link after trying all conference types.');
+      console.error('   Last response:', response?.data);
+      throw new Error('Google Calendar API did not return a Meet link. Please ensure Google Meet is enabled for this calendar.');
     }
 
     // 🔒 Validate the link format before returning
@@ -285,9 +305,9 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
     console.log(`✅ Valid Google Meet link created: ${meetLink}`);
 
     return {
-      meetingLink: meetLink,
+      meetingLink,
       meetingId: response.data.id,
-      joinUrl: meetLink,
+      joinUrl: meetingLink,
       dialInNumber: response.data.conferenceData?.entryPoints?.find(ep => ep.entryPointType === 'phone')?.uri || null,
       password: null,
       calendarEventId: response.data.id,

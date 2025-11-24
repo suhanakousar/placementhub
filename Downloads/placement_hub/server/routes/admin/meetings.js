@@ -350,7 +350,7 @@ router.post('/', async (req, res) => {
       description,
       notes,
       meetingLink,
-      meetingPlatform: 'google_meet',
+      meetingPlatform: 'jitsi',  // Using Jitsi - no API setup required
       meetingId: meetingDetails?.meetingId || null,
       meetingPassword: meetingDetails?.password || null,
       meetingDialIn: meetingDetails?.dialInNumber || null,
@@ -379,7 +379,7 @@ router.post('/', async (req, res) => {
         startTime,
         endTime,
         meetingLink,
-        meetingPlatform: 'google_meet',
+        meetingPlatform: 'jitsi',  // Using Jitsi - no API setup required
         meetingDetails: {
           meetingId: meetingDetails?.meetingId || null,
           password: meetingDetails?.password || null,
@@ -625,7 +625,7 @@ router.post('/bulk', async (req, res) => {
       topic,
       description,
       notes,
-      meetingPlatform = 'google_meet',
+      meetingPlatform = 'jitsi',  // Default to Jitsi - simpler, no API setup required
       studentTimezone,
       mentorTimezone,
       attachments = []
@@ -1283,7 +1283,7 @@ router.post('/requests/:id/approve', async (req, res) => {
       description: request.description,
       notes: notes || request.additionalNotes,
       meetingLink,
-      meetingPlatform: 'google_meet',
+      meetingPlatform: 'jitsi',  // Using Jitsi - no API setup required
       meetingId: meetingDetails?.meetingId || null,
       meetingPassword: meetingDetails?.password || null,
       meetingDialIn: meetingDetails?.dialInNumber || null,
@@ -1313,7 +1313,7 @@ router.post('/requests/:id/approve', async (req, res) => {
         startTime,
         endTime,
         meetingLink,
-        meetingPlatform: 'google_meet',
+        meetingPlatform: 'jitsi',  // Using Jitsi - no API setup required
         meetingDetails: {
           meetingId: meetingDetails?.meetingId || null,
           password: meetingDetails?.password || null,

@@ -131,28 +131,38 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
     
     console.log(`📝 Final meeting title: "${meetingTitle}" (${meetingTitle.length} characters, type: ${typeof meetingTitle})`);
 
-    // Create calendar event with Google Meet
-    const event = {
-      summary: meetingTitle,
-      description: meetingData.description || '',
-      start: {
-        dateTime: new Date(meetingData.startTime).toISOString(),
-        timeZone: meetingData.timezone || 'UTC',
-      },
-      end: {
-        dateTime: new Date(meetingData.endTime).toISOString(),
-        timeZone: meetingData.timezone || 'UTC',
-      },
-      conferenceData: {
-        createRequest: {
-          // 🔒 UNIFIED MEETING LINK POLICY: Use deterministic requestId based on meeting data
-          // This ensures the same meeting data generates the same requestId, which helps with link consistency
-          requestId: `meet-${require('crypto').createHash('md5').update(`${meetingTitle || 'meeting'}-${meetingData.startTime || Date.now()}`).digest('hex').substring(0, 16)}`
-          // Note: conferenceSolutionKey is optional - Google will default to Google Meet
-          // If specified, it should be: { type: 'hangoutsMeet' } but this sometimes causes errors
-          // So we omit it and let Google default to Google Meet
-        }
-      },
+    // Helper to build event request with optional conference type
+    const buildEventRequest = (conferenceType) => {
+      const requestId = `meet-${require('crypto').createHash('md5')
+        .update(`${meetingTitle || 'meeting'}-${meetingData.startTime || Date.now()}`)
+        .digest('hex')
+        .substring(0, 16)}`;
+
+      const event = {
+        summary: meetingTitle,
+        description: meetingData.description || '',
+        start: {
+          dateTime: new Date(meetingData.startTime).toISOString(),
+          timeZone: meetingData.timezone || 'UTC',
+        },
+        end: {
+          dateTime: new Date(meetingData.endTime).toISOString(),
+          timeZone: meetingData.timezone || 'UTC',
+        },
+        conferenceData: {
+          createRequest: {
+            requestId
+          }
+        },
+      };
+
+      if (conferenceType) {
+        event.conferenceData.createRequest.conferenceSolutionKey = {
+          type: conferenceType
+        };
+      }
+
+      return event;
     };
 
     // ❌ Service accounts cannot invite attendees without Domain-Wide Delegation
@@ -163,15 +173,13 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
     // }
 
     // Insert the event with Meet link
-    let response;
-    try {
-      response = await calendar.events.insert({
-        auth: jwtClient,
-        calendarId: GOOGLE_CALENDAR_ID,
-        conferenceDataVersion: 1,
-        requestBody: event,
-      });
-    } catch (insertError) {
+    const conferenceTypeFallbacks = [null, 'hangoutsMeet', 'eventHangout', 'eventNamedHangout'];
+    const invalidConferenceType = (error) => {
+      const msg = error.response?.data?.error?.message || error.message || '';
+      return msg.toLowerCase().includes('invalid conference type');
+    };
+
+    const handleInsertError = (insertError) => {
       console.error('Calendar API insert error:', insertError);
       console.error('Error response:', insertError.response?.data);
       console.error('Error code:', insertError.code);
@@ -221,6 +229,41 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
       } else {
         throw new Error(`Failed to create calendar event: ${insertError.toString()}`);
       }
+    };
+
+    let response;
+    let lastError = null;
+    for (const conferenceType of conferenceTypeFallbacks) {
+      try {
+        const eventRequest = buildEventRequest(conferenceType);
+        response = await calendar.events.insert({
+          auth: jwtClient,
+          calendarId: GOOGLE_CALENDAR_ID,
+          conferenceDataVersion: 1,
+          requestBody: eventRequest,
+        });
+        if (conferenceType) {
+          console.log(`✅ Conference creation succeeded with conference type: ${conferenceType}`);
+        } else {
+          console.log('✅ Conference creation succeeded without explicit conference type (Google default).');
+        }
+        break;
+      } catch (insertError) {
+        lastError = insertError;
+        if (invalidConferenceType(insertError)) {
+          console.warn(`⚠️ Invalid conference type "${conferenceType || 'default'}". Trying next fallback...`);
+          continue;
+        }
+        handleInsertError(insertError); // Will throw
+      }
+    }
+
+    if (!response) {
+      // All attempts failed, throw the last error
+      if (lastError) {
+        handleInsertError(lastError);
+      }
+      throw new Error('Failed to create Google Calendar event due to unknown error.');
     }
 
     // Extract the Meet link from the response

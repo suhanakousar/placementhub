@@ -90,7 +90,6 @@ app.use('/api/leaderboard-public', require('./routes/leaderboardPublic'));
 app.use('/api/meetings', require('./routes/meetings'));
 app.use('/api/sessions', require('./routes/sessions'));
 app.use('/api/tasks', require('./routes/tasks'));
-app.use('/api', require('./routes/jobs'));
 
 // Health check
 app.get('/api/health', (req, res) => {

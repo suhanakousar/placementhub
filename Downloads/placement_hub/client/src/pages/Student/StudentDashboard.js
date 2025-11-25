@@ -15,7 +15,6 @@ import Support from './Support';
 import CompetitiveProfile from './CompetitiveProfile';
 import Meetings from './Meetings';
 import Tasks from './Tasks';
-import JobRecommendations from './JobRecommendations';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
 
@@ -80,7 +79,6 @@ const StudentDashboard = () => {
           <Route path="certifications" element={<Certifications studentData={studentData} onUpdate={fetchStudentData} />} />
           <Route path="resumes" element={<Resumes studentData={studentData} onUpdate={fetchStudentData} />} />
           <Route path="competitive-profile" element={<CompetitiveProfile studentData={studentData} />} />
-          <Route path="job-recommendations" element={<JobRecommendations studentData={studentData} />} />
           <Route path="posts" element={<Posts />} />
           <Route path="meetings" element={<Meetings />} />
           <Route path="tasks" element={<Tasks />} />

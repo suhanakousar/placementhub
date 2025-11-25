@@ -31,8 +31,8 @@ const JobRecommendations = ({ studentData }) => {
   }, []);
 
   useEffect(() => {
-    if (resumeAnalysis && activeTab === 'recommendations') {
-      // Auto-fetch jobs on load if resume is analyzed
+    // Auto-fetch jobs on load if resume is analyzed
+    if (resumeAnalysis && activeTab === 'recommendations' && jobs.length === 0) {
       fetchJobs();
     }
   }, [resumeAnalysis, activeTab]);
@@ -118,20 +118,26 @@ const JobRecommendations = ({ studentData }) => {
     setLoadingJobs(true);
     try {
       const response = await api.post('/jobs/recommend', {
-        keywords: filters.keywords,
-        location: filters.location,
-        experienceLevel: filters.experienceLevel,
-        jobType: filters.jobType,
+        keywords: filters.keywords || '',
+        location: filters.location || 'Remote',
+        experienceLevel: filters.experienceLevel || '',
+        jobType: filters.jobType || '',
         page: 1,
         pageSize: 20
       });
 
+      console.log('Jobs response:', response.data);
       setJobs(response.data.jobs || []);
-      if (response.data.jobs.length === 0) {
-        toast.info('No jobs found. Try adjusting your filters.');
+      
+      if (!response.data.jobs || response.data.jobs.length === 0) {
+        toast.info('No jobs found. Try adjusting your filters or check back later.');
+      } else {
+        toast.success(`Found ${response.data.jobs.length} job${response.data.jobs.length > 1 ? 's' : ''}`);
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to fetch jobs');
+      console.error('Error fetching jobs:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch jobs';
+      toast.error(errorMessage);
       setJobs([]);
     } finally {
       setLoadingJobs(false);

@@ -22,10 +22,21 @@ async function fetchJobsFromRise(params) {
     
     const response = await axios.get(
       `https://api.joinrise.io/api/v1/jobs/public?${queryParams.toString()}`,
-      { timeout: 10000 }
+      { 
+        timeout: 15000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      }
     );
     
     if (!response.data || !response.data.success || !response.data.result?.jobs) {
+      console.log('Rise API: No jobs in response', {
+        hasData: !!response.data,
+        success: response.data?.success,
+        hasJobs: !!response.data?.result?.jobs,
+        jobsCount: response.data?.result?.jobs?.length
+      });
       return [];
     }
     
@@ -55,9 +66,15 @@ async function fetchJobsFromRise(params) {
         source: 'Rise'
       }));
     
+    console.log(`Rise API: Fetched ${jobs.length} jobs`);
     return jobs;
   } catch (error) {
-    console.error('Error fetching jobs from Rise API:', error.message);
+    console.error('Error fetching jobs from Rise API:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data
+    });
     return [];
   }
 }
@@ -107,10 +124,11 @@ async function fetchJobsFromLinkedIn(params) {
     );
     
     if (!response.data || !response.data.jobs) {
+      console.log('LinkedIn API: No jobs in response');
       return [];
     }
     
-    return response.data.jobs.map((job, index) => ({
+    const mappedJobs = response.data.jobs.map((job, index) => ({
       jobId: job.jobId || `linkedin-${Date.now()}-${index}`,
       title: job.title || 'Untitled Position',
       company: job.companyName || 'Unknown Company',
@@ -123,8 +141,15 @@ async function fetchJobsFromLinkedIn(params) {
       salaryRange: job.salary || null,
       source: 'LinkedIn'
     }));
+    
+    console.log(`LinkedIn API: Fetched ${mappedJobs.length} jobs`);
+    return mappedJobs;
   } catch (error) {
-    console.error('Error fetching jobs from LinkedIn API:', error.message);
+    console.error('Error fetching jobs from LinkedIn API:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText
+    });
     return [];
   }
 }
@@ -163,10 +188,11 @@ async function fetchJobsFromActiveJobsDB(params) {
     );
     
     if (!response.data || !Array.isArray(response.data)) {
+      console.log('Active Jobs DB API: No jobs in response');
       return [];
     }
     
-    return response.data.map((job, index) => ({
+    const mappedJobs = response.data.map((job, index) => ({
       jobId: job.id || `activejobs-${Date.now()}-${index}`,
       title: job.title || 'Untitled Position',
       company: job.company || 'Unknown Company',
@@ -179,8 +205,15 @@ async function fetchJobsFromActiveJobsDB(params) {
       salaryRange: job.salary || null,
       source: 'ActiveJobsDB'
     }));
+    
+    console.log(`Active Jobs DB API: Fetched ${mappedJobs.length} jobs`);
+    return mappedJobs;
   } catch (error) {
-    console.error('Error fetching jobs from Active Jobs DB API:', error.message);
+    console.error('Error fetching jobs from Active Jobs DB API:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText
+    });
     return [];
   }
 }
@@ -217,15 +250,32 @@ function extractSkillsFromDescription(description) {
 async function fetchJobsFromAPIs(params) {
   const { pageSize = 20 } = params;
   
-  // Fetch from all APIs in parallel
-  const [riseJobs, linkedInJobs, activeJobs] = await Promise.all([
+  console.log('Fetching jobs with params:', params);
+  
+  // Fetch from all APIs in parallel with error handling
+  const [riseJobs, linkedInJobs, activeJobs] = await Promise.allSettled([
     fetchJobsFromRise({ ...params, pageSize: Math.ceil(pageSize / 3) }),
     fetchJobsFromLinkedIn({ ...params, pageSize: Math.ceil(pageSize / 3) }),
     fetchJobsFromActiveJobsDB({ ...params, pageSize: Math.ceil(pageSize / 3) })
   ]);
   
+  // Extract results from Promise.allSettled
+  const riseResults = riseJobs.status === 'fulfilled' ? riseJobs.value : [];
+  const linkedInResults = linkedInJobs.status === 'fulfilled' ? linkedInJobs.value : [];
+  const activeJobsResults = activeJobs.status === 'fulfilled' ? activeJobs.value : [];
+  
+  if (riseJobs.status === 'rejected') {
+    console.error('Rise API promise rejected:', riseJobs.reason);
+  }
+  if (linkedInJobs.status === 'rejected') {
+    console.error('LinkedIn API promise rejected:', linkedInJobs.reason);
+  }
+  if (activeJobs.status === 'rejected') {
+    console.error('Active Jobs DB API promise rejected:', activeJobs.reason);
+  }
+  
   // Combine and deduplicate by title and company
-  const allJobs = [...riseJobs, ...linkedInJobs, ...activeJobs];
+  const allJobs = [...riseResults, ...linkedInResults, ...activeJobsResults];
   const uniqueJobs = [];
   const seen = new Set();
   
@@ -236,6 +286,8 @@ async function fetchJobsFromAPIs(params) {
       uniqueJobs.push(job);
     }
   }
+  
+  console.log(`Total unique jobs fetched: ${uniqueJobs.length} (Rise: ${riseResults.length}, LinkedIn: ${linkedInResults.length}, ActiveJobs: ${activeJobsResults.length})`);
   
   return uniqueJobs.slice(0, pageSize);
 }

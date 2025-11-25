@@ -5,10 +5,15 @@ const path = require('path');
 const PROGRAMMING_LANGUAGES = [
   'java', 'python', 'javascript', 'typescript', 'c++', 'c#', 'c', 'go', 'rust',
   'php', 'ruby', 'swift', 'kotlin', 'scala', 'r', 'matlab', 'sql', 'html', 'css',
-  'react', 'angular', 'vue', 'node.js', 'express', 'django', 'flask', 'spring',
-  'mongodb', 'mysql', 'postgresql', 'redis', 'aws', 'azure', 'gcp', 'docker',
-  'kubernetes', 'git', 'linux', 'rest', 'graphql', 'microservices', 'agile',
-  'scrum', 'devops', 'ci/cd', 'jenkins', 'terraform', 'ansible'
+  'react', 'angular', 'vue', 'node.js', 'nodejs', 'express', 'django', 'flask', 'spring',
+  'mongodb', 'mysql', 'postgresql', 'postgres', 'redis', 'aws', 'azure', 'gcp', 'google cloud',
+  'docker', 'kubernetes', 'k8s', 'git', 'github', 'gitlab', 'linux', 'rest', 'restful',
+  'graphql', 'microservices', 'agile', 'scrum', 'devops', 'ci/cd', 'cicd', 'jenkins',
+  'terraform', 'ansible', 'jira', 'confluence', 'bootstrap', 'tailwind', 'sass', 'less',
+  'jquery', 'redux', 'mobx', 'next.js', 'nextjs', 'nuxt', 'gatsby', 'webpack', 'vite',
+  'firebase', 'supabase', 'vercel', 'netlify', 'heroku', 'nginx', 'apache', 'tomcat',
+  'elasticsearch', 'kafka', 'rabbitmq', 'socket.io', 'websocket', 'oauth', 'jwt',
+  'tensorflow', 'pytorch', 'pandas', 'numpy', 'scikit-learn', 'opencv', 'd3.js'
 ];
 
 // Common frameworks and tools
@@ -39,30 +44,42 @@ const ROLE_KEYWORDS = {
 };
 
 /**
- * Extract text from PDF (simplified - in production, use pdf-parse or similar)
+ * Extract text from PDF using pdf-parse
  */
 async function extractTextFromPDF(filePath) {
-  // For now, return empty string - in production, use pdf-parse library
-  // const pdfParse = require('pdf-parse');
-  // const dataBuffer = fs.readFileSync(filePath);
-  // const data = await pdfParse(dataBuffer);
-  // return data.text;
-  
-  // Placeholder - you should install and use pdf-parse
-  return '';
+  try {
+    const pdfParse = require('pdf-parse');
+    const dataBuffer = fs.readFileSync(filePath);
+    const data = await pdfParse(dataBuffer);
+    return data.text || '';
+  } catch (error) {
+    console.error('Error extracting text from PDF:', error);
+    // Fallback: try to read as text if it's a text-based PDF
+    try {
+      return fs.readFileSync(filePath, 'utf-8');
+    } catch (err) {
+      return '';
+    }
+  }
 }
 
 /**
- * Extract text from DOCX (simplified - in production, use mammoth or similar)
+ * Extract text from DOCX using mammoth
  */
 async function extractTextFromDOCX(filePath) {
-  // For now, return empty string - in production, use mammoth library
-  // const mammoth = require('mammoth');
-  // const result = await mammoth.extractRawText({ path: filePath });
-  // return result.value;
-  
-  // Placeholder - you should install and use mammoth
-  return '';
+  try {
+    const mammoth = require('mammoth');
+    const result = await mammoth.extractRawText({ path: filePath });
+    return result.value || '';
+  } catch (error) {
+    console.error('Error extracting text from DOCX:', error);
+    // Fallback: try to read as text
+    try {
+      return fs.readFileSync(filePath, 'utf-8');
+    } catch (err) {
+      return '';
+    }
+  }
 }
 
 /**
@@ -84,16 +101,39 @@ async function extractTextFromResume(filePath) {
  * Extract skills from resume text
  */
 function extractSkills(text) {
+  if (!text || text.length === 0) return [];
+  
   const lowerText = text.toLowerCase();
   const foundSkills = [];
   
   // Check for programming languages and frameworks
-  [...PROGRAMMING_LANGUAGES, ...FRAMEWORKS].forEach(skill => {
-    const regex = new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+  const allSkills = [...new Set([...PROGRAMMING_LANGUAGES, ...FRAMEWORKS])];
+  
+  allSkills.forEach(skill => {
+    // Escape special regex characters
+    const escapedSkill = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Use word boundary or allow for variations (e.g., "Node.js" vs "nodejs")
+    const regex = new RegExp(`\\b${escapedSkill}\\b|${escapedSkill.replace(/[.*+?^${}()|[\]\\]/g, '')}`, 'i');
     if (regex.test(lowerText)) {
       foundSkills.push(skill);
     }
   });
+  
+  // Also look for skills mentioned in common sections
+  // Look for "Skills:", "Technologies:", "Technical Skills:" sections
+  const skillsSectionRegex = /(?:skills?|technologies?|technical\s+skills?|programming\s+languages?|tools?|frameworks?)[:;]?\s*([^•\n]{50,500})/i;
+  const skillsMatch = text.match(skillsSectionRegex);
+  
+  if (skillsMatch && skillsMatch[1]) {
+    const skillsSection = skillsMatch[1].toLowerCase();
+    allSkills.forEach(skill => {
+      const escapedSkill = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\b${escapedSkill}\\b`, 'i');
+      if (regex.test(skillsSection) && !foundSkills.includes(skill)) {
+        foundSkills.push(skill);
+      }
+    });
+  }
   
   // Remove duplicates and return top 10
   return [...new Set(foundSkills)].slice(0, 10);
@@ -133,12 +173,28 @@ function extractExperienceLevel(text) {
  * Extract preferred roles from resume text
  */
 function extractPreferredRoles(text) {
+  if (!text || text.length === 0) return ['Software Engineer'];
+  
   const lowerText = text.toLowerCase();
   const foundRoles = [];
   
+  // Check for role keywords
   for (const [role, keywords] of Object.entries(ROLE_KEYWORDS)) {
     if (keywords.some(keyword => lowerText.includes(keyword))) {
       foundRoles.push(role);
+    }
+  }
+  
+  // Also check for role in objective/summary section
+  const objectiveRegex = /(?:objective|summary|profile|about)[:;]?\s*([^•\n]{20,200})/i;
+  const objectiveMatch = text.match(objectiveRegex);
+  
+  if (objectiveMatch && objectiveMatch[1]) {
+    const objectiveText = objectiveMatch[1].toLowerCase();
+    for (const [role, keywords] of Object.entries(ROLE_KEYWORDS)) {
+      if (keywords.some(keyword => objectiveText.includes(keyword)) && !foundRoles.includes(role)) {
+        foundRoles.push(role);
+      }
     }
   }
   
@@ -149,17 +205,33 @@ function extractPreferredRoles(text) {
  * Extract location from resume text
  */
 function extractLocation(text) {
+  if (!text || text.length === 0) return null;
+  
   // Common location patterns
   const locationPatterns = [
-    /(?:located in|based in|from|residing in)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
-    /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*(?:India|USA|United States|UK|United Kingdom)/i,
-    /(?:city|location):\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i
+    /(?:located in|based in|from|residing in|lives? in|current location|address)[:;]?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+    /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*(?:India|USA|United States|UK|United Kingdom|Bangalore|Mumbai|Delhi|Hyderabad|Chennai|Pune|Kolkata)/i,
+    /(?:city|location)[:;]?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+    /(?:address)[:;]?\s*([^,\n]{10,50}),\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i
   ];
   
   for (const pattern of locationPatterns) {
     const match = text.match(pattern);
-    if (match && match[1]) {
-      return match[1].trim();
+    if (match) {
+      // Return the city/state name
+      const location = match[1] || match[2];
+      if (location && location.length > 2 && location.length < 50) {
+        return location.trim();
+      }
+    }
+  }
+  
+  // Try to find common Indian cities
+  const indianCities = ['Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Chennai', 'Pune', 'Kolkata', 'Ahmedabad', 'Jaipur'];
+  const lowerText = text.toLowerCase();
+  for (const city of indianCities) {
+    if (lowerText.includes(city.toLowerCase())) {
+      return city;
     }
   }
   
@@ -192,34 +264,41 @@ function extractDegree(text) {
  */
 async function parseResume(filePath) {
   try {
-    // For now, we'll use a simple approach
-    // In production, you should install: npm install pdf-parse mammoth
-    
-    // Try to read as text (works for some PDFs and text files)
+    const ext = path.extname(filePath).toLowerCase();
     let text = '';
-    try {
-      text = fs.readFileSync(filePath, 'utf-8');
-    } catch (err) {
-      // If not readable as text, try extraction methods
-      const ext = path.extname(filePath).toLowerCase();
-      if (ext === '.pdf') {
-        text = await extractTextFromPDF(filePath);
-      } else if (ext === '.docx' || ext === '.doc') {
-        text = await extractTextFromDOCX(filePath);
+    
+    // Extract text based on file type
+    if (ext === '.pdf') {
+      text = await extractTextFromPDF(filePath);
+    } else if (ext === '.docx' || ext === '.doc') {
+      text = await extractTextFromDOCX(filePath);
+    } else {
+      // Try to read as plain text
+      try {
+        text = fs.readFileSync(filePath, 'utf-8');
+      } catch (err) {
+        console.error('Error reading file as text:', err);
       }
     }
     
-    // If text is still empty, return basic structure
-    if (!text || text.trim().length === 0) {
+    // Clean up text - remove extra whitespace and normalize
+    text = text.replace(/\s+/g, ' ').trim();
+    
+    // If text is still empty or too short, return basic structure
+    if (!text || text.trim().length < 50) {
+      console.warn('Resume text extraction resulted in empty or very short text');
       return {
         topSkills: [],
         experienceLevel: 'Fresher',
         preferredRoles: ['Software Engineer'],
         location: null,
         degree: null,
-        extractedText: ''
+        extractedText: text.substring(0, 500),
+        warning: 'Could not extract sufficient text from resume. Please ensure the file is not corrupted or password-protected.'
       };
     }
+    
+    console.log(`Extracted ${text.length} characters from resume`);
     
     // Extract information
     const topSkills = extractSkills(text);
@@ -227,6 +306,15 @@ async function parseResume(filePath) {
     const preferredRoles = extractPreferredRoles(text);
     const location = extractLocation(text);
     const degree = extractDegree(text);
+    
+    // Log extracted data for debugging
+    console.log('Extracted data:', {
+      skillsCount: topSkills.length,
+      experienceLevel,
+      preferredRoles,
+      location,
+      degree
+    });
     
     return {
       topSkills,

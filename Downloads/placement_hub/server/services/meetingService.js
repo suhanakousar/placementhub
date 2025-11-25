@@ -1,44 +1,10 @@
+const axios = require('axios');
 const { google } = require('googleapis');
 
 /**
  * Create a real Google Meet meeting using Google Calendar API
  */
 async function createGoogleMeetMeeting(meetingData) {
-  // Google Service Account credentials from environment
-  // Default to provided credentials if env vars not set
-  const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL || 'placementhub@placmenthub.iam.gserviceaccount.com';
-  const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY || `-----BEGIN PRIVATE KEY-----
-MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDB+JtLIxi1VZJ2
-NDgYHyEGS+64SrB1NZqZ+dU7foHbwQnS+srTOMOA5+zYv0LFOclsUzJia+P1gB3a
-GuZebM29uA6jtT3jInjt+7rmabACXt20h9YWpSW+MIoZxQbJeijnj9u68YPn0gvf
-aWrc4mOOYCaa/N5h68d9mR3If5qv/sVju2TCzI3GfCUNErsz6gvpcFExJOuRpBXm
-6mxGARR3ErtvQyB77YusxaKUpBZ29uMmFbxuXB4UsZRJ6siPhJ5rzmJWAC1x1gl5
-zDEQfqnIFeSaBzayDcCclkGvQOU6Re99KHWBEHk4nszfYAdGZ58QQ5ES8upYg8bm
-IDnmXUD1AgMBAAECggEAL+P2TYcRCOZjhqEub1AyOmiBfEleh1XQga80BSAfJjdj
-Ok62yI81f8xjRwFz1heGImNpJ3EtY3X6CNlG4u3YnzyECsnLCZr/gfx6oPxbmz46
-XWIDSuyD5ND9q86gNhrd4gw760xJbbFHwqV3n6kafPLC3VXM/x60To+BEbllowll
-FVYYAeocK93bFaW7iviOG90PL9ou2DRC/IL2dMp2iepBGn72Tah01tNBHm2jqFsF
-QDRPRHWQ6W7HEfJiPDWQx5b/vBQna6Lt1efDvUhhVzBeu0xz0Il/EUHRuzvBZbiE
-wPfLH3Dq/IU/YoQodMPOOp452UHIIRdk5gzUiuRAiQKBgQDrb6aVfWFOuMqQSvPZ
-cA+FFJWYd2QSS+ZP82JKkH5SzLJTj833iSnx4b9g3j2m+YJFzn26O5YcNQusUmgc
-6nWUHQYiE+SM+LqsoWRreAYAg9meQzzNO5q1Mq4kE4EHnzFzFWqhcxecfB0ONxgy
-1sB8g73HZ0+1RKjZ/2grDAWKTQKBgQDS6cxyFXFqTSHwyFtrQa69dKeJ+qZ3tFaU
-eEv3xU9AyJAZQs1k9uGjMcEhaBKnEfyaypf7OY0y+pm+VGHLguNRgEFAOrSQKypw
-15K6b9gpDsu4NLuDss9+mLAi4ESEWrt3zi/8Op59BMZQzVlhSEH6UhJXKxJjny1J
-gQcxzXKVSQKBgQDqQCnYPWrvP6/UR68+XmAiwmthyxDXn4sla30VwZTe32pi+Acv
-ztrcHwgi4p0nIMR8nkq8XIMrx5+4sjmC48lfOE2c5HwXw3dBQke/Iimeo5GIBVBe
-x3pT5XwcywcrxToXTmzM/M22Vks2lJzQIJpeiVnvKBzHt+vlE1na0thEVQKBgQCQ
-H0EcJ/jzKbfqoA6QMTblsUQW7hc4rxuGotlOex6X5zVIfbR6rJUs/f+6AzLTxV+2
-qn/GJOKOll3eiCy3cz5AYAK2kCb4aPa8WyKhkXHFRJ4Cxs3nxZUyLcYWXueTBaka
-yeNSWQAZ79xQNLJB3q1vDwwHUqBjQM8ibi/rYTdOOQKBgQDNTBnuJgeEIDIN3Jxm
-+zFB0JVf9uGWvkPW+jXnNX72svePlFavB4pyuxWg3aGxAnMivRSsZIzhKCT1YlTb
-JqFq9GcNgiRBIKDjsyvXKs10B3nnrlfbR9pNm5XNMWC6x0GVgDT0j1E5JS8GI9QN
-Ag4K95ooWn0LT8pYY8uM5HD8cA==
------END PRIVATE KEY-----`;
-  // Use the provided calendar ID (placementhub722@gmail.com)
-  // Make sure this calendar is shared with the service account email
-  const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'placementhub722@gmail.com';
-
   try {
     // 🔒 Validate and sanitize title FIRST, before any processing
     let meetingTitle = meetingData.title;
@@ -128,7 +94,7 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
 
     // Authorize the client
     try {
-      await jwtClient.authorize();
+      const token = await jwtClient.authorize();
       console.log('✅ JWT Authorization successful');
       console.log('   Using Client Email:', GOOGLE_CLIENT_EMAIL);
       console.log('   Using Calendar ID:', GOOGLE_CALENDAR_ID);
@@ -331,21 +297,21 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
 
     // 🔒 Validate the link format before returning
     const { validateGoogleMeetLink } = require('../utils/meetingUtils');
-    if (!validateGoogleMeetLink(meetingLink)) {
-      console.error('❌ CRITICAL: Invalid meeting link format received from API:', meetingLink);
-      throw new Error(`Invalid meeting link format received from API: ${meetingLink}. Expected format: Google Meet (https://meet.google.com/abc-defg-hij) or Jitsi (https://meet.jit.si/room-name)`);
+    if (!validateGoogleMeetLink(meetLink)) {
+      console.error('❌ CRITICAL: Invalid Google Meet link format received from API:', meetLink);
+      throw new Error(`Invalid Google Meet link format received from API: ${meetLink}. Expected format: https://meet.google.com/abc-defg-hij`);
     }
 
-    console.log(`✅ Valid meeting link created: ${meetingLink}`);
+    console.log(`✅ Valid Google Meet link created: ${meetLink}`);
 
     return {
-      meetingLink: meetingLink,
-      meetingId: response?.data?.id || null,
+      meetingLink,
+      meetingId: response.data.id,
       joinUrl: meetingLink,
-      dialInNumber: response?.data?.conferenceData?.entryPoints?.find(ep => ep.entryPointType === 'phone')?.uri || null,
+      dialInNumber: response.data.conferenceData?.entryPoints?.find(ep => ep.entryPointType === 'phone')?.uri || null,
       password: null,
-      calendarEventId: response?.data?.id || null,
-      startUrl: meetingLink // For Google Meet, start and join URLs are the same
+      calendarEventId: response.data.id,
+      startUrl: meetLink // For Google Meet, start and join URLs are the same
     };
   } catch (error) {
     console.error('Error creating Google Meet meeting:', error);
@@ -381,48 +347,18 @@ Ag4K95ooWn0LT8pYY8uM5HD8cA==
 }
 
 /**
- * Create a Jitsi meeting (no API required - just generate unique URL)
- */
-async function createJitsiMeeting(meetingData) {
-  const { generateJitsiLink } = require('../utils/jitsi');
-  
-  // Generate unique meeting ID for the link
-  const crypto = require('crypto');
-  const meetingId = crypto.createHash('md5')
-    .update(`${meetingData.title || 'meeting'}-${meetingData.startTime || Date.now()}`)
-    .digest('hex')
-    .substring(0, 12);
-  
-  const meetingLink = generateJitsiLink(meetingId, 'placementhub');
-  
-  console.log(`✅ Jitsi meeting link generated: ${meetingLink}`);
-  
-  return {
-    meetingLink: meetingLink,
-    meetingId: meetingId,
-    joinUrl: meetingLink,
-    dialInNumber: null,
-    password: null,
-    startUrl: meetingLink,
-    note: 'Jitsi meeting - no authentication required, unlimited participants'
-  };
-}
-
-/**
- * Create a real meeting (supports Google Meet and Jitsi)
+ * Create a real meeting (only Google Meet supported)
  */
 async function createRealMeeting(platform, meetingData) {
-  if (platform === 'jitsi') {
-    return await createJitsiMeeting(meetingData);
-  } else if (platform === 'google_meet') {
-    return await createGoogleMeetMeeting(meetingData);
-  } else {
-    throw new Error(`Unsupported meeting platform: ${platform}. Supported platforms: 'google_meet', 'jitsi'`);
+  // Only Google Meet is supported
+  if (platform !== 'google_meet' && platform !== 'google_meet') {
+    throw new Error('Only Google Meet is supported. Please select Google Meet as the meeting platform.');
   }
+
+  return await createGoogleMeetMeeting(meetingData);
 }
 
 module.exports = {
   createRealMeeting,
-  createGoogleMeetMeeting,
-  createJitsiMeeting
+  createGoogleMeetMeeting
 };

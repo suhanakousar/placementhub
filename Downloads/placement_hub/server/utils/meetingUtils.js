@@ -304,49 +304,9 @@ async function getExistingSingleMeetingLink(studentId, mentorId, startTime, endT
 }
 
 /**
- * 🔒 MEETING LINK VALIDATION
- * Validate that a meeting link has the correct format based on platform
- * @param {string} meetingLink - Meeting link to validate
- * @param {string} platform - Meeting platform ('google_meet', 'jitsi', etc.)
- * @returns {boolean} - True if link is valid, false otherwise
- */
-function validateMeetingLink(meetingLink, platform = 'jitsi') {
-  if (!meetingLink || typeof meetingLink !== 'string') {
-    return false;
-  }
-
-  const trimmedLink = meetingLink.trim();
-  
-  if (platform === 'jitsi') {
-    // Jitsi links: https://meet.jit.si/room-name
-    if (!trimmedLink.startsWith('https://meet.jit.si/')) {
-      return false;
-    }
-    const roomName = trimmedLink.replace('https://meet.jit.si/', '').split('?')[0].split('#')[0];
-    const validPattern = /^[a-z0-9_-]+$/i;
-    return validPattern.test(roomName) && roomName.length > 0;
-  } else if (platform === 'google_meet') {
-    // Google Meet links: https://meet.google.com/abc-defg-hij
-    if (!trimmedLink.startsWith('https://meet.google.com/')) {
-      return false;
-    }
-    const meetingCode = trimmedLink.replace('https://meet.google.com/', '').split('?')[0].split('#')[0];
-    const validPattern = /^[a-z0-9]{3}-[a-z0-9]{3,4}-[a-z0-9]{3}$/;
-    return validPattern.test(meetingCode);
-  }
-  
-  // For other platforms, just check it's a valid URL
-  try {
-    new URL(trimmedLink);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 🔒 GOOGLE MEET LINK VALIDATION (backward compatibility)
- * Now supports both Google Meet and Jitsi - auto-detects platform from URL
+ * 🔒 GOOGLE MEET LINK VALIDATION
+ * Validate that a Google Meet link has the correct format
+ * Valid format: https://meet.google.com/abc-defg-hij (3-4-3 lowercase letters/numbers)
  * @param {string} meetingLink - Meeting link to validate
  * @returns {boolean} - True if link is valid, false otherwise
  */
@@ -354,16 +314,29 @@ function validateGoogleMeetLink(meetingLink) {
   if (!meetingLink || typeof meetingLink !== 'string') {
     return false;
   }
+
+  const trimmedLink = meetingLink.trim();
   
-  // Auto-detect platform from URL
-  if (meetingLink.includes('meet.jit.si')) {
-    return validateMeetingLink(meetingLink, 'jitsi');
-  } else if (meetingLink.includes('meet.google.com')) {
-    return validateMeetingLink(meetingLink, 'google_meet');
+  // Must start with https://meet.google.com/
+  if (!trimmedLink.startsWith('https://meet.google.com/')) {
+    return false;
   }
+
+  // Extract the meeting code (part after the domain)
+  const meetingCode = trimmedLink.replace('https://meet.google.com/', '').split('?')[0].split('#')[0];
   
-  // Default: try Jitsi format (more lenient)
-  return validateMeetingLink(meetingLink, 'jitsi');
+  // Google Meet codes follow pattern: abc-defg-hij (3-4-3 alphanumeric, lowercase)
+  // Or sometimes: abc-def-ghi (3-3-3)
+  // Pattern: 3-4-3 or 3-3-3 lowercase alphanumeric characters separated by hyphens
+  const validPattern = /^[a-z0-9]{3}-[a-z0-9]{3,4}-[a-z0-9]{3}$/;
+  
+  if (!validPattern.test(meetingCode)) {
+    console.warn(`⚠️ Invalid Google Meet link format: ${meetingLink}`);
+    console.warn(`   Meeting code: "${meetingCode}" does not match pattern: abc-defg-hij or abc-def-ghi`);
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -404,6 +377,24 @@ async function validateMeetingLinkUniqueness(meetingLink, excludeMeetingId = nul
   }
   
   return true; // Link is unique
+}
+
+/**
+ * Validate manually provided meeting link (any external platform)
+ * @param {string} meetingLink
+ * @returns {boolean}
+ */
+function validateManualMeetingLink(meetingLink) {
+  if (!meetingLink || typeof meetingLink !== 'string') {
+    return false;
+  }
+
+  try {
+    const url = new URL(meetingLink.trim());
+    return ['http:', 'https:'].includes(url.protocol);
+  } catch (error) {
+    return false;
+  }
 }
 
 /**
@@ -450,9 +441,9 @@ async function createOrGetSession(options) {
     throw new Error('Meeting link is required to create a session. Cannot create session without a valid meeting link.');
   }
 
-  // Validate meeting link format (supports both Google Meet and Jitsi)
+  // Validate meeting link format (validateGoogleMeetLink is defined above in this file)
   if (!validateGoogleMeetLink(meetingLink)) {
-    throw new Error(`Invalid meeting link format: ${meetingLink}. Meeting link must be a valid meeting URL (Google Meet: https://meet.google.com/abc-defg-hij or Jitsi: https://meet.jit.si/room-name).`);
+    throw new Error(`Invalid meeting link format: ${meetingLink}. Meeting link must be a valid Google Meet URL (format: https://meet.google.com/abc-defg-hij).`);
   }
 
   // For group sessions, check if session with same groupSessionId and link exists
@@ -599,6 +590,7 @@ module.exports = {
   getExistingSingleMeetingLink,
   validateMeetingLinkUniqueness,
   validateGoogleMeetLink,
+  validateManualMeetingLink,
   findExistingGroupSession,
   createOrGetSession
 };

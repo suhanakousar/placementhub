@@ -12,7 +12,8 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
     topic: 'resume_review',
     description: '',
     notes: '',
-    meetingPlatform: 'google_meet',
+    meetingPlatform: 'external',
+    meetingLink: '',
     studentTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     mentorTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
   });
@@ -80,7 +81,11 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
   ];
 
   const platforms = [
-    { value: 'google_meet', label: 'Google Meet' }
+    { value: 'external', label: 'External Link' },
+    { value: 'google_meet', label: 'Google Meet' },
+    { value: 'microsoft_teams', label: 'Microsoft Teams' },
+    { value: 'zoom', label: 'Zoom' },
+    { value: 'other', label: 'Other' }
   ];
 
   useEffect(() => {
@@ -95,7 +100,8 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
           topic: initialData.topic || 'resume_review',
           description: initialData.description || '',
           notes: initialData.notes || '',
-          meetingPlatform: 'google_meet',
+          meetingPlatform: initialData.meetingPlatform || 'external',
+          meetingLink: initialData.meetingLink || '',
           studentTimezone: initialData.studentTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
           mentorTimezone: initialData.mentorTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone
         });
@@ -109,7 +115,8 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
           topic: 'resume_review',
           description: '',
           notes: '',
-          meetingPlatform: 'google_meet',
+          meetingPlatform: 'external',
+          meetingLink: '',
           studentTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           mentorTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         });
@@ -152,19 +159,39 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
 
     try {
       if (requestId) {
+        const trimmedLink = formData.meetingLink.trim();
+        if (!trimmedLink) {
+          toast.error('Meeting link is required');
+          setSubmitting(false);
+          return;
+        }
+        if (!/^https?:\/\//i.test(trimmedLink)) {
+          toast.error('Meeting link must start with http:// or https://');
+          setSubmitting(false);
+          return;
+        }
+
         // Approve request and create meeting
         await api.post(`/admin/meetings/requests/${requestId}/approve`, {
           startTime: new Date(formData.startTime).toISOString(),
           endTime: new Date(formData.endTime).toISOString(),
           meetingPlatform: formData.meetingPlatform,
+          meetingLink: trimmedLink,
           notes: formData.notes,
           message: 'Meeting approved and scheduled'
         });
         toast.success('Meeting request approved and meeting created');
       } else {
         // Validate required fields
-        if ((!formData.studentId && !applyToFilteredStudents) || !formData.startTime || !formData.endTime || !formData.title) {
+        if ((!formData.studentId && !applyToFilteredStudents) || !formData.startTime || !formData.endTime || !formData.title || !formData.meetingLink.trim()) {
           toast.error('Please fill in all required fields');
+          setSubmitting(false);
+          return;
+        }
+
+        const trimmedLink = formData.meetingLink.trim();
+        if (!/^https?:\/\//i.test(trimmedLink)) {
+          toast.error('Meeting link must start with http:// or https://');
           setSubmitting(false);
           return;
         }
@@ -200,6 +227,7 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
             description: formData.description,
             notes: formData.notes,
             meetingPlatform: formData.meetingPlatform,
+            meetingLink: trimmedLink,
             studentTimezone: formData.studentTimezone,
             mentorTimezone: formData.mentorTimezone
           });
@@ -215,6 +243,7 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
             description: formData.description,
             notes: formData.notes,
             meetingPlatform: formData.meetingPlatform,
+            meetingLink: trimmedLink,
             studentTimezone: formData.studentTimezone,
             mentorTimezone: formData.mentorTimezone
           };
@@ -439,13 +468,38 @@ const MeetingForm = ({ isOpen, onClose, onSuccess, initialData = null, requestId
                 <FaVideo className="inline mr-1" />
                 Meeting Platform
               </label>
-              <div className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white bg-gray-50 dark:bg-gray-800">
-                <span className="text-gray-700 dark:text-gray-300">Google Meet</span>
-              </div>
+              <select
+                value={formData.meetingPlatform}
+                onChange={(e) => setFormData({ ...formData, meetingPlatform: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              >
+                {platforms.map((platform) => (
+                  <option key={platform.value} value={platform.value}>
+                    {platform.label}
+                  </option>
+                ))}
+              </select>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                A real Google Meet meeting will be created automatically
+                Select the platform you used to generate the meeting link.
               </p>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Meeting Link (paste from your meeting provider) *
+            </label>
+            <input
+              type="url"
+              value={formData.meetingLink}
+              onChange={(e) => setFormData({ ...formData, meetingLink: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              placeholder="https://meet.google.com/abc-defg-hij or https://teams.microsoft.com/..."
+              required
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Create the meeting in your preferred platform (Google Meet, Teams, Zoom, etc.) and paste the link here. Everyone will be redirected to this link when they click Join.
+            </p>
           </div>
 
           <div>

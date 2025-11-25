@@ -8,11 +8,10 @@ const Reminder = require('../../models/Reminder');
 const Task = require('../../models/Task');
 const EmailLog = require('../../models/EmailLog');
 const { protect, authorize } = require('../../middleware/auth');
-const { checkMeetingConflicts, generateICSFile, generateMeetingLink, formatTimeInTimezone, getExistingGroupSessionLink, getExistingSingleMeetingLink, validateMeetingLinkUniqueness, validateGoogleMeetLink, findExistingGroupSession, createOrGetSession } = require('../../utils/meetingUtils');
+const { checkMeetingConflicts, generateICSFile, formatTimeInTimezone, validateManualMeetingLink, createOrGetSession } = require('../../utils/meetingUtils');
 const { sendEmail } = require('../../utils/emailService');
 const { createRemindersForMeeting } = require('../../utils/reminderUtils');
 const { createTasksFromFeedback } = require('../../utils/taskUtils');
-const { createRealMeeting } = require('../../services/meetingService');
 
 const router = express.Router();
 
@@ -203,7 +202,8 @@ router.post('/', async (req, res) => {
       notes,
       meetingPlatform,
       studentTimezone,
-      attachments
+      attachments,
+      meetingLink: providedMeetingLink
     } = req.body;
 
     // Validate required fields
@@ -262,80 +262,24 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Meeting time conflicts with existing meeting' });
     }
 
-    // Get student user email for meeting creation
-    const studentUser = await require('../../models/User').findById(student.userId);
-    
-    // 🔒 UNIFIED MEETING LINK POLICY: Check if meeting link already exists for this session
-    let meetingDetails = await getExistingSingleMeetingLink(
-      studentId,
-      admin._id,
-      startTime,
-      endTime
-    );
-    
-    let meetingLink = '';
-    
-    // If no existing link found, create a new one
-    if (!meetingDetails || !meetingDetails.meetingLink) {
-      console.log(`🔒 Creating NEW meeting link for single meeting (student: ${studentId}, mentor: ${admin._id})`);
-      try {
-        meetingDetails = await createRealMeeting('google_meet', {
-          title,
-          startTime,
-          endTime,
-          timezone: studentTimezone || 'UTC',
-          attendeeEmail: studentUser?.email
-        });
-        
-        // 🔒 Validate link format and uniqueness (safety check)
-        if (meetingDetails?.meetingLink) {
-          // First validate format
-          if (!validateGoogleMeetLink(meetingDetails.meetingLink)) {
-            console.error(`❌ CRITICAL: Invalid Google Meet link format received: ${meetingDetails.meetingLink}`);
-            return res.status(500).json({ 
-              message: 'Failed to create Google Meet meeting. Invalid link format received from Google Calendar API.',
-              error: 'Invalid meeting link format',
-              receivedLink: meetingDetails.meetingLink
-            });
-          }
-
-          // Then check uniqueness
-          const isUnique = await validateMeetingLinkUniqueness(meetingDetails.meetingLink);
-          if (!isUnique) {
-            console.warn(`⚠️ WARNING: Meeting link may be duplicate: ${meetingDetails.meetingLink}`);
-            // Still proceed, but log the warning
-          }
-        }
-        
-        meetingLink = meetingDetails.joinUrl || meetingDetails.meetingLink || '';
-        
-        if (!meetingLink) {
-          return res.status(500).json({ 
-            message: 'Failed to create Google Meet meeting. No meeting link was generated.',
-            error: 'Missing meeting link'
-          });
-        }
-
-        // Final validation before saving
-        if (!validateGoogleMeetLink(meetingLink)) {
-          console.error(`❌ CRITICAL: Invalid Google Meet link format before saving: ${meetingLink}`);
-          return res.status(500).json({ 
-            message: 'Failed to create Google Meet meeting. Invalid link format.',
-            error: 'Invalid meeting link format',
-            receivedLink: meetingLink
-          });
-        }
-      } catch (meetingError) {
-        console.error('Error creating Google Meet meeting:', meetingError);
-        return res.status(500).json({ 
-          message: 'Failed to create Google Meet meeting.',
-          error: meetingError.message
-        });
-      }
-    } else {
-      console.log(`✅ REUSING existing meeting link for single meeting (student: ${studentId}, mentor: ${admin._id})`);
-      meetingLink = meetingDetails.meetingLink;
+    // Validate manual meeting link
+    const manualMeetingLink = (providedMeetingLink || '').trim();
+    if (!manualMeetingLink) {
+      return res.status(400).json({
+        message: 'Meeting link is required. Please paste the link generated from your meeting platform (Google Meet, Teams, Zoom, etc.).'
+      });
     }
+    if (!validateManualMeetingLink(manualMeetingLink)) {
+      return res.status(400).json({
+        message: 'Invalid meeting link. Please provide a valid URL that starts with http:// or https://'
+      });
+    }
+    const meetingLink = manualMeetingLink;
+    const meetingPlatformValue = meetingPlatform || 'external';
+    console.log(`📎 Using admin-provided meeting link: ${meetingLink}`);
+
+    // Get student user email for notifications
+    const studentUser = await require('../../models/User').findById(student.userId);
 
     // Create meeting
     const meeting = await Meeting.create({
@@ -350,11 +294,11 @@ router.post('/', async (req, res) => {
       description,
       notes,
       meetingLink,
-      meetingPlatform: 'jitsi',  // Using Jitsi - no API setup required
-      meetingId: meetingDetails?.meetingId || null,
-      meetingPassword: meetingDetails?.password || null,
-      meetingDialIn: meetingDetails?.dialInNumber || null,
-      meetingStartUrl: meetingDetails?.startUrl || null,
+      meetingPlatform: meetingPlatformValue,
+      meetingId: null,
+      meetingPassword: null,
+      meetingDialIn: null,
+      meetingStartUrl: null,
       status: 'approved',
       createdBy: 'admin',
       attachments: attachments || []
@@ -379,13 +323,8 @@ router.post('/', async (req, res) => {
         startTime,
         endTime,
         meetingLink,
-        meetingPlatform: 'jitsi',  // Using Jitsi - no API setup required
-        meetingDetails: {
-          meetingId: meetingDetails?.meetingId || null,
-          password: meetingDetails?.password || null,
-          dialInNumber: meetingDetails?.dialInNumber || null,
-          startUrl: meetingDetails?.startUrl || null
-        },
+        meetingPlatform: meetingPlatformValue,
+        meetingDetails: {},
         participantUserIds,
         meetingId: meeting._id
       });
@@ -625,7 +564,7 @@ router.post('/bulk', async (req, res) => {
       topic,
       description,
       notes,
-      meetingPlatform = 'jitsi',  // Default to Jitsi - simpler, no API setup required
+      meetingPlatform = 'google_meet',
       studentTimezone,
       mentorTimezone,
       attachments = []
@@ -694,109 +633,26 @@ router.post('/bulk', async (req, res) => {
       return res.status(400).json({ message: 'Meeting time conflicts with existing meeting' });
     }
 
-    // 🔒 UNIFIED MEETING LINK POLICY: Check for existing group session with same criteria FIRST
-    // This prevents creating duplicate group sessions with different links
-    let meetingDetails = await findExistingGroupSession(admin._id, start, end, filters);
-    let groupSessionId;
-    
-    if (meetingDetails && meetingDetails.groupSessionId) {
-      // Found existing group session - reuse its link and session ID
-      groupSessionId = meetingDetails.groupSessionId;
-      console.log(`✅ Found existing group session: ${groupSessionId}`);
-      console.log(`   Reusing meeting link: ${meetingDetails.meetingLink}`);
-    } else {
-      // No existing group session found - create new one
-      groupSessionId = `group-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-      console.log(`🔒 Creating NEW group session: ${groupSessionId}`);
-      
-      // Check if a meeting link already exists for this new group session (shouldn't happen, but safety check)
-      meetingDetails = await getExistingGroupSessionLink(groupSessionId);
+    // Require manual meeting link input
+    const providedMeetingLink = (req.body.meetingLink || '').trim();
+    if (!providedMeetingLink) {
+      return res.status(400).json({
+        message: 'Meeting link is required. Please paste the link generated from your meeting platform (Google Meet, Teams, Zoom, etc.).'
+      });
     }
-    
-    // If no existing link found, create a new one
-    if (!meetingDetails || !meetingDetails.meetingLink) {
-      console.log(`🔒 Creating NEW meeting link for group session: ${groupSessionId}`);
-      const primaryStudentEmail = targetStudents[0]?.userId?.email || null;
-      try {
-        meetingDetails = await createRealMeeting(meetingPlatform, {
-          title,
-          description,
-          startTime,
-          endTime,
-          timezone: studentTimezone || 'UTC',
-          attendeeEmail: primaryStudentEmail
-        });
-        
-        // 🔒 Validate link format and uniqueness (safety check)
-        if (meetingDetails?.meetingLink) {
-          // First validate format
-          if (!validateGoogleMeetLink(meetingDetails.meetingLink)) {
-            console.error(`❌ CRITICAL: Invalid Google Meet link format received: ${meetingDetails.meetingLink}`);
-            return res.status(500).json({
-              message: 'Failed to create Google Meet meeting. Invalid link format received from Google Calendar API.',
-              error: 'Invalid meeting link format',
-              receivedLink: meetingDetails.meetingLink
-            });
-          }
-
-          // Then check uniqueness
-          const isUnique = await validateMeetingLinkUniqueness(meetingDetails.meetingLink);
-          if (!isUnique) {
-            console.warn(`⚠️ WARNING: Meeting link may be duplicate: ${meetingDetails.meetingLink}`);
-            // Still proceed, but log the warning
-          }
-        }
-      } catch (meetingError) {
-        console.error('❌ Error creating meeting link for bulk session:', meetingError);
-        console.error('Error details:', {
-          message: meetingError.message,
-          stack: meetingError.stack,
-          code: meetingError.code,
-          response: meetingError.response?.data
-        });
-        
-        // Provide more helpful error messages
-        let errorMessage = meetingError.message;
-        if (meetingError.message?.includes('Calendar API not configured')) {
-          errorMessage = 'Google Calendar API is not configured. Please add GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY, and GOOGLE_CALENDAR_ID environment variables in Render.';
-        } else if (meetingError.message?.includes('Permission') || meetingError.code === 403) {
-          errorMessage = 'Permission denied. Please ensure the calendar "placementhub722@gmail.com" is shared with the service account "placementhub@placmenthub.iam.gserviceaccount.com" with "Make changes to events" permission.';
-        } else if (meetingError.message?.includes('Invalid meeting link format')) {
-          errorMessage = 'Invalid meeting link format received from Google Calendar API. Please check your Google Calendar API configuration.';
-        }
-        
-        return res.status(500).json({
-          message: 'Failed to create meeting link',
-          error: errorMessage,
-          details: process.env.NODE_ENV === 'development' ? meetingError.stack : undefined
-        });
-      }
-    } else {
-      console.log(`✅ REUSING existing meeting link for group session: ${groupSessionId}`);
-      
-      // Validate existing link format
-      if (meetingDetails?.meetingLink && !validateGoogleMeetLink(meetingDetails.meetingLink)) {
-        console.error(`❌ CRITICAL: Invalid Google Meet link format in existing group session: ${meetingDetails.meetingLink}`);
-        return res.status(500).json({
-          message: 'Invalid meeting link format detected in existing group session. Please recreate the session.',
-          error: 'Invalid meeting link format',
-          receivedLink: meetingDetails.meetingLink
-        });
-      }
+    if (!validateManualMeetingLink(providedMeetingLink)) {
+      return res.status(400).json({
+        message: 'Invalid meeting link. Please provide a valid URL that starts with http:// or https://'
+      });
     }
+    const sharedMeetingLink = providedMeetingLink;
+    const meetingPlatformValue = meetingPlatform || 'external';
+    const groupSessionId = `group-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    console.log(`🔒 Creating NEW group session: ${groupSessionId}`);
+    console.log(`📎 Using admin-provided group meeting link: ${sharedMeetingLink}`);
 
     // 🔒 Create or get session for group meeting (ONE SESSION = ONE LINK)
     let session = null;
-    
-    // Validate meeting link exists before creating session
-    if (!meetingDetails || !meetingDetails.meetingLink) {
-      console.error('❌ CRITICAL: No meeting link available for session creation');
-      return res.status(500).json({
-        message: 'Failed to create meeting link. Cannot proceed with session creation.',
-        error: 'Missing meeting link'
-      });
-    }
-
     try {
       const participantUserIds = [];
       
@@ -819,14 +675,9 @@ router.post('/bulk', async (req, res) => {
         mentorId: admin._id,
         startTime: start,
         endTime: end,
-        meetingLink: meetingDetails.meetingLink,
-        meetingPlatform,
-        meetingDetails: {
-          meetingId: meetingDetails?.meetingId || null,
-          password: meetingDetails?.password || null,
-          dialInNumber: meetingDetails?.dialInNumber || null,
-          startUrl: meetingDetails?.startUrl || null
-        },
+        meetingLink: sharedMeetingLink,
+        meetingPlatform: meetingPlatformValue,
+        meetingDetails: {},
         participantUserIds,
         groupSessionId,
         groupFilters: {
@@ -854,7 +705,7 @@ router.post('/bulk', async (req, res) => {
     console.log(`\n📧 Creating group meeting for ${targetStudents.length} students`);
     console.log(`   Group Session ID: ${groupSessionId}`);
     console.log(`   Session ID: ${session?._id || 'N/A'}`);
-    console.log(`   Shared Meeting Link: ${meetingDetails?.meetingLink || 'N/A'}`);
+    console.log(`   Shared Meeting Link: ${sharedMeetingLink}`);
     console.log(`   Note: All students will receive SEPARATE emails with the SAME meeting link (correct for group sessions)\n`);
 
     for (const student of targetStudents) {
@@ -872,12 +723,12 @@ router.post('/bulk', async (req, res) => {
           topic,
           description,
           notes,
-          meetingLink: meetingDetails?.meetingLink || '',
-          meetingPlatform,
-          meetingId: meetingDetails?.meetingId || null,
-          meetingPassword: meetingDetails?.password || null,
-          meetingDialIn: meetingDetails?.dialInNumber || null,
-          meetingStartUrl: meetingDetails?.startUrl || null,
+          meetingLink: sharedMeetingLink,
+          meetingPlatform: meetingPlatformValue,
+          meetingId: null,
+          meetingPassword: null,
+          meetingDialIn: null,
+          meetingStartUrl: null,
           status: 'approved',
           createdBy: 'admin',
           attachments,
@@ -1139,7 +990,7 @@ router.post('/bulk', async (req, res) => {
         failedFor: emailResults.failed.map(f => ({ email: f.email, name: f.name, error: f.error }))
       },
       groupSessionId,
-      meetingLink: meetingDetails?.meetingLink || '',
+      meetingLink: sharedMeetingLink,
       note: 'All students in this group session share the same meeting link. Each student received a separate email with their personalized meeting details.'
     });
   } catch (error) {
@@ -1197,78 +1048,20 @@ router.post('/requests/:id/approve', async (req, res) => {
     // Get student user email for meeting creation
     const studentUser = await require('../../models/User').findById(request.studentId.userId);
 
-    // 🔒 UNIFIED MEETING LINK POLICY: Check if meeting link already exists for this session
-    let meetingDetails = await getExistingSingleMeetingLink(
-      request.studentId._id,
-      admin._id,
-      startTime,
-      endTime
-    );
-    
-    let meetingLink = '';
-    
-    // If no existing link found, create a new one
-    if (!meetingDetails || !meetingDetails.meetingLink) {
-      console.log(`🔒 Creating NEW meeting link for approved request (student: ${request.studentId._id}, mentor: ${admin._id})`);
-      try {
-        meetingDetails = await createRealMeeting('google_meet', {
-          title: request.title,
-          startTime,
-          endTime,
-          timezone: request.studentTimezone || 'UTC',
-          attendeeEmail: studentUser?.email,
-          description: request.description
-        });
-        
-        // 🔒 Validate link format and uniqueness (safety check)
-        if (meetingDetails?.meetingLink) {
-          // First validate format
-          if (!validateGoogleMeetLink(meetingDetails.meetingLink)) {
-            console.error(`❌ CRITICAL: Invalid Google Meet link format received: ${meetingDetails.meetingLink}`);
-            return res.status(500).json({ 
-              message: 'Failed to create Google Meet meeting. Invalid link format received from Google Calendar API.',
-              error: 'Invalid meeting link format',
-              receivedLink: meetingDetails.meetingLink
-            });
-          }
-
-          // Then check uniqueness
-          const isUnique = await validateMeetingLinkUniqueness(meetingDetails.meetingLink);
-          if (!isUnique) {
-            console.warn(`⚠️ WARNING: Meeting link may be duplicate: ${meetingDetails.meetingLink}`);
-            // Still proceed, but log the warning
-          }
-        }
-        
-        meetingLink = meetingDetails.joinUrl || meetingDetails.meetingLink || '';
-        
-        if (!meetingLink) {
-          return res.status(500).json({ 
-            message: 'Failed to create Google Meet meeting. No meeting link was generated.',
-            error: 'Missing meeting link'
-          });
-        }
-
-        // Final validation before saving
-        if (!validateGoogleMeetLink(meetingLink)) {
-          console.error(`❌ CRITICAL: Invalid Google Meet link format before saving: ${meetingLink}`);
-          return res.status(500).json({ 
-            message: 'Failed to create Google Meet meeting. Invalid link format.',
-            error: 'Invalid meeting link format',
-            receivedLink: meetingLink
-          });
-        }
-      } catch (meetingError) {
-        console.error('Error creating Google Meet meeting:', meetingError);
-        return res.status(500).json({ 
-          message: 'Failed to create Google Meet meeting.',
-          error: meetingError.message
-        });
-      }
-    } else {
-      console.log(`✅ REUSING existing meeting link for approved request (student: ${request.studentId._id}, mentor: ${admin._id})`);
-      meetingLink = meetingDetails.meetingLink;
+    const manualMeetingLink = (req.body.meetingLink || '').trim();
+    if (!manualMeetingLink) {
+      return res.status(400).json({
+        message: 'Meeting link is required. Please paste the link generated from your meeting platform (Google Meet, Teams, Zoom, etc.).'
+      });
     }
+    if (!validateManualMeetingLink(manualMeetingLink)) {
+      return res.status(400).json({
+        message: 'Invalid meeting link. Please provide a valid URL that starts with http:// or https://'
+      });
+    }
+    const meetingLink = manualMeetingLink;
+    const meetingPlatformValue = req.body.meetingPlatform || 'external';
+    console.log(`📎 Using admin-provided meeting link for approved request: ${meetingLink}`);
 
     // Create meeting
     const meeting = await Meeting.create({
@@ -1283,11 +1076,11 @@ router.post('/requests/:id/approve', async (req, res) => {
       description: request.description,
       notes: notes || request.additionalNotes,
       meetingLink,
-      meetingPlatform: 'jitsi',  // Using Jitsi - no API setup required
-      meetingId: meetingDetails?.meetingId || null,
-      meetingPassword: meetingDetails?.password || null,
-      meetingDialIn: meetingDetails?.dialInNumber || null,
-      meetingStartUrl: meetingDetails?.startUrl || null,
+      meetingPlatform: meetingPlatformValue,
+      meetingId: null,
+      meetingPassword: null,
+      meetingDialIn: null,
+      meetingStartUrl: null,
       status: 'approved',
       requestId: request._id,
       createdBy: 'admin',
@@ -1313,13 +1106,8 @@ router.post('/requests/:id/approve', async (req, res) => {
         startTime,
         endTime,
         meetingLink,
-        meetingPlatform: 'jitsi',  // Using Jitsi - no API setup required
-        meetingDetails: {
-          meetingId: meetingDetails?.meetingId || null,
-          password: meetingDetails?.password || null,
-          dialInNumber: meetingDetails?.dialInNumber || null,
-          startUrl: meetingDetails?.startUrl || null
-        },
+        meetingPlatform: meetingPlatformValue,
+        meetingDetails: {},
         participantUserIds,
         meetingId: meeting._id
       });

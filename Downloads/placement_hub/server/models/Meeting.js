@@ -59,8 +59,8 @@ const meetingSchema = new mongoose.Schema({
   },
   meetingPlatform: {
     type: String,
-    enum: ['google_meet', 'jitsi'],
-    default: 'jitsi'  // Changed default to Jitsi since it's simpler and works without API setup
+    enum: ['google_meet', 'microsoft_teams', 'zoom', 'external', 'other'],
+    default: 'external'
   },
   // Real meeting details
   meetingId: {

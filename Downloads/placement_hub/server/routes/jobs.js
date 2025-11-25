@@ -46,7 +46,7 @@ const upload = multer({
 // @route   POST /api/resume/upload
 // @desc    Upload and parse resume
 // @access  Private (Student)
-router.post('/resume/upload', authorize('student'), upload.single('resume'), async (req, res) => {
+router.post('/resume/upload', protect, authorize('student'), upload.single('resume'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
@@ -84,7 +84,7 @@ router.post('/resume/upload', authorize('student'), upload.single('resume'), asy
 // @route   GET /api/resume/analysis
 // @desc    Get resume analysis for current student
 // @access  Private (Student)
-router.get('/resume/analysis', authorize('student'), async (req, res) => {
+router.get('/resume/analysis', protect, authorize('student'), async (req, res) => {
   try {
     const student = await Student.findOne({ userId: req.user._id });
     if (!student) {
@@ -105,7 +105,7 @@ router.get('/resume/analysis', authorize('student'), async (req, res) => {
 // @route   POST /api/jobs/recommend
 // @desc    Get job recommendations based on resume
 // @access  Private (Student)
-router.post('/jobs/recommend', authorize('student'), async (req, res) => {
+router.post('/jobs/recommend', protect, authorize('student'), async (req, res) => {
   try {
     const { keywords, location, experienceLevel, jobType, page = 1, pageSize = 20 } = req.body;
 
@@ -168,7 +168,7 @@ router.post('/jobs/recommend', authorize('student'), async (req, res) => {
 // @route   POST /api/jobs/save
 // @desc    Save a job for later
 // @access  Private (Student)
-router.post('/jobs/save', authorize('student'), async (req, res) => {
+router.post('/jobs/save', protect, authorize('student'), async (req, res) => {
   try {
     const { jobId, title, company, location, url, type } = req.body;
 
@@ -215,7 +215,7 @@ router.post('/jobs/save', authorize('student'), async (req, res) => {
 // @route   DELETE /api/jobs/save/:jobId
 // @desc    Unsave a job
 // @access  Private (Student)
-router.delete('/jobs/save/:jobId', authorize('student'), async (req, res) => {
+router.delete('/jobs/save/:jobId', protect, authorize('student'), async (req, res) => {
   try {
     const student = await Student.findOne({ userId: req.user._id });
     if (!student) {
@@ -244,7 +244,7 @@ router.delete('/jobs/save/:jobId', authorize('student'), async (req, res) => {
 // @route   GET /api/jobs/saved
 // @desc    Get all saved jobs
 // @access  Private (Student)
-router.get('/jobs/saved', authorize('student'), async (req, res) => {
+router.get('/jobs/saved', protect, authorize('student'), async (req, res) => {
   try {
     const student = await Student.findOne({ userId: req.user._id });
     if (!student) {

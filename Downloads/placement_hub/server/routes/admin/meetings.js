@@ -272,8 +272,8 @@ router.post('/', async (req, res) => {
     if (!validateManualMeetingLink(manualMeetingLink)) {
       return res.status(400).json({
         message: 'Invalid meeting link. Please provide a valid URL that starts with http:// or https://'
-      });
-    }
+          });
+        }
     const meetingLink = manualMeetingLink;
     const meetingPlatformValue = meetingPlatform || 'external';
     console.log(`📎 Using admin-provided meeting link: ${meetingLink}`);
@@ -648,7 +648,7 @@ router.post('/bulk', async (req, res) => {
     const sharedMeetingLink = providedMeetingLink;
     const meetingPlatformValue = meetingPlatform || 'external';
     const groupSessionId = `group-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-    console.log(`🔒 Creating NEW group session: ${groupSessionId}`);
+      console.log(`🔒 Creating NEW group session: ${groupSessionId}`);
     console.log(`📎 Using admin-provided group meeting link: ${sharedMeetingLink}`);
 
     // 🔒 Create or get session for group meeting (ONE SESSION = ONE LINK)
@@ -670,7 +670,7 @@ router.post('/bulk', async (req, res) => {
 
       session = await createOrGetSession({
         type: 'group',
-        title,
+          title,
         description: description || '',
         mentorId: admin._id,
         startTime: start,
@@ -1057,8 +1057,8 @@ router.post('/requests/:id/approve', async (req, res) => {
     if (!validateManualMeetingLink(manualMeetingLink)) {
       return res.status(400).json({
         message: 'Invalid meeting link. Please provide a valid URL that starts with http:// or https://'
-      });
-    }
+          });
+        }
     const meetingLink = manualMeetingLink;
     const meetingPlatformValue = req.body.meetingPlatform || 'external';
     console.log(`📎 Using admin-provided meeting link for approved request: ${meetingLink}`);

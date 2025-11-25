@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { FaUsers, FaCheckCircle, FaTimesCircle, FaTrophy, FaBriefcase } from 'react-icons/fa';
+import { FaUsers, FaCheckCircle, FaTimesCircle, FaTrophy, FaBriefcase, FaUser } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import api from '../../utils/api';
 
 const DashboardHome = ({ stats: initialStats }) => {
   const [stats, setStats] = useState(initialStats || {});
   const [loading, setLoading] = useState(!initialStats);
+  const [students, setStudents] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(true);
 
   useEffect(() => {
     // Fetch stats immediately if not provided
@@ -16,8 +18,34 @@ const DashboardHome = ({ stats: initialStats }) => {
     // Set up polling every 30 seconds for real-time updates
     const interval = setInterval(fetchStats, 30000);
 
+    // Fetch students list
+    fetchStudents();
+
     return () => clearInterval(interval);
   }, []);
+
+  const fetchStudents = async () => {
+    try {
+      setStudentsLoading(true);
+      const response = await api.get('/students');
+      setStudents(response.data || []);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    } finally {
+      setStudentsLoading(false);
+    }
+  };
+
+  const handleStudentClick = (studentId) => {
+    const url = `/student-profile/${studentId}`;
+    window.open(url, '_blank');
+  };
+
+  const getInitials = (firstName, lastName) => {
+    const first = firstName?.charAt(0) || '';
+    const last = lastName?.charAt(0) || '';
+    return `${first}${last}`.toUpperCase() || 'U';
+  };
 
   const fetchStats = async () => {
     try {
@@ -172,6 +200,55 @@ const DashboardHome = ({ stats: initialStats }) => {
             <p className="text-gray-500 text-center py-4">No upcoming drives</p>
           )}
         </div>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">All Registered Students</h3>
+        {studentsLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          </div>
+        ) : students.length === 0 ? (
+          <p className="text-gray-500 text-center py-4">No students registered yet</p>
+        ) : (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {students.map((student) => {
+              const studentId = student._id || student.id;
+              const firstName = student.personalInfo?.firstName || '';
+              const lastName = student.personalInfo?.lastName || '';
+              const fullName = `${firstName} ${lastName}`.trim() || 'Unknown';
+              const rollNumber = student.academicInfo?.rollNumber || '';
+              const department = student.academicInfo?.department || '';
+              
+              return (
+                <div
+                  key={studentId}
+                  onClick={() => handleStudentClick(studentId)}
+                  onMouseDown={(e) => {
+                    if (e.button === 1) {
+                      e.preventDefault();
+                    }
+                  }}
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-600 dark:text-primary-300 font-semibold">
+                      {getInitials(firstName, lastName)}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-800 dark:text-white">{fullName}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {rollNumber && `${rollNumber} • `}
+                        {department}
+                      </p>
+                    </div>
+                  </div>
+                  <FaUser className="text-gray-400" />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

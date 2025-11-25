@@ -8,6 +8,7 @@ const RAPIDAPI_KEY =
   'f627be65a2mshfe6bd4a0cff94f1p16906fjsn66a6d43077ce';
 const RAPIDAPI_HOST =
   process.env.RAPIDAPI_HOST || 'competitive-coding-api.p.rapidapi.com';
+const LEETCODE_API_HOST = 'leetcodeapi.p.rapidapi.com';
 
 const platformCache = new Map();
 
@@ -325,6 +326,41 @@ function calculatePlatformScores(platforms = []) {
 
 async function fetchLeetCode(username) {
   if (!username) return null;
+  
+  // Try RapidAPI first, fallback to herokuapp if it fails
+  try {
+    const { data } = await axios.get(
+      `https://${LEETCODE_API_HOST}/${encodeURIComponent(username)}`,
+      {
+        timeout: 8000,
+        headers: {
+          'X-RapidAPI-Key': RAPIDAPI_KEY,
+          'X-RapidAPI-Host': LEETCODE_API_HOST
+        }
+      }
+    );
+
+    // Parse RapidAPI response
+    if (data) {
+      return {
+        platformId: 'leetcode',
+        username,
+        currentRating: data.rating ?? data.contestRating ?? data.contestRanking ?? null,
+        highestRating: data.highestRating ?? data.maxRating ?? data.rating ?? null,
+        totalContests: data.contestsAttended ?? data.totalContests ?? null,
+        solvedProblems: data.totalSolved ?? data.problemsSolved ?? null,
+        ratingChange: data.ratingChange ?? null,
+        points: (data.rating ?? 0) * 0.3 + (data.totalSolved ?? 0) * 2,
+        badges: data.badges || [],
+        lastActivity: data.lastActivity ? new Date(data.lastActivity) : null,
+        history: buildSparkline(data.rating || data.totalSolved || 1500)
+      };
+    }
+  } catch (rapidApiError) {
+    console.log(`RapidAPI LeetCode fetch failed, trying fallback: ${rapidApiError.message}`);
+  }
+
+  // Fallback to herokuapp API
   try {
     const { data } = await axios.get(
       `https://leetcode-stats-api.herokuapp.com/${encodeURIComponent(
@@ -345,7 +381,7 @@ async function fetchLeetCode(username) {
       totalContests: data.contestAttended ?? null,
       solvedProblems: data.totalSolved ?? null,
       ratingChange: data.contestRanking ?? null,
-      points: data.contributionPoints ?? null,
+      points: (data.contestRanking ?? 0) * 0.3 + (data.totalSolved ?? 0) * 2,
       badges: data.badges?.map((badge) => badge.displayName) || [],
       lastActivity: data.recentSubmissions?.[0]?.timestamp
         ? new Date(Number(data.recentSubmissions[0].timestamp) * 1000)
@@ -356,7 +392,7 @@ async function fetchLeetCode(username) {
     return {
       platformId: 'leetcode',
       username,
-      warning: error.message
+      warning: error.response?.data?.message || error.message
     };
   }
 }
@@ -587,7 +623,13 @@ async function fetchGitHub(username) {
 async function fetchCodingStats(handles = {}) {
   const entries = [];
   
-  // Only fetch LeetCode and HackerRank
+  // Fetch CodeChef, Codeforces, LeetCode, and HackerRank
+  if (handles.codechef) {
+    entries.push({ platformId: 'codechef', username: handles.codechef });
+  }
+  if (handles.codeforces) {
+    entries.push({ platformId: 'codeforces', username: handles.codeforces });
+  }
   if (handles.leetcode) {
     entries.push({ platformId: 'leetcode', username: handles.leetcode });
   }
@@ -597,6 +639,8 @@ async function fetchCodingStats(handles = {}) {
   
   if (entries.length === 0) {
     return {
+      codechef: null,
+      codeforces: null,
       leetcode: null,
       hackerrank: null
     };
@@ -605,14 +649,40 @@ async function fetchCodingStats(handles = {}) {
   const platforms = await fetchPlatforms(entries);
   
   const result = {
+    codechef: null,
+    codeforces: null,
     leetcode: null,
     hackerrank: null
   };
   
   platforms.forEach(platform => {
-    if (platform.platformId === 'leetcode') {
+    if (platform.platformId === 'codechef') {
+      result.codechef = {
+        contestRating: platform.currentRating,
+        highestRating: platform.highestRating,
+        contests: platform.totalContests || 0,
+        ratingChange: platform.ratingChange || 0,
+        ratingHistory: platform.history || [],
+        points: platform.points || 0,
+        warning: platform.warning || null
+      };
+    } else if (platform.platformId === 'codeforces') {
+      result.codeforces = {
+        contestRating: platform.currentRating,
+        highestRating: platform.highestRating,
+        contests: platform.totalContests || 0,
+        ratingChange: platform.ratingChange || 0,
+        ratingHistory: platform.history || [],
+        points: platform.points || 0,
+        warning: platform.warning || null
+      };
+    } else if (platform.platformId === 'leetcode') {
       result.leetcode = {
         contestRating: platform.currentRating,
+        highestRating: platform.highestRating,
+        contests: platform.totalContests || 0,
+        ratingChange: platform.ratingChange || 0,
+        ratingHistory: platform.history || [],
         problemsSolved: platform.solvedProblems,
         points: platform.points || (platform.solvedProblems ? platform.solvedProblems * 10 : 0),
         warning: platform.warning || null

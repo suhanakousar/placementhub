@@ -9,11 +9,18 @@
     "client": "cd client && npm start",
     "install-all": "npm install && cd server && npm install && cd ../client && npm install"
   },
-  "keywords": ["placement", "management", "tracking"],
+  "keywords": [
+    "placement",
+    "management",
+    "tracking"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "mammoth": "^1.11.0",
+    "pdf-parse": "^2.4.5"
   }
 }
-

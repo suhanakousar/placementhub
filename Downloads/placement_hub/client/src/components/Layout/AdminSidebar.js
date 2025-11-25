@@ -12,7 +12,8 @@ import {
   FaUserTie,
   FaTasks,
   FaCalendarCheck,
-  FaVideo
+  FaVideo,
+  FaTrophy
 } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -26,7 +27,8 @@ const adminMenuItems = [
   { path: '/admin/tasks', icon: FaTasks, label: 'Task Management' },
   { path: '/admin/reports', icon: FaChartBar, label: 'Reports & Analytics' },
   { path: '/admin/verification', icon: FaCheckCircle, label: 'Verification Center' },
-  { path: '/admin/notifications', icon: FaBell, label: 'Notifications' }
+  { path: '/admin/notifications', icon: FaBell, label: 'Notifications' },
+  { path: '/admin/leaderboard', icon: FaTrophy, label: 'Leaderboard', openInNewTab: true }
 ];
 
 const AdminSidebar = ({ isOpen, onClose }) => {
@@ -150,6 +152,34 @@ const AdminSidebar = ({ isOpen, onClose }) => {
             {adminMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
+              
+              if (item.openInNewTab) {
+                return (
+                  <a
+                    key={item.path}
+                    href={item.path}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.innerWidth < 1024) {
+                        setTimeout(() => {
+                          onClose();
+                        }, 100);
+                      }
+                    }}
+                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition relative z-50 ${
+                      isActive
+                        ? 'bg-primary-600 text-white'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <Icon className="text-lg flex-shrink-0" />
+                    <span className="font-medium">{item.label}</span>
+                  </a>
+                );
+              }
+              
               return (
                 <Link
                   key={item.path}

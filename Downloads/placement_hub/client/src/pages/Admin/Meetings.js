@@ -176,6 +176,7 @@ const Meetings = () => {
     );
   }
 
+  // Filter meetings first
   const filteredMeetings = meetings.filter(meeting => {
     if (viewMode === 'upcoming') {
       return new Date(meeting.startTime) > new Date() && meeting.status !== 'cancelled' && meeting.status !== 'completed';
@@ -188,6 +189,49 @@ const Meetings = () => {
     }
     return true;
   });
+
+  // Group meetings by groupSessionId for group sessions
+  const groupedMeetings = [];
+  const processedGroupSessionIds = new Set();
+  const individualMeetings = [];
+
+  filteredMeetings.forEach(meeting => {
+    // If it's a group meeting with a groupSessionId, group it
+    if (meeting.isGroupMeeting && meeting.groupSessionId) {
+      if (!processedGroupSessionIds.has(meeting.groupSessionId)) {
+        // Find all meetings with the same groupSessionId
+        const groupMeetings = filteredMeetings.filter(m => 
+          m.isGroupMeeting && m.groupSessionId === meeting.groupSessionId
+        );
+        
+        // Create a grouped meeting object
+        const groupedMeeting = {
+          ...meeting, // Use the first meeting as base
+          _id: `group-${meeting.groupSessionId}`, // Unique ID for the group
+          isGrouped: true,
+          participants: groupMeetings.map(m => ({
+            _id: m._id,
+            name: `${m.studentId?.personalInfo?.firstName || ''} ${m.studentId?.personalInfo?.lastName || ''}`.trim(),
+            studentId: m.studentId,
+            status: m.status
+          })),
+          participantCount: groupMeetings.length,
+          allMeetingIds: groupMeetings.map(m => m._id)
+        };
+        
+        groupedMeetings.push(groupedMeeting);
+        processedGroupSessionIds.add(meeting.groupSessionId);
+      }
+    } else {
+      // Individual meeting (not part of a group)
+      individualMeetings.push(meeting);
+    }
+  });
+
+  // Combine grouped and individual meetings, sorted by startTime
+  const displayMeetings = [...groupedMeetings, ...individualMeetings].sort((a, b) => 
+    new Date(a.startTime) - new Date(b.startTime)
+  );
 
   return (
     <div className="space-y-6">
@@ -402,20 +446,40 @@ const Meetings = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredMeetings.map(meeting => {
+                {displayMeetings.map(meeting => {
                   const badge = getStatusBadge(meeting.status);
                   const StatusIcon = badge.icon;
                   const localTime = formatTimeInTimezone(meeting.startTime, meeting.studentTimezone);
+                  const isGrouped = meeting.isGrouped || false;
                   
                   return (
                     <tr key={meeting._id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="py-3 px-4">
-                        <div className="flex items-center space-x-2">
-                          <FaUser className="text-gray-400" />
-                          <span className="text-gray-800 dark:text-white">
-                            {meeting.studentId?.personalInfo?.firstName} {meeting.studentId?.personalInfo?.lastName}
-                          </span>
-                        </div>
+                        {isGrouped ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <FaUser className="text-gray-400" />
+                              <span className="text-gray-800 dark:text-white font-medium">
+                                {meeting.participantCount} Participants
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400 pl-6">
+                              {meeting.participants.map((p, idx) => (
+                                <span key={p._id}>
+                                  {p.name || 'Unknown'}
+                                  {idx < meeting.participants.length - 1 && ', '}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <FaUser className="text-gray-400" />
+                            <span className="text-gray-800 dark:text-white">
+                              {meeting.studentId?.personalInfo?.firstName} {meeting.studentId?.personalInfo?.lastName}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         <div>
@@ -476,14 +540,38 @@ const Meetings = () => {
                           {meeting.status === 'confirmed' && new Date(meeting.startTime) <= new Date() && (
                             <>
                               <button
-                                onClick={() => handleMarkComplete(meeting._id)}
+                                onClick={() => {
+                                  if (isGrouped && meeting.allMeetingIds) {
+                                    // Mark all meetings in group as complete
+                                    Promise.all(meeting.allMeetingIds.map(id => 
+                                      api.post(`/admin/meetings/${id}/complete`).catch(err => console.error(err))
+                                    )).then(() => {
+                                      toast.success('All meetings in group marked as completed');
+                                      fetchMeetings();
+                                    });
+                                  } else {
+                                    handleMarkComplete(meeting._id);
+                                  }
+                                }}
                                 className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
                                 title="Mark Complete"
                               >
                                 <FaCheckCircle />
                               </button>
                               <button
-                                onClick={() => handleMarkNoShow(meeting._id)}
+                                onClick={() => {
+                                  if (isGrouped && meeting.allMeetingIds) {
+                                    // Mark all meetings in group as no-show
+                                    Promise.all(meeting.allMeetingIds.map(id => 
+                                      api.post(`/admin/meetings/${id}/no-show`).catch(err => console.error(err))
+                                    )).then(() => {
+                                      toast.success('All meetings in group marked as no-show');
+                                      fetchMeetings();
+                                    });
+                                  } else {
+                                    handleMarkNoShow(meeting._id);
+                                  }
+                                }}
                                 className="p-2 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded"
                                 title="Mark No-Show"
                               >
@@ -491,7 +579,7 @@ const Meetings = () => {
                               </button>
                             </>
                           )}
-                          {meeting.status === 'completed' && !meeting.feedbackId && (
+                          {meeting.status === 'completed' && !meeting.feedbackId && !isGrouped && (
                             <button
                               onClick={() => {
                                 setSelectedMeeting(meeting);
@@ -506,7 +594,19 @@ const Meetings = () => {
                           {meeting.status !== 'cancelled' && new Date(meeting.startTime) > new Date() && (
                             <>
                               <button
-                                onClick={() => handleCancelMeeting(meeting._id)}
+                                onClick={() => {
+                                  if (isGrouped && meeting.allMeetingIds) {
+                                    // Cancel all meetings in group
+                                    Promise.all(meeting.allMeetingIds.map(id => 
+                                      api.post(`/admin/meetings/${id}/cancel`, { reason: 'Group session cancelled' }).catch(err => console.error(err))
+                                    )).then(() => {
+                                      toast.success('Group session cancelled');
+                                      fetchMeetings();
+                                    });
+                                  } else {
+                                    handleCancelMeeting(meeting._id);
+                                  }
+                                }}
                                 className="p-2 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded"
                                 title="Cancel Meeting"
                               >
@@ -516,7 +616,19 @@ const Meetings = () => {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  openDeleteConfirm('meeting', meeting._id, meeting.title);
+                                  if (isGrouped && meeting.allMeetingIds) {
+                                    // Delete all meetings in group
+                                    if (window.confirm(`Are you sure you want to delete this group session with ${meeting.participantCount} participants? This will delete all ${meeting.participantCount} meetings.`)) {
+                                      Promise.all(meeting.allMeetingIds.map(id => 
+                                        api.delete(`/admin/meetings/${id}`).catch(err => console.error(err))
+                                      )).then(() => {
+                                        toast.success('Group session deleted');
+                                        fetchMeetings();
+                                      });
+                                    }
+                                  } else {
+                                    openDeleteConfirm('meeting', meeting._id, meeting.title);
+                                  }
                                 }}
                                 className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition cursor-pointer"
                                 title="Delete Meeting"
@@ -531,7 +643,19 @@ const Meetings = () => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                openDeleteConfirm('meeting', meeting._id, meeting.title);
+                                if (isGrouped && meeting.allMeetingIds) {
+                                  // Delete all meetings in group
+                                  if (window.confirm(`Are you sure you want to delete this cancelled group session with ${meeting.participantCount} participants? This will delete all ${meeting.participantCount} meetings.`)) {
+                                    Promise.all(meeting.allMeetingIds.map(id => 
+                                      api.delete(`/admin/meetings/${id}`).catch(err => console.error(err))
+                                    )).then(() => {
+                                      toast.success('Group session deleted');
+                                      fetchMeetings();
+                                    });
+                                  }
+                                } else {
+                                  openDeleteConfirm('meeting', meeting._id, meeting.title);
+                                }
                               }}
                               className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition cursor-pointer"
                               title="Delete Meeting"
@@ -547,7 +671,7 @@ const Meetings = () => {
                 })}
               </tbody>
             </table>
-            {filteredMeetings.length === 0 && (
+            {displayMeetings.length === 0 && (
               <div className="text-center py-12">
                 <FaCalendar className="mx-auto text-4xl text-gray-400 mb-4" />
                 <p className="text-gray-500 dark:text-gray-400">No meetings found</p>

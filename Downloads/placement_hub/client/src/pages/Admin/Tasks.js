@@ -404,24 +404,25 @@ const Tasks = () => {
       </div>
 
       {/* Tasks Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-200 dark:border-gray-700">
-              <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Student</th>
-              <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Task</th>
-              <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Priority</th>
-              <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Due Date</th>
-              <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Status</th>
-              <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Origin</th>
-              <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Submission</th>
-              <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.map(task => (
-              <tr key={task._id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                <td className="py-3 px-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-gray-700">
+                <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Student</th>
+                <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Task</th>
+                <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Priority</th>
+                <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Due Date</th>
+                <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Status</th>
+                <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Origin</th>
+                <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Submission</th>
+                <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.map(task => (
+                <tr key={task._id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <td className="py-3 px-4">
                   <div className="flex items-center space-x-2">
                     <FaUser className="text-gray-400" />
                     <span className="text-gray-800 dark:text-white">
@@ -516,11 +517,12 @@ const Tasks = () => {
                       <FaTrash />
                     </button>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {tasks.length === 0 && (
           <div className="text-center py-12">
             <FaTasks className="mx-auto text-4xl text-gray-400 mb-4" />
@@ -608,27 +610,89 @@ const Tasks = () => {
                       <span>Send task to all students matching these filters</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <input
-                        type="text"
-                        placeholder="Department (e.g., CSE)"
+                      <select
                         value={taskFilters.department}
                         onChange={(e) => setTaskFilters({ ...taskFilters, department: e.target.value })}
                         className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
-                      />
-                      <input
-                        type="number"
-                        placeholder="Passout year (e.g., 2026)"
+                      >
+                        <option value="">All Departments</option>
+                        <option value="CSE">Computer Science & Engineering</option>
+                        <option value="ECE">Electronics & Communication Engineering</option>
+                        <option value="EEE">Electrical & Electronics Engineering</option>
+                        <option value="ME">Mechanical Engineering</option>
+                        <option value="CE">Civil Engineering</option>
+                        <option value="IT">Information Technology</option>
+                        <option value="CSIT">Computer Science and Information Technology</option>
+                        <option value="AI">Artificial Intelligence & Data Science (AI & DS)</option>
+                        <option value="BT">Biotechnology</option>
+                      </select>
+
+                      <select
                         value={taskFilters.year}
                         onChange={(e) => setTaskFilters({ ...taskFilters, year: e.target.value })}
                         className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Specialization (optional)"
+                      >
+                        <option value="">All Passout Batches</option>
+                        <option value="2026">2026</option>
+                        <option value="2027">2027</option>
+                        <option value="2028">2028</option>
+                        <option value="2029">2029</option>
+                      </select>
+
+                      <select
                         value={taskFilters.specialization}
                         onChange={(e) => setTaskFilters({ ...taskFilters, specialization: e.target.value })}
                         className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
-                      />
+                      >
+                        <option value="">All Specializations</option>
+                        <option value="AGRI-BIOTECHNOLOGY">AGRI-BIOTECHNOLOGY</option>
+                        <option value="AI AND AUTONOMOUS SYSTEMS">AI AND AUTONOMOUS SYSTEMS</option>
+                        <option value="AI FOR COMPUTATIONAL INTELLIGENCE">AI FOR COMPUTATIONAL INTELLIGENCE</option>
+                        <option value="AI-DRIVEN EDGE ARCHITECTURES AND APPLICATIONS">AI-DRIVEN EDGE ARCHITECTURES AND APPLICATIONS</option>
+                        <option value="AI-DRIVEN LANGUAGE TECHNOLOGIES">AI-DRIVEN LANGUAGE TECHNOLOGIES</option>
+                        <option value="AUTOMOTIVE ELECTRONICS AND AUTOSAR">AUTOMOTIVE ELECTRONICS AND AUTOSAR</option>
+                        <option value="AUTOMOTIVE ENERGY ENGINEERING">AUTOMOTIVE ENERGY ENGINEERING</option>
+                        <option value="BIOINFORMATICS">BIOINFORMATICS</option>
+                        <option value="DATA COMMUNICATIONS">DATA COMMUNICATIONS</option>
+                        <option value="E-MOBILITY ENGINEERING">E-MOBILITY ENGINEERING</option>
+                        <option value="ELECTRICAL MACHINES">ELECTRICAL MACHINES</option>
+                        <option value="ENGINEERING DESIGN">ENGINEERING DESIGN</option>
+                        <option value="STRUCTURAL ENGINEERING">STRUCTURAL ENGINEERING</option>
+                        <option value="GEOTECHNICAL AND TRANSPORTATION ENGINEERING">GEOTECHNICAL AND TRANSPORTATION ENGINEERING</option>
+                        <option value="GREEN ENERGY TECHNOLOGIES">GREEN ENERGY TECHNOLOGIES</option>
+                        <option value="INDUSTRIAL AUTOMATION">INDUSTRIAL AUTOMATION</option>
+                        <option value="SMART GRID TECHNOLOGIES">SMART GRID TECHNOLOGIES</option>
+                        <option value="HEALTHCARE DATA ANALYTICS">HEALTHCARE DATA ANALYTICS</option>
+                        <option value="INDUSTRIAL BIOTECHNOLOGY">INDUSTRIAL BIOTECHNOLOGY</option>
+                        <option value="GENERATIVE AI & MACHINE LEARNING">GENERATIVE AI & MACHINE LEARNING</option>
+                        <option value="IOT ANALYTICS">IOT ANALYTICS</option>
+                        <option value="MEDICAL BIOTECHNOLOGY">MEDICAL BIOTECHNOLOGY</option>
+                        <option value="ROBOTICS AND AUTOMATION">ROBOTICS AND AUTOMATION</option>
+                        <option value="SMART MANUFACTURING">SMART MANUFACTURING</option>
+                        <option value="VERY LARGE-SCALE INTEGRATION">VERY LARGE-SCALE INTEGRATION</option>
+                        <option value="WATER RESOURCE AND ENVIRONMENTAL ENGINEERING">WATER RESOURCE AND ENVIRONMENTAL ENGINEERING</option>
+                        <option value="CONSTRUCTION TECHNOLOGY AND MANAGEMENT">CONSTRUCTION TECHNOLOGY AND MANAGEMENT</option>
+                        <option value="NANOTECHNOLOGY & OPTOELECTRONICS">NANOTECHNOLOGY & OPTOELECTRONICS</option>
+                        <option value="CLOUD AND EDGE COMPUTING">CLOUD AND EDGE COMPUTING</option>
+                        <option value="CLOUD INFRASTRUCTURE DESIGN AND ENGINEERING">CLOUD INFRASTRUCTURE DESIGN AND ENGINEERING</option>
+                        <option value="CLOUD NATIVE SECURITY">CLOUD NATIVE SECURITY</option>
+                        <option value="CLOUD NATIVE SOFTWARE ENGINEERING">CLOUD NATIVE SOFTWARE ENGINEERING</option>
+                        <option value="CLOUD-BASED SCIENTIFIC COMPUTING">CLOUD-BASED SCIENTIFIC COMPUTING</option>
+                        <option value="DATA ENGINEERING FOR AI">DATA ENGINEERING FOR AI</option>
+                        <option value="DATA SCIENCE AND BIG DATA ANALYTICS">DATA SCIENCE AND BIG DATA ANALYTICS</option>
+                        <option value="DISTRIBUTED LEDGER ANALYTICS">DISTRIBUTED LEDGER ANALYTICS</option>
+                        <option value="SOCIAL AND DIGITAL MEDIA ANALYTICS">SOCIAL AND DIGITAL MEDIA ANALYTICS</option>
+                        <option value="AI SYSTEMS FOR VISUAL INTELLIGENCE">AI SYSTEMS FOR VISUAL INTELLIGENCE</option>
+                        <option value="5G - 6G WIRELESS TECHNOLOGIES">5G - 6G WIRELESS TECHNOLOGIES</option>
+                        <option value="CROSS PLATFORM DEVELOPMENT FRAMEWORKS">CROSS PLATFORM DEVELOPMENT FRAMEWORKS</option>
+                        <option value="GAME DEVELOPMENT AND UX DESIGN">GAME DEVELOPMENT AND UX DESIGN</option>
+                        <option value="SPATIAL COMPUTING AND IMMERSIVE TECHNOLOGIES">SPATIAL COMPUTING AND IMMERSIVE TECHNOLOGIES</option>
+                        <option value="BLOCKCHAIN ENGINEERING FOR WEB3">BLOCKCHAIN ENGINEERING FOR WEB3</option>
+                        <option value="CYBER PHYSICAL SYSTEMS AND IOT">CYBER PHYSICAL SYSTEMS AND IOT</option>
+                        <option value="CYBER SECURITY AND BLOCKCHAIN TECHNOLOGY">CYBER SECURITY AND BLOCKCHAIN TECHNOLOGY</option>
+                        <option value="HARDWARE-SOFTWARE CO-DESIGN FOR SECURITY">HARDWARE-SOFTWARE CO-DESIGN FOR SECURITY</option>
+                        <option value="SOFTWARE MODELLING AND DEVOPS">SOFTWARE MODELLING AND DEVOPS</option>
+                      </select>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-300">
                       Leave a field empty to ignore that filter. Example: set only year=&quot;2026&quot; to assign to all 2026 batch students.

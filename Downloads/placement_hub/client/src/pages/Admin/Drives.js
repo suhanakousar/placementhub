@@ -163,7 +163,7 @@ const Drives = () => {
       </div>
 
       {showAddForm && (
-        <form onSubmit={handleSubmit} className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+        <form onSubmit={handleSubmit} className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg max-h-[80vh] overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -283,9 +283,9 @@ const Drives = () => {
 
             {studentSelectionMode === 'manual' && (
               <div className="mt-4 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-gray-600 dark:text-gray-300">
-                    Choose the specific students who should receive this drive.
+                    Filter and choose the specific students who should receive this drive.
                   </p>
                   <button
                     type="button"
@@ -294,6 +294,93 @@ const Drives = () => {
                   >
                     {studentsLoading ? 'Loading…' : 'Load / Refresh students'}
                   </button>
+                </div>
+
+                {/* Same style filters as Tasks/Students page */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <select
+                    value={filters.department}
+                    onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
+                  >
+                    <option value="">All Departments</option>
+                    <option value="CSE">Computer Science & Engineering</option>
+                    <option value="ECE">Electronics & Communication Engineering</option>
+                    <option value="EEE">Electrical & Electronics Engineering</option>
+                    <option value="ME">Mechanical Engineering</option>
+                    <option value="CE">Civil Engineering</option>
+                    <option value="IT">Information Technology</option>
+                    <option value="CSIT">Computer Science and Information Technology</option>
+                    <option value="AI">Artificial Intelligence & Data Science (AI & DS)</option>
+                    <option value="BT">Biotechnology</option>
+                  </select>
+
+                  <select
+                    value={filters.year}
+                    onChange={(e) => setFilters({ ...filters, year: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
+                  >
+                    <option value="">All Passout Batches</option>
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                    <option value="2028">2028</option>
+                    <option value="2029">2029</option>
+                  </select>
+
+                  <select
+                    value={filters.specialization}
+                    onChange={(e) => setFilters({ ...filters, specialization: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
+                  >
+                    <option value="">All Specializations</option>
+                    <option value="AGRI-BIOTECHNOLOGY">AGRI-BIOTECHNOLOGY</option>
+                    <option value="AI AND AUTONOMOUS SYSTEMS">AI AND AUTONOMOUS SYSTEMS</option>
+                    <option value="AI FOR COMPUTATIONAL INTELLIGENCE">AI FOR COMPUTATIONAL INTELLIGENCE</option>
+                    <option value="AI-DRIVEN EDGE ARCHITECTURES AND APPLICATIONS">AI-DRIVEN EDGE ARCHITECTURES AND APPLICATIONS</option>
+                    <option value="AI-DRIVEN LANGUAGE TECHNOLOGIES">AI-DRIVEN LANGUAGE TECHNOLOGIES</option>
+                    <option value="AUTOMOTIVE ELECTRONICS AND AUTOSAR">AUTOMOTIVE ELECTRONICS AND AUTOSAR</option>
+                    <option value="AUTOMOTIVE ENERGY ENGINEERING">AUTOMOTIVE ENERGY ENGINEERING</option>
+                    <option value="BIOINFORMATICS">BIOINFORMATICS</option>
+                    <option value="DATA COMMUNICATIONS">DATA COMMUNICATIONS</option>
+                    <option value="E-MOBILITY ENGINEERING">E-MOBILITY ENGINEERING</option>
+                    <option value="ELECTRICAL MACHINES">ELECTRICAL MACHINES</option>
+                    <option value="ENGINEERING DESIGN">ENGINEERING DESIGN</option>
+                    <option value="STRUCTURAL ENGINEERING">STRUCTURAL ENGINEERING</option>
+                    <option value="GEOTECHNICAL AND TRANSPORTATION ENGINEERING">GEOTECHNICAL AND TRANSPORTATION ENGINEERING</option>
+                    <option value="GREEN ENERGY TECHNOLOGIES">GREEN ENERGY TECHNOLOGIES</option>
+                    <option value="INDUSTRIAL AUTOMATION">INDUSTRIAL AUTOMATION</option>
+                    <option value="SMART GRID TECHNOLOGIES">SMART GRID TECHNOLOGIES</option>
+                    <option value="HEALTHCARE DATA ANALYTICS">HEALTHCARE DATA ANALYTICS</option>
+                    <option value="INDUSTRIAL BIOTECHNOLOGY">INDUSTRIAL BIOTECHNOLOGY</option>
+                    <option value="GENERATIVE AI & MACHINE LEARNING">GENERATIVE AI & MACHINE LEARNING</option>
+                    <option value="IOT ANALYTICS">IOT ANALYTICS</option>
+                    <option value="MEDICAL BIOTECHNOLOGY">MEDICAL BIOTECHNOLOGY</option>
+                    <option value="ROBOTICS AND AUTOMATION">ROBOTICS AND AUTOMATION</option>
+                    <option value="SMART MANUFACTURING">SMART MANUFACTURING</option>
+                    <option value="VERY LARGE-SCALE INTEGRATION">VERY LARGE-SCALE INTEGRATION</option>
+                    <option value="WATER RESOURCE AND ENVIRONMENTAL ENGINEERING">WATER RESOURCE AND ENVIRONMENTAL ENGINEERING</option>
+                    <option value="CONSTRUCTION TECHNOLOGY AND MANAGEMENT">CONSTRUCTION TECHNOLOGY AND MANAGEMENT</option>
+                    <option value="NANOTECHNOLOGY & OPTOELECTRONICS">NANOTECHNOLOGY & OPTOELECTRONICS</option>
+                    <option value="CLOUD AND EDGE COMPUTING">CLOUD AND EDGE COMPUTING</option>
+                    <option value="CLOUD INFRASTRUCTURE DESIGN AND ENGINEERING">CLOUD INFRASTRUCTURE DESIGN AND ENGINEERING</option>
+                    <option value="CLOUD NATIVE SECURITY">CLOUD NATIVE SECURITY</option>
+                    <option value="CLOUD NATIVE SOFTWARE ENGINEERING">CLOUD NATIVE SOFTWARE ENGINEERING</option>
+                    <option value="CLOUD-BASED SCIENTIFIC COMPUTING">CLOUD-BASED SCIENTIFIC COMPUTING</option>
+                    <option value="DATA ENGINEERING FOR AI">DATA ENGINEERING FOR AI</option>
+                    <option value="DATA SCIENCE AND BIG DATA ANALYTICS">DATA SCIENCE AND BIG DATA ANALYTICS</option>
+                    <option value="DISTRIBUTED LEDGER ANALYTICS">DISTRIBUTED LEDGER ANALYTICS</option>
+                    <option value="SOCIAL AND DIGITAL MEDIA ANALYTICS">SOCIAL AND DIGITAL MEDIA ANALYTICS</option>
+                    <option value="AI SYSTEMS FOR VISUAL INTELLIGENCE">AI SYSTEMS FOR VISUAL INTELLIGENCE</option>
+                    <option value="5G - 6G WIRELESS TECHNOLOGIES">5G - 6G WIRELESS TECHNOLOGIES</option>
+                    <option value="CROSS PLATFORM DEVELOPMENT FRAMEWORKS">CROSS PLATFORM DEVELOPMENT FRAMEWORKS</option>
+                    <option value="GAME DEVELOPMENT AND UX DESIGN">GAME DEVELOPMENT AND UX DESIGN</option>
+                    <option value="SPATIAL COMPUTING AND IMMERSIVE TECHNOLOGIES">SPATIAL COMPUTING AND IMMERSIVE TECHNOLOGIES</option>
+                    <option value="BLOCKCHAIN ENGINEERING FOR WEB3">BLOCKCHAIN ENGINEERING FOR WEB3</option>
+                    <option value="CYBER PHYSICAL SYSTEMS AND IOT">CYBER PHYSICAL SYSTEMS AND IOT</option>
+                    <option value="CYBER SECURITY AND BLOCKCHAIN TECHNOLOGY">CYBER SECURITY AND BLOCKCHAIN TECHNOLOGY</option>
+                    <option value="HARDWARE-SOFTWARE CO-DESIGN FOR SECURITY">HARDWARE-SOFTWARE CO-DESIGN FOR SECURITY</option>
+                    <option value="SOFTWARE MODELLING AND DEVOPS">SOFTWARE MODELLING AND DEVOPS</option>
+                  </select>
                 </div>
 
                 {studentsLoading ? (
@@ -307,35 +394,46 @@ const Drives = () => {
                         No students loaded. Click &quot;Load / Refresh students&quot; to fetch the list.
                       </p>
                     ) : (
-                      students.map((student) => {
-                        const name = `${student.personalInfo?.firstName || ''} ${student.personalInfo?.lastName || ''}`.trim() || 'Unnamed';
-                        const roll = student.academicInfo?.rollNumber || 'N/A';
-                        const dept = student.academicInfo?.department || 'N/A';
-                        const isChecked = selectedStudentIds.includes(student._id);
-                        return (
-                          <label
-                            key={student._id}
-                            className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-xs"
-                          >
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => toggleStudentSelected(student._id)}
-                                className="text-primary-600 focus:ring-primary-500"
-                              />
-                              <div>
-                                <p className="text-gray-800 dark:text-gray-100 font-medium">
-                                  {name} <span className="text-gray-500 dark:text-gray-400 font-normal">({roll})</span>
-                                </p>
-                                <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  Dept: {dept}
-                                </p>
+                      students
+                        .filter((student) => {
+                          const dept = student.academicInfo?.department || '';
+                          const year = student.academicInfo?.year ? String(student.academicInfo.year) : '';
+                          const spec = student.academicInfo?.specialization || '';
+
+                          if (filters.department && dept !== filters.department) return false;
+                          if (filters.year && String(year) !== String(filters.year)) return false;
+                          if (filters.specialization && spec !== filters.specialization) return false;
+                          return true;
+                        })
+                        .map((student) => {
+                          const name = `${student.personalInfo?.firstName || ''} ${student.personalInfo?.lastName || ''}`.trim() || 'Unnamed';
+                          const roll = student.academicInfo?.rollNumber || 'N/A';
+                          const dept = student.academicInfo?.department || 'N/A';
+                          const isChecked = selectedStudentIds.includes(student._id);
+                          return (
+                            <label
+                              key={student._id}
+                              className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-xs"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleStudentSelected(student._id)}
+                                  className="text-primary-600 focus:ring-primary-500"
+                                />
+                                <div>
+                                  <p className="text-gray-800 dark:text-gray-100 font-medium">
+                                    {name} <span className="text-gray-500 dark:text-gray-400 font-normal">({roll})</span>
+                                  </p>
+                                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                    Dept: {dept}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          </label>
-                        );
-                      })
+                            </label>
+                          );
+                        })
                     )}
                   </div>
                 )}

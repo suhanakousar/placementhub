@@ -534,8 +534,8 @@ const Tasks = () => {
       {/* Create Task Form Modal */}
       {showCreateForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6">
-            <div className="flex justify-between items-center mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center px-6 pt-6 pb-3 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-xl font-bold text-gray-800 dark:text-white">Create New Task</h3>
               <button
                 onClick={() => setShowCreateForm(false)}
@@ -544,7 +544,7 @@ const Tasks = () => {
                 <FaTimes className="text-xl" />
               </button>
             </div>
-            <form onSubmit={handleCreateTask} className="space-y-4">
+            <form onSubmit={handleCreateTask} className="space-y-4 px-6 py-4 overflow-y-auto">
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Assign To
@@ -800,7 +800,7 @@ const Tasks = () => {
                   />
                 </div>
               </div>
-              <div className="flex space-x-3">
+              <div className="flex space-x-3 pt-2 pb-4">
                 <button
                   type="submit"
                   className="flex-1 px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"

@@ -36,6 +36,11 @@ const Drives = () => {
   const [students, setStudents] = useState([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
+  const [selectionFilters, setSelectionFilters] = useState({
+    department: '',
+    year: '',
+    specialization: ''
+  });
 
   useEffect(() => {
     fetchDrives();
@@ -299,8 +304,8 @@ const Drives = () => {
                 {/* Same style filters as Tasks/Students page */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <select
-                    value={filters.department}
-                    onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+                    value={selectionFilters.department}
+                    onChange={(e) => setSelectionFilters({ ...selectionFilters, department: e.target.value })}
                     className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
                   >
                     <option value="">All Departments</option>
@@ -316,8 +321,8 @@ const Drives = () => {
                   </select>
 
                   <select
-                    value={filters.year}
-                    onChange={(e) => setFilters({ ...filters, year: e.target.value })}
+                    value={selectionFilters.year}
+                    onChange={(e) => setSelectionFilters({ ...selectionFilters, year: e.target.value })}
                     className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
                   >
                     <option value="">All Passout Batches</option>
@@ -328,8 +333,8 @@ const Drives = () => {
                   </select>
 
                   <select
-                    value={filters.specialization}
-                    onChange={(e) => setFilters({ ...filters, specialization: e.target.value })}
+                    value={selectionFilters.specialization}
+                    onChange={(e) => setSelectionFilters({ ...selectionFilters, specialization: e.target.value })}
                     className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
                   >
                     <option value="">All Specializations</option>
@@ -400,9 +405,9 @@ const Drives = () => {
                           const year = student.academicInfo?.year ? String(student.academicInfo.year) : '';
                           const spec = student.academicInfo?.specialization || '';
 
-                          if (filters.department && dept !== filters.department) return false;
-                          if (filters.year && String(year) !== String(filters.year)) return false;
-                          if (filters.specialization && spec !== filters.specialization) return false;
+                          if (selectionFilters.department && dept !== selectionFilters.department) return false;
+                          if (selectionFilters.year && String(year) !== String(selectionFilters.year)) return false;
+                          if (selectionFilters.specialization && spec !== selectionFilters.specialization) return false;
                           return true;
                         })
                         .map((student) => {

@@ -588,7 +588,7 @@ const sendEmail = async ({ to, subject, html, text, fromEmail, fromName = 'Place
         // Fall through to SMTP only in development
       }
     }
-    
+
     // Fall back to SMTP
     console.log('Attempting to send via SMTP...');
     if (!process.env.SMTP_HOST) {

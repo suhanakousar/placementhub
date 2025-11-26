@@ -15,7 +15,17 @@ router.use(protect);
 // @access  Private
 router.get('/', async (req, res) => {
   try {
-    const drives = await PlacementDrive.find().populate('createdBy', 'personalInfo').sort({ createdAt: -1 });
+    const drives = await PlacementDrive.find()
+      .populate('createdBy', 'personalInfo')
+      .populate({
+        path: 'applications.studentId',
+        select: 'personalInfo academicInfo placementStatus userId',
+        populate: {
+          path: 'userId',
+          select: 'email'
+        }
+      })
+      .sort({ createdAt: -1 });
     res.json(drives);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

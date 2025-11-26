@@ -3,7 +3,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const Student = require('../models/Student');
-const LeaderboardProfile = require('../models/LeaderboardProfile');
 const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 const { fetchCodingStats } = require('../services/codingPlatformService');
@@ -31,70 +30,6 @@ const upload = multer({
   storage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit
-  }
-});
-
-// ==================== PUBLIC LEADERBOARD ROUTES ====================
-
-// @route   GET /api/students/leaderboard
-// @desc    Get ranked list of all students with overall scores
-// @access  Public
-router.get('/leaderboard', async (req, res) => {
-  try {
-    const students = await Student.find()
-      .select('personalInfo academicInfo userId')
-      .populate('userId', 'email')
-      .lean();
-
-    const userIds = students.map((s) => s.userId?._id || s.userId);
-    const leaderboardProfiles = await LeaderboardProfile.find({
-      userId: { $in: userIds }
-    }).lean();
-
-    const profileMap = new Map();
-    leaderboardProfiles.forEach((profile) => {
-      profileMap.set(profile.userId.toString(), profile);
-    });
-
-    const studentsWithScores = students.map((student) => {
-      const userId = student.userId?._id || student.userId;
-      const profile = profileMap.get(userId?.toString());
-
-      let overallScore = 0;
-      if (profile?.metadata?.codingStats) {
-        overallScore = calculateOverallScore(profile.metadata.codingStats);
-      } else if (profile?.points?.total) {
-        overallScore = profile.points.total;
-      }
-
-      return {
-        studentId: student._id.toString(),
-        username:
-          `${student.personalInfo?.firstName || ''} ${
-            student.personalInfo?.lastName || ''
-          }`.trim() || student.userId?.email || 'Unknown',
-        email: student.userId?.email || '',
-        rollNumber: student.academicInfo?.rollNumber || '',
-        department: student.academicInfo?.department || '',
-        overallScore,
-        avatarUrl: student.personalInfo?.profilePhoto || profile?.avatarUrl || null
-      };
-    });
-
-    studentsWithScores.sort((a, b) => b.overallScore - a.overallScore);
-
-    const rankedStudents = studentsWithScores.map((student, index) => ({
-      ...student,
-      rank: index + 1,
-      rankChange: null
-    }));
-
-    res.json({
-      students: rankedStudents
-    });
-  } catch (error) {
-    console.error('Error fetching leaderboard:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
@@ -776,128 +711,6 @@ function calculateOverallScore(codingStats) {
   
   return Math.round(score);
 }
-
-// @route   GET /api/students/leaderboard
-// @desc    Get ranked list of all students with overall scores
-// @access  Public (for now, can be restricted later)
-router.get('/leaderboard', async (req, res) => {
-  try {
-    // Get all students
-    const students = await Student.find()
-      .select('personalInfo academicInfo userId')
-      .populate('userId', 'email')
-      .lean();
-
-    // Get all leaderboard profiles for these users
-    const userIds = students.map(s => s.userId?._id || s.userId);
-    const leaderboardProfiles = await LeaderboardProfile.find({
-      userId: { $in: userIds }
-    }).lean();
-
-    // Create a map for quick lookup
-    const profileMap = new Map();
-    leaderboardProfiles.forEach(profile => {
-      profileMap.set(profile.userId.toString(), profile);
-    });
-
-    // Calculate scores for each student using cached data or calculate on the fly
-    const studentsWithScores = students.map((student) => {
-      const userId = student.userId?._id || student.userId;
-      const profile = profileMap.get(userId?.toString());
-      
-      // Use cached coding stats from leaderboard profile if available
-      let overallScore = 0;
-      if (profile?.metadata?.codingStats) {
-        overallScore = calculateOverallScore(profile.metadata.codingStats);
-      } else if (profile?.points?.total) {
-        // Fallback to total points if coding stats not available
-        overallScore = profile.points.total;
-      } else {
-        // If no cached data, calculate from handles (but don't fetch - too slow)
-        // Just return 0 for now, can be synced later
-        overallScore = 0;
-      }
-
-      return {
-        studentId: student._id.toString(),
-        username: `${student.personalInfo?.firstName || ''} ${student.personalInfo?.lastName || ''}`.trim() || student.userId?.email || 'Unknown',
-        email: student.userId?.email || '',
-        rollNumber: student.academicInfo?.rollNumber || '',
-        department: student.academicInfo?.department || '',
-        overallScore: overallScore,
-        avatarUrl: student.personalInfo?.profilePhoto || profile?.avatarUrl || null
-      };
-    });
-
-    // Sort by overall score descending and assign ranks
-    studentsWithScores.sort((a, b) => b.overallScore - a.overallScore);
-    
-    const rankedStudents = studentsWithScores.map((student, index) => ({
-      ...student,
-      rank: index + 1,
-      rankChange: null // Can be calculated later with historical data
-    }));
-
-    res.json({
-      students: rankedStudents
-    });
-  } catch (error) {
-    console.error('Error fetching leaderboard:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// @route   GET /api/students/:studentId/coding-stats
-// @desc    Get coding platform statistics for a specific student (public view)
-// @access  Public
-router.get('/:studentId/coding-stats', async (req, res) => {
-  try {
-    const student = await Student.findById(req.params.studentId);
-    if (!student) {
-      return res.status(404).json({ message: 'Student profile not found' });
-    }
-
-    // Extract handles from personalInfo - only LeetCode and HackerRank
-    const handles = {
-      leetcode: student.personalInfo?.leetcode ? extractUsername(student.personalInfo.leetcode, 'leetcode') : null,
-      hackerrank: student.personalInfo?.hackerrank ? extractUsername(student.personalInfo.hackerrank, 'hackerrank') : null
-    };
-
-    // Fetch real coding stats (only LeetCode and HackerRank)
-    const codingStats = await fetchCodingStats(handles);
-
-    // Calculate overall score from real data only
-    const overallScore = calculateOverallScore(codingStats);
-
-    // Generate score distribution from real data only
-    const scoreDistribution = [
-      { name: 'LeetCode', value: codingStats.leetcode?.points || 0, color: '#f89f1b' },
-      { name: 'HackerRank', value: codingStats.hackerrank?.points || 0, color: '#16a34a' }
-    ].filter(item => item.value > 0);
-
-    // Get student info for the profile
-    const studentInfo = {
-      firstName: student.personalInfo?.firstName || '',
-      lastName: student.personalInfo?.lastName || '',
-      department: student.academicInfo?.department || '',
-      year: student.academicInfo?.year || null,
-      rollNumber: student.academicInfo?.rollNumber || '',
-      profilePhoto: student.personalInfo?.profilePhoto || null
-    };
-
-    res.json({
-      studentInfo,
-      codingStats,
-      overallScore,
-      globalRank: null, // No mock rank
-      globalRankingsHistory: [], // No mock history
-      scoreDistribution
-    });
-  } catch (error) {
-    console.error('Error fetching student coding stats:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
 
 module.exports = router;
 

@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
-const { scheduleLeaderboardJob } = require('./jobs/recalculateLeaderboard');
 const { scheduleMeetingJobs } = require('./jobs/meetingReminders');
 
 dotenv.config();
@@ -70,7 +69,6 @@ mongoose
   .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/placement_hub')
   .then(() => {
     console.log('MongoDB Connected');
-    scheduleLeaderboardJob();
     scheduleMeetingJobs();
   })
 .catch(err => console.error('MongoDB connection error:', err));
@@ -84,9 +82,6 @@ app.use('/api/drives', require('./routes/drives'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/support', require('./routes/support'));
 app.use('/api/analytics', require('./routes/analytics'));
-app.use('/api/leaderboard', require('./routes/leaderboard'));
-app.use('/api/users', require('./routes/leaderboardUsers'));
-app.use('/api/leaderboard-public', require('./routes/leaderboardPublic'));
 app.use('/api/meetings', require('./routes/meetings'));
 app.use('/api/sessions', require('./routes/sessions'));
 app.use('/api/tasks', require('./routes/tasks'));

@@ -1,12 +1,3 @@
-## Leaderboard + User Profile System
-
-This project implements a SmartInterviews-style leaderboard and user profile system with:
-
-- **Frontend (`client/`)**: React + TailwindCSS `Leaderboard` UI (highlighted profile + leaderboard list, filters, search, pagination) now available at `client/src/pages/LeaderboardPage.js`.
-- **Backend (`server/`)**: Node.js + Express + MongoDB endpoints (`/api/leaderboard`, `/api/users/:id/profile`, `/api/leaderboard/score`) plus caching and a scheduled rank recalculation job.
-
-Use `cd server && npm install` / `cd client && npm install` to work with the respective stacks.
-
 # Placement Hub
 
 A comprehensive web application for managing campus placements with modern UI/UX, serving three main user roles: Admin, Student, and Recruiter.

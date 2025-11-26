@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaPlus, FaChevronDown, FaChevronUp, FaFilter, FaUserCheck } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
+
+const APPLICANT_FILTERS = [
+  { value: 'selected', label: 'Selected applicants' },
+  { value: 'all', label: 'All applicants' },
+  { value: 'shortlisted', label: 'Shortlisted' },
+  { value: 'interviewed', label: 'Interviewed' },
+  { value: 'applied', label: 'Applied only' },
+  { value: 'rejected', label: 'Rejected' }
+];
 
 const Drives = () => {
   const [drives, setDrives] = useState([]);
@@ -21,6 +30,8 @@ const Drives = () => {
     driveDate: ''
   });
   const [loading, setLoading] = useState(true);
+  const [expandedDriveId, setExpandedDriveId] = useState(null);
+  const [applicationFilters, setApplicationFilters] = useState({});
 
   useEffect(() => {
     fetchDrives();
@@ -60,6 +71,45 @@ const Drives = () => {
       fetchDrives();
     } catch (error) {
       toast.error('Failed to create placement drive');
+    }
+  };
+
+  const toggleDriveExpansion = (driveId) => {
+    setExpandedDriveId((prev) => (prev === driveId ? null : driveId));
+    setApplicationFilters((prev) => {
+      if (prev[driveId]) {
+        return prev;
+      }
+      return { ...prev, [driveId]: 'selected' };
+    });
+  };
+
+  const handleApplicationFilterChange = (driveId, value) => {
+    setApplicationFilters((prev) => ({ ...prev, [driveId]: value }));
+  };
+
+  const getStatusStyles = (status) => {
+    const map = {
+      selected: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200',
+      shortlisted: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200',
+      interviewed: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200',
+      rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200',
+      applied: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+    };
+    return map[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+  };
+
+  const formatAppliedDate = (timestamp) => {
+    if (!timestamp) {
+      return '—';
+    }
+    try {
+      return new Date(timestamp).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      });
+    } catch {
+      return '—';
     }
   };
 
@@ -184,32 +234,138 @@ const Drives = () => {
       )}
 
       <div className="space-y-4">
-        {drives.map((drive) => (
-          <div key={drive._id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-xl font-semibold text-gray-800 dark:text-white">{drive.companyName}</h3>
-                <p className="text-gray-600 dark:text-gray-400">{drive.role}</p>
-                <p className="text-gray-600 dark:text-gray-400">Package: {drive.package}</p>
-                <p className="text-sm text-gray-500 mt-2">
-                  Deadline: {new Date(drive.applicationDeadline).toLocaleDateString()}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Applications: {drive.applications?.length || 0}
-                </p>
+        {drives.map((drive) => {
+          const applications = drive.applications || [];
+          const isExpanded = expandedDriveId === drive._id;
+          const currentFilter = applicationFilters[drive._id] || 'selected';
+          const statusCounts = applications.reduce((acc, application) => {
+            const statusKey = application.status || 'applied';
+            acc[statusKey] = (acc[statusKey] || 0) + 1;
+            return acc;
+          }, {});
+          const filteredApplications = applications.filter((application) => {
+            const statusKey = application.status || 'applied';
+            if (currentFilter === 'all') {
+              return true;
+            }
+            return statusKey === currentFilter;
+          });
+
+          return (
+            <div key={drive._id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+              <div className="flex justify-between items-start gap-4">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white">{drive.companyName}</h3>
+                  <p className="text-gray-600 dark:text-gray-400">{drive.role}</p>
+                  <p className="text-gray-600 dark:text-gray-400">Package: {drive.package}</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Deadline: {new Date(drive.applicationDeadline).toLocaleDateString()}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Applications: {applications.length}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end space-y-2">
+                  <span className={`px-3 py-1 rounded-full text-sm ${
+                    drive.status === 'open' ? 'bg-green-100 text-green-800' :
+                    drive.status === 'closed' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {drive.status}
+                  </span>
+                  <button
+                    onClick={() => toggleDriveExpansion(drive._id)}
+                    className="flex items-center space-x-2 text-primary-600 hover:text-primary-700 text-sm"
+                  >
+                    {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
+                    <span>{isExpanded ? 'Hide applicants' : 'View applicants'}</span>
+                  </button>
+                </div>
               </div>
-              <div className="flex space-x-2">
-                <span className={`px-3 py-1 rounded-full text-sm ${
-                  drive.status === 'open' ? 'bg-green-100 text-green-800' :
-                  drive.status === 'closed' ? 'bg-red-100 text-red-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}>
-                  {drive.status}
-                </span>
-              </div>
+
+              {isExpanded && (
+                <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Total applicants: {applications.length}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center mt-1">
+                        <FaUserCheck className="mr-2 text-green-500" />
+                        Selected: {statusCounts.selected || 0}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <FaFilter className="text-gray-400" />
+                      <select
+                        value={currentFilter}
+                        onChange={(e) => handleApplicationFilterChange(drive._id, e.target.value)}
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+                      >
+                        {APPLICANT_FILTERS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {filteredApplications.length > 0 ? (
+                    <div className="overflow-x-auto mt-4">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+                            <th className="py-2 pr-4">Student</th>
+                            <th className="py-2 pr-4">Email</th>
+                            <th className="py-2 pr-4">Roll No.</th>
+                            <th className="py-2 pr-4">Department</th>
+                            <th className="py-2 pr-4">Status</th>
+                            <th className="py-2">Applied</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredApplications.map((application) => {
+                            const applicant = application.studentId;
+                            const fullName = applicant
+                              ? `${applicant.personalInfo?.firstName || ''} ${applicant.personalInfo?.lastName || ''}`.trim() || 'N/A'
+                              : 'Student removed';
+                            const email = applicant?.userId?.email || 'N/A';
+                            const rollNumber = applicant?.academicInfo?.rollNumber || '—';
+                            const department = applicant?.academicInfo?.department || '—';
+                            const applicationStatus = application.status || 'applied';
+                            const statusLabel = applicationStatus.charAt(0).toUpperCase() + applicationStatus.slice(1);
+
+                            return (
+                              <tr key={application._id || `${drive._id}-${rollNumber}`} className="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+                                <td className="py-2 pr-4 text-gray-800 dark:text-gray-100">{fullName}</td>
+                                <td className="py-2 pr-4 text-gray-600 dark:text-gray-300">{email}</td>
+                                <td className="py-2 pr-4 text-gray-600 dark:text-gray-300">{rollNumber}</td>
+                                <td className="py-2 pr-4 text-gray-600 dark:text-gray-300">{department}</td>
+                                <td className="py-2 pr-4">
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusStyles(applicationStatus)}`}>
+                                    {statusLabel}
+                                  </span>
+                                </td>
+                                <td className="py-2 text-gray-600 dark:text-gray-300">
+                                  {formatAppliedDate(application.appliedAt)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
+                      No applicants match the selected filter.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
         {drives.length === 0 && (
           <p className="text-gray-500 text-center py-8">No placement drives</p>
         )}

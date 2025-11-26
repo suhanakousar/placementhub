@@ -278,9 +278,6 @@ router.post('/', async (req, res) => {
     const meetingPlatformValue = meetingPlatform || 'external';
     console.log(`📎 Using admin-provided meeting link: ${meetingLink}`);
 
-    // Get student user email for notifications
-    const studentUser = await require('../../models/User').findById(student.userId);
-
     // Create meeting
     const meeting = await Meeting.create({
       studentId,
@@ -304,206 +301,12 @@ router.post('/', async (req, res) => {
       attachments: attachments || []
     });
 
-    // 🔒 Create or get session for this meeting (ONE SESSION = ONE LINK)
-    try {
-      const studentUser = await require('../../models/User').findById(student.userId);
-      const participantUserIds = [];
-      if (studentUser) {
-        participantUserIds.push(studentUser._id);
-      }
-      if (admin.userId) {
-        participantUserIds.push(admin.userId);
-      }
-
-      await createOrGetSession({
-        type: 'one_to_one',
-        title,
-        description: description || '',
-        mentorId: admin._id,
-        startTime,
-        endTime,
-        meetingLink,
-        meetingPlatform: meetingPlatformValue,
-        meetingDetails: {},
-        participantUserIds,
-        meetingId: meeting._id
-      });
-      console.log(`✅ Session created/linked for meeting ${meeting._id}`);
-    } catch (sessionError) {
-      console.error('⚠️ Error creating session (non-blocking):', sessionError);
-      // Continue even if session creation fails (backward compatibility)
-    }
-
-    // Generate ICS file (non-blocking)
-    try {
-      const icsContent = generateICSFile(meeting, student);
-      if (icsContent) {
-        meeting.icsFile = icsContent;
-        await meeting.save();
-      }
-    } catch (icsError) {
-      console.error('Error generating ICS file:', icsError);
-      // Continue even if ICS generation fails
-    }
-
-    // Create reminders (non-blocking)
-    try {
-      await createRemindersForMeeting(meeting, student);
-    } catch (reminderError) {
-      console.error('Error creating reminders:', reminderError);
-      // Continue even if reminder creation fails
-    }
-
-    // Send confirmation email to student immediately
-    let emailSent = false;
-    let emailError = null;
-    try {
-      // Use populated userId if available, otherwise fetch it
-      let studentUser = student.userId;
-      if (!studentUser && student.userId) {
-        // If userId is an ObjectId, fetch the User
-        const User = require('../../models/User');
-        studentUser = await User.findById(student.userId);
-      }
-      
-      if (!student.userId) {
-        console.error('❌ Student has no userId field. Student ID:', student._id);
-        emailError = 'Student user not linked - userId is missing';
-      } else if (!studentUser) {
-        console.error('❌ Student user not found for userId:', student.userId);
-        emailError = `Student user not found for userId: ${student.userId}`;
-      } else if (!studentUser.email) {
-        console.error('❌ Student email not found for user:', studentUser._id);
-        emailError = `Student email not configured for user: ${studentUser._id}`;
-      } else {
-        console.log(`\n📧 Attempting to send meeting email to: ${studentUser.email}`);
-        console.log(`   Student: ${student.personalInfo?.firstName} ${student.personalInfo?.lastName}`);
-        console.log(`   Meeting: ${meeting.title}`);
-        const localStartTime = formatTimeInTimezone(meeting.startTime, meeting.studentTimezone);
-        const localEndTime = formatTimeInTimezone(meeting.endTime, meeting.studentTimezone);
-        const studentName = student.personalInfo?.firstName || 'Student';
-        
-        const emailHtml = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
-              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-              .meeting-info { background: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #667eea; }
-              .meeting-link { display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 15px 0; font-weight: bold; }
-              .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-              .reminder-note { background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 5px; margin: 20px 0; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>Meeting Scheduled</h1>
-              </div>
-              <div class="content">
-                <h2>Hello ${studentName},</h2>
-                <p>Your meeting with your mentor has been successfully scheduled!</p>
-                
-                <div class="meeting-info">
-                  <h3 style="margin-top: 0; color: #667eea;">${meeting.title}</h3>
-                  <p><strong>Topic:</strong> ${meeting.topic}</p>
-                  <p><strong>Date & Time:</strong> ${localStartTime}</p>
-                  <p><strong>Duration:</strong> Until ${localEndTime}</p>
-                  ${meeting.description ? `<p><strong>Description:</strong><br>${meeting.description}</p>` : ''}
-                </div>
-
-                <div style="text-align: center;">
-                  <a href="${meeting.meetingLink}" class="meeting-link">Join Meeting</a>
-                </div>
-                
-                <div class="reminder-note">
-                  <strong>📅 Reminder:</strong> You will receive automatic email reminders at:
-                  <ul style="margin: 10px 0; padding-left: 20px;">
-                    <li>48 hours before the meeting</li>
-                    <li>24 hours before the meeting</li>
-                    <li>1 hour before the meeting</li>
-                    <li>10 minutes before the meeting</li>
-                  </ul>
-                </div>
-
-                <p>Please add this meeting to your calendar and prepare any questions or materials you'd like to discuss.</p>
-                
-                <div class="footer">
-                  <p>© ${new Date().getFullYear()} Placement Hub. All rights reserved.</p>
-                </div>
-              </div>
-            </div>
-          </body>
-          </html>
-        `;
-        
-        const emailResult = await sendEmail({
-          to: studentUser.email,
-          subject: `Meeting Scheduled: ${meeting.title}`,
-          html: emailHtml,
-          fromName: 'Placement Hub - Mentoring System'
-        });
-
-        if (emailResult && emailResult.success && emailResult.mode !== 'development') {
-          emailSent = true;
-          console.log(`✅ Meeting email sent successfully to ${studentUser.email}`);
-          
-          // Log email
-          await EmailLog.create({
-            recipientId: student._id,
-            recipientType: 'Student',
-            recipientEmail: studentUser.email,
-            sentBy: admin._id,
-            subject: `Meeting Scheduled: ${meeting.title}`,
-            body: `Meeting scheduled for ${localStartTime}`,
-            status: 'sent',
-            sentAt: new Date(),
-            includesMeetingLink: true,
-            meetingId: meeting._id
-          });
-        } else {
-          emailError = emailResult?.message || emailResult?.error || 'Email sending failed';
-          console.error('❌ Email sending failed:', emailResult);
-          console.error('Email error details:', {
-            success: emailResult?.success,
-            mode: emailResult?.mode,
-            error: emailResult?.error,
-            message: emailResult?.message
-          });
-          
-          // Log failed email attempt
-          try {
-            await EmailLog.create({
-              recipientId: student._id,
-              recipientType: 'Student',
-              recipientEmail: studentUser.email,
-              sentBy: admin._id,
-              subject: `Meeting Scheduled: ${meeting.title}`,
-              body: `Meeting scheduled for ${localStartTime}`,
-              status: 'failed',
-              sentAt: new Date(),
-              error: emailError,
-              includesMeetingLink: true,
-              meetingId: meeting._id
-            });
-          } catch (logError) {
-            console.error('Failed to log email error:', logError);
-          }
-        }
-      }
-    } catch (err) {
-      emailError = err.message || err.toString();
-      console.error('❌ Error sending confirmation email:', err);
-      console.error('Error details:', {
-        message: err.message,
-        stack: err.stack,
-        code: err.code,
-        response: err.response
-      });
-    }
+    queuePostMeetingSideEffects({
+      meeting,
+      student,
+      admin,
+      meetingPlatform: meetingPlatformValue
+    });
 
     // Populate meeting with student info for response
     const populatedMeeting = await Meeting.findById(meeting._id)
@@ -521,12 +324,13 @@ router.post('/', async (req, res) => {
       success: true,
       message: 'Meeting created successfully',
       meeting: populatedMeeting || meeting,
-      emailSent: emailSent,
-      emailError: emailError ? `Email notification failed: ${emailError}. Meeting was created successfully.` : null,
+      emailSent: null,
+      emailError: null,
+      emailStatus: 'queued',
       debug: {
         studentEmail: student.userId?.email || 'not found',
-        emailAttempted: emailSent,
-        emailError: emailError
+        emailAttempted: false,
+        emailError: null
       }
     });
   } catch (error) {
@@ -1919,6 +1723,242 @@ router.get('/:id/join-link', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
+const scheduleAsync = typeof setImmediate === 'function' ? setImmediate : (fn) => setTimeout(fn, 0);
+
+function queuePostMeetingSideEffects({ meeting, student, admin, meetingPlatform }) {
+  scheduleAsync(() => {
+    runPostMeetingSideEffects({ meeting, student, admin, meetingPlatform }).catch((error) => {
+      console.error('❌ Post-meeting side effects failed:', error);
+    });
+  });
+}
+
+async function runPostMeetingSideEffects({ meeting, student, admin, meetingPlatform }) {
+  const tasks = [
+    { name: 'session_sync', execute: () => syncMeetingSession({ meeting, student, admin, meetingPlatform }) },
+    { name: 'ics_attachment', execute: () => attachIcsFile(meeting, student) },
+    { name: 'reminders', execute: () => createRemindersForMeeting(meeting, student) },
+    { name: 'email_notification', execute: () => sendMeetingConfirmationEmail({ meeting, student, admin }) }
+  ];
+
+  const results = await Promise.allSettled(tasks.map((task) => task.execute()));
+
+  results.forEach((result, index) => {
+    const taskName = tasks[index].name;
+    if (result.status === 'fulfilled') {
+      console.log(`✅ Post-meeting task "${taskName}" completed`);
+    } else {
+      console.error(`❌ Post-meeting task "${taskName}" failed:`, result.reason);
+    }
+  });
+}
+
+async function syncMeetingSession({ meeting, student, admin, meetingPlatform }) {
+  try {
+    const participantUserIds = [];
+    const studentUser = await resolveStudentUser(student);
+
+    if (studentUser) {
+      participantUserIds.push(studentUser._id);
+    }
+
+    if (admin.userId) {
+      participantUserIds.push(admin.userId);
+    }
+
+    if (!participantUserIds.length) {
+      console.warn(`⚠️ Skipping session sync for meeting ${meeting._id} - no participant user IDs found`);
+      return;
+    }
+
+    await createOrGetSession({
+      type: 'one_to_one',
+      title: meeting.title,
+      description: meeting.description || '',
+      mentorId: admin._id,
+      startTime: meeting.startTime,
+      endTime: meeting.endTime,
+      meetingLink: meeting.meetingLink,
+      meetingPlatform,
+      meetingDetails: {},
+      participantUserIds,
+      meetingId: meeting._id
+    });
+
+    console.log(`✅ Session created/linked for meeting ${meeting._id}`);
+  } catch (error) {
+    console.error(`⚠️ Error creating session for meeting ${meeting._id}:`, error);
+    throw error;
+  }
+}
+
+async function attachIcsFile(meeting, student) {
+  const icsContent = generateICSFile(meeting, student);
+  if (!icsContent) {
+    return;
+  }
+  meeting.icsFile = icsContent;
+  await meeting.save();
+}
+
+async function sendMeetingConfirmationEmail({ meeting, student, admin }) {
+  let emailSent = false;
+  let emailError = null;
+
+  try {
+    if (!student.userId) {
+      emailError = 'Student user not linked - userId is missing';
+      console.error('❌ Student has no userId field. Student ID:', student._id);
+      return { emailSent, emailError };
+    }
+
+    const studentUser = await resolveStudentUser(student);
+
+    if (!studentUser) {
+      emailError = `Student user not found for userId: ${student.userId}`;
+      console.error('❌ Student user not found for userId:', student.userId);
+      return { emailSent, emailError };
+    }
+
+    if (!studentUser.email) {
+      emailError = `Student email not configured for user: ${studentUser._id}`;
+      console.error('❌ Student email not found for user:', studentUser._id);
+      return { emailSent, emailError };
+    }
+
+    console.log(`\n📧 Queueing meeting email to: ${studentUser.email}`);
+    console.log(`   Student: ${student.personalInfo?.firstName} ${student.personalInfo?.lastName}`);
+    console.log(`   Meeting: ${meeting.title}`);
+
+    const localStartTime = formatTimeInTimezone(meeting.startTime, meeting.studentTimezone);
+    const localEndTime = formatTimeInTimezone(meeting.endTime, meeting.studentTimezone);
+    const studentName = student.personalInfo?.firstName || 'Student';
+
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+          .meeting-info { background: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #667eea; }
+          .meeting-link { display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 15px 0; font-weight: bold; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          .reminder-note { background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Meeting Scheduled</h1>
+          </div>
+          <div class="content">
+            <h2>Hello ${studentName},</h2>
+            <p>Your meeting with your mentor has been successfully scheduled!</p>
+            
+            <div class="meeting-info">
+              <h3 style="margin-top: 0; color: #667eea;">${meeting.title}</h3>
+              <p><strong>Topic:</strong> ${meeting.topic}</p>
+              <p><strong>Date & Time:</strong> ${localStartTime}</p>
+              <p><strong>Duration:</strong> Until ${localEndTime}</p>
+              ${meeting.description ? `<p><strong>Description:</strong><br>${meeting.description}</p>` : ''}
+            </div>
+
+            <div style="text-align: center;">
+              <a href="${meeting.meetingLink}" class="meeting-link">Join Meeting</a>
+            </div>
+            
+            <div class="reminder-note">
+              <strong>📅 Reminder:</strong> You will receive automatic email reminders at:
+              <ul style="margin: 10px 0; padding-left: 20px;">
+                <li>48 hours before the meeting</li>
+                <li>24 hours before the meeting</li>
+                <li>1 hour before the meeting</li>
+                <li>10 minutes before the meeting</li>
+              </ul>
+            </div>
+
+            <p>Please add this meeting to your calendar and prepare any questions or materials you'd like to discuss.</p>
+            
+            <div class="footer">
+              <p>© ${new Date().getFullYear()} Placement Hub. All rights reserved.</p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const emailResult = await sendEmail({
+      to: studentUser.email,
+      subject: `Meeting Scheduled: ${meeting.title}`,
+      html: emailHtml,
+      fromName: 'Placement Hub - Mentoring System'
+    });
+
+    if (emailResult && emailResult.success && emailResult.mode !== 'development') {
+      emailSent = true;
+      console.log(`✅ Meeting email sent successfully to ${studentUser.email}`);
+
+      await EmailLog.create({
+        recipientId: student._id,
+        recipientType: 'Student',
+        recipientEmail: studentUser.email,
+        sentBy: admin._id,
+        subject: `Meeting Scheduled: ${meeting.title}`,
+        body: `Meeting scheduled for ${localStartTime}`,
+        status: 'sent',
+        sentAt: new Date(),
+        includesMeetingLink: true,
+        meetingId: meeting._id
+      });
+    } else {
+      emailError = emailResult?.message || emailResult?.error || 'Email sending failed';
+      console.error('❌ Email sending failed:', emailResult);
+
+      await EmailLog.create({
+        recipientId: student._id,
+        recipientType: 'Student',
+        recipientEmail: studentUser.email,
+        sentBy: admin._id,
+        subject: `Meeting Scheduled: ${meeting.title}`,
+        body: `Meeting scheduled for ${localStartTime}`,
+        status: 'failed',
+        sentAt: new Date(),
+        error: emailError,
+        includesMeetingLink: true,
+        meetingId: meeting._id
+      });
+    }
+  } catch (err) {
+    emailError = err.message || err.toString();
+    console.error('❌ Error sending confirmation email:', err);
+    console.error('Error details:', {
+      message: err.message,
+      stack: err.stack,
+      code: err.code,
+      response: err.response
+    });
+  }
+
+  return { emailSent, emailError };
+}
+
+async function resolveStudentUser(student) {
+  if (!student?.userId) {
+    return null;
+  }
+
+  if (typeof student.userId === 'object' && student.userId.email) {
+    return student.userId;
+  }
+
+  const User = require('../../models/User');
+  return User.findById(student.userId);
+}
 
 module.exports = router;
 

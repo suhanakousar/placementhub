@@ -12,7 +12,6 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import StudentDashboard from './pages/Student/StudentDashboard';
 import AdminDashboard from './pages/Admin/AdminDashboard';
-import StudentProfileView from './pages/StudentProfileView';
 import PrivateRoute from './components/PrivateRoute';
 
 function App() {
@@ -28,7 +27,6 @@ function App() {
               <Route path="/student-register" element={<StudentRegister />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/student-profile/:studentId" element={<StudentProfileView />} />
               <Route
                 path="/student/*"
                 element={

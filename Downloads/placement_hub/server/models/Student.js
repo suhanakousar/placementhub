@@ -127,27 +127,6 @@ const studentSchema = new mongoose.Schema({
     feedback: String,
     score: Number
   }],
-  resumeAnalysis: {
-    file: String,
-    fileName: String,
-    fileSize: Number,
-    uploadedAt: Date,
-    topSkills: [String],
-    experienceLevel: String,
-    preferredRoles: [String],
-    location: String,
-    degree: String,
-    extractedText: String
-  },
-  savedJobs: [{
-    jobId: String,
-    title: String,
-    company: String,
-    location: String,
-    url: String,
-    type: String,
-    savedAt: { type: Date, default: Date.now }
-  }],
   placementStatus: {
     profileCompleted: { type: Boolean, default: false },
     resumeVerified: { type: Boolean, default: false },

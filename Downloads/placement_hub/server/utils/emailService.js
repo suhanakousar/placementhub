@@ -1,13 +1,37 @@
 const nodemailer = require('nodemailer');
 const https = require('https');
 
+const sanitizeEnvValue = (value) => {
+  if (!value) return '';
+  if (typeof value !== 'string') return String(value);
+  // Trim whitespace and strip wrapping quotes that Render sometimes adds
+  return value.trim().replace(/^(['"])(.*)\1$/, '$2').trim();
+};
+
+const getSendGridApiKey = () => {
+  const directKey = sanitizeEnvValue(process.env.SENDGRID_API_KEY);
+  if (directKey) return directKey;
+
+  const smtpHost = sanitizeEnvValue(process.env.SMTP_HOST);
+  if (smtpHost === 'smtp.sendgrid.net') {
+    const smtpPassword = sanitizeEnvValue(process.env.SMTP_PASSWORD);
+    if (smtpPassword) return smtpPassword;
+  }
+
+  return '';
+};
+
 // Send email via SendGrid API (more reliable than SMTP)
 const sendEmailViaSendGridAPI = async (to, subject, html, text, fromEmail, fromName = 'Placement Hub') => {
   return new Promise((resolve, reject) => {
-    const apiKey = process.env.SENDGRID_API_KEY || process.env.SMTP_PASSWORD;
+    const apiKey = getSendGridApiKey();
     
     if (!apiKey) {
       return reject(new Error('SendGrid API key not configured'));
+    }
+
+    if (!apiKey.startsWith('SG.')) {
+      console.warn('⚠️ SendGrid API key is set but does not start with "SG." – this may cause authentication failures.');
     }
 
     // Generate text version from HTML if text is empty
@@ -108,7 +132,7 @@ const createTransporter = () => {
   const isSecure = port === 465;
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASSWORD;
+  const pass = sanitizeEnvValue(process.env.SMTP_PASSWORD);
   
   if (!user || !pass) {
     throw new Error('SMTP_USER and SMTP_PASSWORD must be set in environment variables');
@@ -294,8 +318,8 @@ const sendPasswordResetEmail = async (email, resetToken) => {
     console.log(`From email: ${fromEmail}`);
 
     // Try SendGrid API first (more reliable), fall back to SMTP
-    const apiKey = process.env.SENDGRID_API_KEY || process.env.SMTP_PASSWORD;
-    if (apiKey && process.env.SMTP_HOST === 'smtp.sendgrid.net') {
+    const apiKey = getSendGridApiKey();
+    if (apiKey) {
       console.log('Using SendGrid API');
       try {
         const result = await sendEmailViaSendGridAPI(email, subject, html, text, fromEmail, 'Placement Hub');
@@ -542,7 +566,7 @@ const sendEmail = async ({ to, subject, html, text, fromEmail, fromName = 'Place
     
     // Try SendGrid API first (more reliable), fall back to SMTP
     // Check if SendGrid API key is available (preferred method for cloud deployments)
-    const sendGridApiKey = process.env.SENDGRID_API_KEY;
+    const sendGridApiKey = getSendGridApiKey();
     if (sendGridApiKey) {
       try {
         console.log('📧 SendGrid API key detected. Using SendGrid API (recommended for cloud deployments)...');
@@ -565,19 +589,6 @@ const sendEmail = async ({ to, subject, html, text, fromEmail, fromName = 'Place
       }
     }
     
-    // Also try SendGrid if SMTP_HOST is set to sendgrid.net
-    if (process.env.SMTP_HOST === 'smtp.sendgrid.net' && process.env.SMTP_PASSWORD && process.env.SMTP_PASSWORD.startsWith('SG.')) {
-      try {
-        console.log('📧 SendGrid SMTP detected. Attempting SendGrid API instead (more reliable)...');
-        const result = await sendEmailViaSendGridAPI(to, subject, html, text || '', email, fromName);
-        console.log('✅ Email sent successfully via SendGrid API');
-        return result;
-      } catch (apiError) {
-        console.error('❌ SendGrid API failed, will try SMTP:', apiError.message);
-        // Fall through to SMTP
-      }
-    }
-
     // Fall back to SMTP
     console.log('Attempting to send via SMTP...');
     if (!process.env.SMTP_HOST) {

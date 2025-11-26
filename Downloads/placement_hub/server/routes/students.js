@@ -699,40 +699,27 @@ router.get('/:id', authorize('admin'), async (req, res) => {
 // @route   GET /api/students/coding-stats
 // @desc    Get coding platform statistics for current student
 // @access  Private (Student)
-router.get('/coding-stats', protect, authorize('student'), async (req, res) => {
+router.get('/coding-stats', authorize('student'), async (req, res) => {
   try {
     const student = await Student.findOne({ userId: req.user._id });
     if (!student) {
       return res.status(404).json({ message: 'Student profile not found' });
     }
 
-    // Extract handles from personalInfo - CodeChef, Codeforces, LeetCode, and HackerRank
+    // Extract handles from personalInfo - only LeetCode and HackerRank
     const handles = {
-      codechef: student.personalInfo?.codechef ? extractUsername(student.personalInfo.codechef, 'codechef') : null,
-      codeforces: student.personalInfo?.codeforces ? extractUsername(student.personalInfo.codeforces, 'codeforces') : null,
       leetcode: student.personalInfo?.leetcode ? extractUsername(student.personalInfo.leetcode, 'leetcode') : null,
       hackerrank: student.personalInfo?.hackerrank ? extractUsername(student.personalInfo.hackerrank, 'hackerrank') : null
     };
 
-    console.log('Fetching coding stats for handles:', handles);
-
-    // Fetch real coding stats from all platforms
+    // Fetch real coding stats (only LeetCode and HackerRank)
     const codingStats = await fetchCodingStats(handles);
-
-    console.log('Fetched coding stats:', {
-      codechef: !!codingStats.codechef,
-      codeforces: !!codingStats.codeforces,
-      leetcode: !!codingStats.leetcode,
-      hackerrank: !!codingStats.hackerrank
-    });
 
     // Calculate overall score from real data only
     const overallScore = calculateOverallScore(codingStats);
 
     // Generate score distribution from real data only
     const scoreDistribution = [
-      { name: 'CodeChef', value: codingStats.codechef?.points || 0, color: '#8b5a2b' },
-      { name: 'Codeforces', value: codingStats.codeforces?.points || 0, color: '#2563eb' },
       { name: 'LeetCode', value: codingStats.leetcode?.points || 0, color: '#f89f1b' },
       { name: 'HackerRank', value: codingStats.hackerrank?.points || 0, color: '#16a34a' }
     ].filter(item => item.value > 0);
@@ -870,15 +857,13 @@ router.get('/:studentId/coding-stats', async (req, res) => {
       return res.status(404).json({ message: 'Student profile not found' });
     }
 
-    // Extract handles from personalInfo - CodeChef, Codeforces, LeetCode, and HackerRank
+    // Extract handles from personalInfo - only LeetCode and HackerRank
     const handles = {
-      codechef: student.personalInfo?.codechef ? extractUsername(student.personalInfo.codechef, 'codechef') : null,
-      codeforces: student.personalInfo?.codeforces ? extractUsername(student.personalInfo.codeforces, 'codeforces') : null,
       leetcode: student.personalInfo?.leetcode ? extractUsername(student.personalInfo.leetcode, 'leetcode') : null,
       hackerrank: student.personalInfo?.hackerrank ? extractUsername(student.personalInfo.hackerrank, 'hackerrank') : null
     };
 
-    // Fetch real coding stats from all platforms
+    // Fetch real coding stats (only LeetCode and HackerRank)
     const codingStats = await fetchCodingStats(handles);
 
     // Calculate overall score from real data only
@@ -886,8 +871,6 @@ router.get('/:studentId/coding-stats', async (req, res) => {
 
     // Generate score distribution from real data only
     const scoreDistribution = [
-      { name: 'CodeChef', value: codingStats.codechef?.points || 0, color: '#8b5a2b' },
-      { name: 'Codeforces', value: codingStats.codeforces?.points || 0, color: '#2563eb' },
       { name: 'LeetCode', value: codingStats.leetcode?.points || 0, color: '#f89f1b' },
       { name: 'HackerRank', value: codingStats.hackerrank?.points || 0, color: '#16a34a' }
     ].filter(item => item.value > 0);

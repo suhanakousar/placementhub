@@ -13,7 +13,6 @@ import Notifications from './Notifications';
 import MentorDashboard from './MentorDashboard';
 import Tasks from './Tasks';
 import Meetings from './Meetings';
-import Leaderboard from './Leaderboard';
 import api from '../../utils/api';
 
 const AdminDashboard = () => {
@@ -79,7 +78,6 @@ const AdminDashboard = () => {
           <Route path="mentor" element={<MentorDashboard />} />
           <Route path="meetings" element={<Meetings />} />
           <Route path="tasks" element={<Tasks />} />
-          <Route path="leaderboard" element={<Leaderboard />} />
         </Routes>
       </main>
     </div>

@@ -8,7 +8,6 @@ const RAPIDAPI_KEY =
   'f627be65a2mshfe6bd4a0cff94f1p16906fjsn66a6d43077ce';
 const RAPIDAPI_HOST =
   process.env.RAPIDAPI_HOST || 'competitive-coding-api.p.rapidapi.com';
-const LEETCODE_API_HOST = 'leetcodeapi.p.rapidapi.com';
 
 const platformCache = new Map();
 
@@ -326,52 +325,6 @@ function calculatePlatformScores(platforms = []) {
 
 async function fetchLeetCode(username) {
   if (!username) return null;
-  
-  // Try RapidAPI first, fallback to herokuapp if it fails
-  try {
-    const { data } = await axios.get(
-      `https://${LEETCODE_API_HOST}/${encodeURIComponent(username)}`,
-      {
-        timeout: 8000,
-        headers: {
-          'X-RapidAPI-Key': RAPIDAPI_KEY,
-          'X-RapidAPI-Host': LEETCODE_API_HOST
-        }
-      }
-    );
-
-    console.log(`LeetCode RapidAPI response for ${username}:`, JSON.stringify(data).substring(0, 200));
-
-    // Parse RapidAPI response - handle different response structures
-    if (data) {
-      // Try to extract rating from various possible fields
-      const rating = data.rating ?? data.contestRating ?? data.contestRanking ?? data.currentRating ?? null;
-      const maxRating = data.highestRating ?? data.maxRating ?? data.highestContestRating ?? rating ?? null;
-      const contests = data.contestsAttended ?? data.totalContests ?? data.contests ?? null;
-      const solved = data.totalSolved ?? data.problemsSolved ?? data.solvedProblems ?? null;
-      
-      return {
-        platformId: 'leetcode',
-        username,
-        currentRating: rating,
-        highestRating: maxRating,
-        totalContests: contests,
-        solvedProblems: solved,
-        ratingChange: data.ratingChange ?? null,
-        points: (rating ?? 0) * 0.3 + (solved ?? 0) * 2,
-        badges: data.badges || [],
-        lastActivity: data.lastActivity ? new Date(data.lastActivity) : null,
-        history: buildSparkline(rating || solved || 1500)
-      };
-    }
-  } catch (rapidApiError) {
-    console.log(`RapidAPI LeetCode fetch failed for ${username}, trying fallback:`, rapidApiError.message);
-    if (rapidApiError.response) {
-      console.log('RapidAPI error response:', rapidApiError.response.status, rapidApiError.response.data);
-    }
-  }
-
-  // Fallback to herokuapp API
   try {
     const { data } = await axios.get(
       `https://leetcode-stats-api.herokuapp.com/${encodeURIComponent(
@@ -392,7 +345,7 @@ async function fetchLeetCode(username) {
       totalContests: data.contestAttended ?? null,
       solvedProblems: data.totalSolved ?? null,
       ratingChange: data.contestRanking ?? null,
-      points: (data.contestRanking ?? 0) * 0.3 + (data.totalSolved ?? 0) * 2,
+      points: data.contributionPoints ?? null,
       badges: data.badges?.map((badge) => badge.displayName) || [],
       lastActivity: data.recentSubmissions?.[0]?.timestamp
         ? new Date(Number(data.recentSubmissions[0].timestamp) * 1000)
@@ -403,7 +356,7 @@ async function fetchLeetCode(username) {
     return {
       platformId: 'leetcode',
       username,
-      warning: error.response?.data?.message || error.message
+      warning: error.message
     };
   }
 }
@@ -465,9 +418,6 @@ async function fetchCodeforces(username) {
 
     let contestCount = null;
     let lastActivity = null;
-    let ratingChange = null;
-    let ratingHistory = [];
-    
     try {
       const contestData = await axios.get(
         `https://codeforces.com/api/user.rating?handle=${encodeURIComponent(
@@ -475,37 +425,18 @@ async function fetchCodeforces(username) {
         )}`,
         { timeout: 8000 }
       );
-      if (contestData?.data?.status === 'OK' && contestData.data.result) {
-        const contests = contestData.data.result;
-        contestCount = contests.length || 0;
-        
-        if (contests.length > 0) {
-          const lastContest = contests[contests.length - 1];
-          const previousContest = contests.length > 1 ? contests[contests.length - 2] : null;
-          
-          // Calculate rating change from last contest
-          if (previousContest && lastContest.newRating && previousContest.newRating) {
-            ratingChange = lastContest.newRating - previousContest.newRating;
-          } else if (lastContest.newRating && profile.rating) {
-            // If only one contest, compare with current rating
-            ratingChange = profile.rating - lastContest.newRating;
-          }
-          
-          if (lastContest?.ratingUpdateTimeSeconds) {
-            lastActivity = new Date(
-              lastContest.ratingUpdateTimeSeconds * 1000
-            );
-          }
-          
-          // Build real rating history from contest data
-          ratingHistory = contests.slice(-12).map(contest => ({
-            name: new Date(contest.ratingUpdateTimeSeconds * 1000).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-            rating: contest.newRating || contest.oldRating || 0
-          }));
+      if (contestData?.data?.status === 'OK') {
+        contestCount = contestData.data.result?.length || 0;
+        const lastRatingChange =
+          contestData.data.result?.[contestData.data.result.length - 1];
+        if (lastRatingChange?.ratingUpdateTimeSeconds) {
+          lastActivity = new Date(
+            lastRatingChange.ratingUpdateTimeSeconds * 1000
+          );
         }
       }
     } catch (err) {
-      console.warn('[CodingStats] Codeforces rating history failed:', err.message);
+      console.warn('[CodingStats] Codeforces rating history failed');
     }
 
     return {
@@ -515,10 +446,12 @@ async function fetchCodeforces(username) {
       highestRating: profile.maxRating ?? profile.rating ?? null,
       totalContests: contestCount,
       solvedProblems: null,
-      ratingChange: ratingChange,
+      ratingChange: profile.rating && profile.maxRating
+        ? profile.rating - profile.maxRating
+        : null,
       badges: [profile.rank, profile.maxRank].filter(Boolean),
       lastActivity,
-      history: ratingHistory.length > 0 ? ratingHistory : buildSparkline(profile.rating || 1600)
+      history: buildSparkline(profile.rating || 1600)
     };
   } catch (error) {
     return {
@@ -654,13 +587,7 @@ async function fetchGitHub(username) {
 async function fetchCodingStats(handles = {}) {
   const entries = [];
   
-  // Fetch CodeChef, Codeforces, LeetCode, and HackerRank
-  if (handles.codechef) {
-    entries.push({ platformId: 'codechef', username: handles.codechef });
-  }
-  if (handles.codeforces) {
-    entries.push({ platformId: 'codeforces', username: handles.codeforces });
-  }
+  // Only fetch LeetCode and HackerRank
   if (handles.leetcode) {
     entries.push({ platformId: 'leetcode', username: handles.leetcode });
   }
@@ -670,8 +597,6 @@ async function fetchCodingStats(handles = {}) {
   
   if (entries.length === 0) {
     return {
-      codechef: null,
-      codeforces: null,
       leetcode: null,
       hackerrank: null
     };
@@ -680,40 +605,14 @@ async function fetchCodingStats(handles = {}) {
   const platforms = await fetchPlatforms(entries);
   
   const result = {
-    codechef: null,
-    codeforces: null,
     leetcode: null,
     hackerrank: null
   };
   
   platforms.forEach(platform => {
-    if (platform.platformId === 'codechef') {
-      result.codechef = {
-        contestRating: platform.currentRating,
-        highestRating: platform.highestRating,
-        contests: platform.totalContests || 0,
-        ratingChange: platform.ratingChange || 0,
-        ratingHistory: platform.history || [],
-        points: platform.points || 0,
-        warning: platform.warning || null
-      };
-    } else if (platform.platformId === 'codeforces') {
-      result.codeforces = {
-        contestRating: platform.currentRating,
-        highestRating: platform.highestRating,
-        contests: platform.totalContests || 0,
-        ratingChange: platform.ratingChange || 0,
-        ratingHistory: platform.history || [],
-        points: platform.points || 0,
-        warning: platform.warning || null
-      };
-    } else if (platform.platformId === 'leetcode') {
+    if (platform.platformId === 'leetcode') {
       result.leetcode = {
         contestRating: platform.currentRating,
-        highestRating: platform.highestRating,
-        contests: platform.totalContests || 0,
-        ratingChange: platform.ratingChange || 0,
-        ratingHistory: platform.history || [],
         problemsSolved: platform.solvedProblems,
         points: platform.points || (platform.solvedProblems ? platform.solvedProblems * 10 : 0),
         warning: platform.warning || null

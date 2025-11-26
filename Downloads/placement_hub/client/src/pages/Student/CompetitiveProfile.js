@@ -19,19 +19,10 @@ const CompetitiveProfile = ({ studentData }) => {
 
   const fetchCodingStats = async () => {
     try {
-      setLoading(true);
       const response = await api.get('/students/coding-stats');
-      console.log('Coding stats response:', response.data);
       setData(response.data);
     } catch (error) {
       console.error('Error fetching coding stats:', error);
-      console.error('Error response:', error.response?.data);
-      // Set empty data structure to prevent crashes
-      setData({
-        codingStats: {},
-        overallScore: 0,
-        scoreDistribution: []
-      });
     } finally {
       setLoading(false);
     }
@@ -154,11 +145,9 @@ const CompetitiveProfile = ({ studentData }) => {
     );
   }
 
-  const codechefData = data?.codingStats?.codechef || null;
-  const codeforcesData = data?.codingStats?.codeforces || null;
   const leetcodeData = data?.codingStats?.leetcode || null;
   const hackerrankData = data?.codingStats?.hackerrank || null;
-  const hasCodingData = Boolean(codechefData || codeforcesData || leetcodeData || hackerrankData);
+  const hasCodingData = Boolean(leetcodeData || hackerrankData);
   const scoreDistribution = data?.scoreDistribution || [];
   const rankingHistory = data?.globalRankingsHistory || [];
   const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#6b7280', '#8b5cf6'];
@@ -231,23 +220,18 @@ const CompetitiveProfile = ({ studentData }) => {
 
             {/* Rating Cards */}
             <RatingCard
-              platform="CodeChef"
-              data={codechefData}
-              color="#8b5a2b"
-            />
-            <RatingCard
-              platform="Codeforces"
-              data={codeforcesData}
-              color="#2563eb"
-            />
-            <RatingCard
               platform="LeetCode"
               data={leetcodeData}
               color="#f89f1b"
             />
+            <RatingCard
+              platform="HackerRank"
+              data={hackerrankData}
+              color="#16a34a"
+            />
             {!hasCodingData && (
               <div className="bg-white rounded-lg shadow-md p-5 text-sm text-gray-500">
-                Connect your coding platform profiles (CodeChef, Codeforces, LeetCode) to see live stats here.
+                Connect your LeetCode or HackerRank profile to see live stats here.
               </div>
             )}
           </div>

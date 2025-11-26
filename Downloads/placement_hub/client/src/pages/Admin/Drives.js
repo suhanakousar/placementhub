@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaPlus, FaChevronDown, FaChevronUp, FaFilter, FaUserCheck } from 'react-icons/fa';
+import { FaPlus, FaChevronDown, FaChevronUp, FaFilter, FaUserCheck, FaUsers } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 
@@ -32,6 +32,10 @@ const Drives = () => {
   const [loading, setLoading] = useState(true);
   const [expandedDriveId, setExpandedDriveId] = useState(null);
   const [applicationFilters, setApplicationFilters] = useState({});
+  const [studentSelectionMode, setStudentSelectionMode] = useState('auto'); // 'auto' | 'manual'
+  const [students, setStudents] = useState([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
 
   useEffect(() => {
     fetchDrives();
@@ -48,10 +52,39 @@ const Drives = () => {
     }
   };
 
+  const fetchStudentsForSelection = async () => {
+    try {
+      setStudentsLoading(true);
+      const response = await api.get('/students');
+      setStudents(response.data || []);
+    } catch (error) {
+      console.error('Error fetching students for selection:', error);
+      toast.error('Failed to load students for selection');
+    } finally {
+      setStudentsLoading(false);
+    }
+  };
+
+  const toggleStudentSelected = (studentId) => {
+    setSelectedStudentIds((prev) =>
+      prev.includes(studentId)
+        ? prev.filter((id) => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/drives', formData);
+      const payload = {
+        ...formData
+      };
+
+      if (studentSelectionMode === 'manual' && selectedStudentIds.length > 0) {
+        payload.studentIds = selectedStudentIds;
+      }
+
+      await api.post('/drives', payload);
       toast.success('Placement drive created successfully');
       setShowAddForm(false);
       setFormData({
@@ -68,6 +101,9 @@ const Drives = () => {
         applicationDeadline: '',
         driveDate: ''
       });
+      setStudentSelectionMode('auto');
+      setSelectedStudentIds([]);
+      setStudents([]);
       fetchDrives();
     } catch (error) {
       toast.error('Failed to create placement drive');
@@ -214,6 +250,101 @@ const Drives = () => {
                 rows="3"
               />
             </div>
+          </div>
+          <div className="mt-6 border-t border-gray-200 dark:border-gray-600 pt-4">
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center space-x-2">
+              <FaUsers />
+              <span>Who should receive this drive?</span>
+            </h3>
+            <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-2 md:space-y-0">
+              <label className="inline-flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-200">
+                <input
+                  type="radio"
+                  name="studentSelectionMode"
+                  value="auto"
+                  checked={studentSelectionMode === 'auto'}
+                  onChange={() => setStudentSelectionMode('auto')}
+                  className="text-primary-600 focus:ring-primary-500"
+                />
+                <span>All eligible students (based on CGPA / departments)</span>
+              </label>
+              <label className="inline-flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-200">
+                <input
+                  type="radio"
+                  name="studentSelectionMode"
+                  value="manual"
+                  checked={studentSelectionMode === 'manual'}
+                  onChange={() => setStudentSelectionMode('manual')}
+                  className="text-primary-600 focus:ring-primary-500"
+                />
+                <span>Only selected students</span>
+              </label>
+            </div>
+
+            {studentSelectionMode === 'manual' && (
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-600 dark:text-gray-300">
+                    Choose the specific students who should receive this drive.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={fetchStudentsForSelection}
+                    className="px-3 py-1.5 text-xs bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  >
+                    {studentsLoading ? 'Loading…' : 'Load / Refresh students'}
+                  </button>
+                </div>
+
+                {studentsLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+                  </div>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 p-2">
+                    {students.length === 0 ? (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 py-4 text-center">
+                        No students loaded. Click &quot;Load / Refresh students&quot; to fetch the list.
+                      </p>
+                    ) : (
+                      students.map((student) => {
+                        const name = `${student.personalInfo?.firstName || ''} ${student.personalInfo?.lastName || ''}`.trim() || 'Unnamed';
+                        const roll = student.academicInfo?.rollNumber || 'N/A';
+                        const dept = student.academicInfo?.department || 'N/A';
+                        const isChecked = selectedStudentIds.includes(student._id);
+                        return (
+                          <label
+                            key={student._id}
+                            className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-xs"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleStudentSelected(student._id)}
+                                className="text-primary-600 focus:ring-primary-500"
+                              />
+                              <div>
+                                <p className="text-gray-800 dark:text-gray-100 font-medium">
+                                  {name} <span className="text-gray-500 dark:text-gray-400 font-normal">({roll})</span>
+                                </p>
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                  Dept: {dept}
+                                </p>
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-600 dark:text-gray-300">
+                  <strong>{selectedStudentIds.length}</strong> student(s) selected. Only these students will get this drive notification.
+                </p>
+              </div>
+            )}
           </div>
           <div className="mt-4 flex space-x-2">
             <button

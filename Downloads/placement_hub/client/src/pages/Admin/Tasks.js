@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaPlus, FaFilter, FaCheckCircle, FaClock, FaExclamationTriangle, FaEdit, FaTrash, FaUser, FaCalendar, FaTimes, FaTasks, FaEye, FaComment, FaCheck, FaTimesCircle, FaPaperclip, FaSpinner } from 'react-icons/fa';
+import { FaPlus, FaFilter, FaCheckCircle, FaClock, FaExclamationTriangle, FaEdit, FaTrash, FaUser, FaCalendar, FaTimes, FaTasks, FaEye, FaComment, FaCheck, FaTimesCircle, FaPaperclip, FaSpinner, FaUsers } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
@@ -35,6 +35,13 @@ const Tasks = () => {
     dueDate: '',
     reminders: []
   });
+  const [assignmentMode, setAssignmentMode] = useState('single'); // 'single' | 'group_filters' | 'group_selected'
+  const [taskFilters, setTaskFilters] = useState({
+    department: '',
+    year: '',
+    specialization: ''
+  });
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
 
   useEffect(() => {
     fetchTasks();
@@ -82,10 +89,22 @@ const Tasks = () => {
   const handleCreateTask = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/admin/tasks', {
-        ...formData,
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
         dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : undefined
-      });
+      };
+
+      if (assignmentMode === 'single') {
+        payload.studentId = formData.studentId;
+      } else if (assignmentMode === 'group_selected') {
+        payload.studentIds = selectedStudentIds;
+      } else if (assignmentMode === 'group_filters') {
+        payload.filters = taskFilters;
+      }
+
+      await api.post('/admin/tasks', payload);
       toast.success('Task created successfully');
       setShowCreateForm(false);
       setFormData({
@@ -96,11 +115,20 @@ const Tasks = () => {
         dueDate: '',
         reminders: []
       });
+      setAssignmentMode('single');
+      setTaskFilters({ department: '', year: '', specialization: '' });
+      setSelectedStudentIds([]);
       fetchTasks();
       fetchStats();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to create task');
     }
+  };
+
+  const toggleSelectedStudent = (id) => {
+    setSelectedStudentIds((prev) =>
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
+    );
   };
 
   const handleUpdateStatus = async (taskId, newStatus) => {
@@ -515,23 +543,147 @@ const Tasks = () => {
               </button>
             </div>
             <form onSubmit={handleCreateTask} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Student *
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Assign To
                 </label>
-                <select
-                  value={formData.studentId}
-                  onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                  required
-                >
-                  <option value="">Select a student</option>
-                  {students.map(student => (
-                    <option key={student._id} value={student._id}>
-                      {student.personalInfo?.firstName} {student.personalInfo?.lastName}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-2 md:space-y-0">
+                  <label className="inline-flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-200">
+                    <input
+                      type="radio"
+                      name="assignmentMode"
+                      value="single"
+                      checked={assignmentMode === 'single'}
+                      onChange={() => setAssignmentMode('single')}
+                    />
+                    <span>Single student</span>
+                  </label>
+                  <label className="inline-flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-200">
+                    <input
+                      type="radio"
+                      name="assignmentMode"
+                      value="group_filters"
+                      checked={assignmentMode === 'group_filters'}
+                      onChange={() => setAssignmentMode('group_filters')}
+                    />
+                    <span>Group by filters (department / year / specialization)</span>
+                  </label>
+                  <label className="inline-flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-200">
+                    <input
+                      type="radio"
+                      name="assignmentMode"
+                      value="group_selected"
+                      checked={assignmentMode === 'group_selected'}
+                      onChange={() => setAssignmentMode('group_selected')}
+                    />
+                    <span>Manually selected students</span>
+                  </label>
+                </div>
+
+                {assignmentMode === 'single' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Student *
+                    </label>
+                    <select
+                      value={formData.studentId}
+                      onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                      required
+                    >
+                      <option value="">Select a student</option>
+                      {students.map(student => (
+                        <option key={student._id} value={student._id}>
+                          {student.personalInfo?.firstName} {student.personalInfo?.lastName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {assignmentMode === 'group_filters' && (
+                  <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-3 space-y-3">
+                    <div className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-200 mb-1">
+                      <FaFilter />
+                      <span>Send task to all students matching these filters</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <input
+                        type="text"
+                        placeholder="Department (e.g., CSE)"
+                        value={taskFilters.department}
+                        onChange={(e) => setTaskFilters({ ...taskFilters, department: e.target.value })}
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Passout year (e.g., 2026)"
+                        value={taskFilters.year}
+                        onChange={(e) => setTaskFilters({ ...taskFilters, year: e.target.value })}
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Specialization (optional)"
+                        value={taskFilters.specialization}
+                        onChange={(e) => setTaskFilters({ ...taskFilters, specialization: e.target.value })}
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-300">
+                      Leave a field empty to ignore that filter. Example: set only year=&quot;2026&quot; to assign to all 2026 batch students.
+                    </p>
+                  </div>
+                )}
+
+                {assignmentMode === 'group_selected' && (
+                  <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-200 mb-1">
+                      <FaUsers />
+                      <span>Select individual students to assign this task</span>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 p-2">
+                      {students.length === 0 ? (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 py-4 text-center">
+                          No students loaded.
+                        </p>
+                      ) : (
+                        students.map((student) => {
+                          const name = `${student.personalInfo?.firstName || ''} ${student.personalInfo?.lastName || ''}`.trim() || 'Unnamed';
+                          const roll = student.academicInfo?.rollNumber || 'N/A';
+                          const dept = student.academicInfo?.department || 'N/A';
+                          const isChecked = selectedStudentIds.includes(student._id);
+                          return (
+                            <label
+                              key={student._id}
+                              className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-xs"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleSelectedStudent(student._id)}
+                                  className="text-primary-600 focus:ring-primary-500"
+                                />
+                                <div>
+                                  <p className="text-gray-800 dark:text-gray-100 font-medium">
+                                    {name} <span className="text-gray-500 dark:text-gray-400 font-normal">({roll})</span>
+                                  </p>
+                                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                    Dept: {dept}
+                                  </p>
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-300">
+                      <strong>{selectedStudentIds.length}</strong> student(s) selected. A separate copy of this task will be created for each selected student.
+                    </p>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

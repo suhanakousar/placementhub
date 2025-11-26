@@ -103,7 +103,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // @route   POST /api/admin/tasks
-// @desc    Create a new task
+// @desc    Create new task(s) - supports single, filtered group, or explicit student list
 // @access  Private (Admin)
 router.post('/', async (req, res) => {
   try {
@@ -114,6 +114,8 @@ router.post('/', async (req, res) => {
 
     const {
       studentId,
+      studentIds,
+      filters,
       title,
       description,
       priority,
@@ -124,10 +126,49 @@ router.post('/', async (req, res) => {
       attachments
     } = req.body;
 
-    const task = await Task.create({
-      studentId,
+    if (!title || !title.trim()) {
+      return res.status(400).json({ message: 'Task title is required' });
+    }
+
+    // Determine target students
+    let targetStudentIds = [];
+
+    if (Array.isArray(studentIds) && studentIds.length > 0) {
+      // Explicit selection
+      targetStudentIds = studentIds;
+    } else if (filters && Object.keys(filters).length > 0) {
+      // Group by filters: department / year / specialization
+      const query = {};
+      if (filters.department) {
+        query['academicInfo.department'] = filters.department;
+      }
+      if (filters.specialization) {
+        query['academicInfo.specialization'] = filters.specialization;
+      }
+      if (filters.year) {
+        const yearInt = parseInt(filters.year, 10);
+        if (!Number.isNaN(yearInt)) {
+          query['academicInfo.year'] = yearInt;
+        }
+      }
+
+      const matchingStudents = await Student.find(query).select('_id');
+      targetStudentIds = matchingStudents.map((s) => s._id);
+    } else if (studentId) {
+      // Single student (existing behaviour)
+      targetStudentIds = [studentId];
+    }
+
+    if (!targetStudentIds.length) {
+      return res.status(400).json({
+        message: 'No target students found for this task. Please select a student or provide filters/studentIds.'
+      });
+    }
+
+    const payload = targetStudentIds.map((sid) => ({
+      studentId: sid,
       createdBy: admin._id,
-      title,
+      title: title.trim(),
       description,
       priority: priority || 'medium',
       dueDate: dueDate ? new Date(dueDate) : undefined,
@@ -136,12 +177,18 @@ router.post('/', async (req, res) => {
       linkedFeedbackId,
       reminders: reminders || [],
       attachments: attachments || []
-    });
+    }));
+
+    const createdTasks = await Task.insertMany(payload);
 
     res.status(201).json({
       success: true,
-      message: 'Task created successfully',
-      task
+      message:
+        createdTasks.length === 1
+          ? 'Task created successfully'
+          : `Tasks created for ${createdTasks.length} students`,
+      count: createdTasks.length,
+      tasks: createdTasks
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

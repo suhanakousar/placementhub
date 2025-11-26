@@ -37,19 +37,43 @@ router.get('/', async (req, res) => {
 // @access  Private (Admin)
 router.post('/', authorize('admin'), async (req, res) => {
   try {
+    const { studentIds } = req.body;
     const admin = await Admin.findOne({ userId: req.user._id });
     const drive = await PlacementDrive.create({
       ...req.body,
       createdBy: admin._id
     });
 
-    // Notify eligible students
-    const eligibleStudents = await Student.find({
-      'academicInfo.cgpa': { $gte: drive.eligibilityCriteria.minCGPA || 0 },
-      'academicInfo.department': { $in: drive.eligibilityCriteria.departments || [] }
-    });
+    // Determine target students
+    let targetStudents = [];
 
-    for (const student of eligibleStudents) {
+    if (Array.isArray(studentIds) && studentIds.length > 0) {
+      // Explicit selection: only notify these students
+      targetStudents = await Student.find({ _id: { $in: studentIds } });
+      console.log(
+        `📢 Placement drive ${drive._id}: notifying ${targetStudents.length} explicitly selected students`
+      );
+    } else {
+      // Fallback: notify all eligible students based on criteria
+      const minCgpa = drive.eligibilityCriteria?.minCGPA || 0;
+      const departments = drive.eligibilityCriteria?.departments || [];
+
+      const eligibilityQuery = {
+        'academicInfo.cgpa': { $gte: minCgpa }
+      };
+
+      if (departments.length > 0) {
+        eligibilityQuery['academicInfo.department'] = { $in: departments };
+      }
+
+      targetStudents = await Student.find(eligibilityQuery);
+      console.log(
+        `📢 Placement drive ${drive._id}: notifying ${targetStudents.length} eligible students (auto filter)`
+      );
+    }
+
+    // Notify target students
+    for (const student of targetStudents) {
       await Notification.create({
         recipientId: student._id,
         recipientType: 'Student',

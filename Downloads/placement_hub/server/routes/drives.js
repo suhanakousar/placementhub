@@ -123,5 +123,22 @@ router.post('/:id/apply', authorize('student'), async (req, res) => {
   }
 });
 
+// @route   DELETE /api/drives/:id
+// @desc    Delete a placement drive
+// @access  Private (Admin)
+router.delete('/:id', authorize('admin'), async (req, res) => {
+  try {
+    const drive = await PlacementDrive.findByIdAndDelete(req.params.id);
+
+    if (!drive) {
+      return res.status(404).json({ message: 'Drive not found' });
+    }
+
+    res.json({ success: true, message: 'Placement drive deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;
 

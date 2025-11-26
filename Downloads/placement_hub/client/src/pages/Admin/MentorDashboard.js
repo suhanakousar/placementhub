@@ -84,13 +84,6 @@ const MentorDashboard = () => {
             <span>Create Meeting</span>
           </button>
           <button
-            onClick={() => window.location.href = '/admin/emails/send'}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <FaEnvelope />
-            <span>Send Email</span>
-          </button>
-          <button
             onClick={() => window.location.href = '/admin/tasks'}
             className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaPlus, FaChevronDown, FaChevronUp, FaFilter, FaUserCheck, FaUsers } from 'react-icons/fa';
+import { FaPlus, FaChevronDown, FaChevronUp, FaFilter, FaUserCheck, FaUsers, FaTrash } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 
@@ -495,9 +495,6 @@ const Drives = () => {
                   <p className="text-sm text-gray-500 mt-2">
                     Deadline: {new Date(drive.applicationDeadline).toLocaleDateString()}
                   </p>
-                  <p className="text-sm text-gray-500">
-                    Applications: {applications.length}
-                  </p>
                 </div>
                 <div className="flex flex-col items-end space-y-2">
                   <span className={`px-3 py-1 rounded-full text-sm ${
@@ -507,6 +504,24 @@ const Drives = () => {
                   }`}>
                     {drive.status}
                   </span>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to delete the drive "${drive.companyName}"?`)) {
+                        api.delete(`/drives/${drive._id}`)
+                          .then(() => {
+                            toast.success('Placement drive deleted successfully');
+                            fetchDrives();
+                          })
+                          .catch((error) => {
+                            toast.error(error.response?.data?.message || 'Failed to delete placement drive');
+                          });
+                      }
+                    }}
+                    className="flex items-center space-x-1 text-red-600 hover:text-red-700 text-xs"
+                  >
+                    <FaTrash />
+                    <span>Delete</span>
+                  </button>
                   <button
                     onClick={() => toggleDriveExpansion(drive._id)}
                     className="flex items-center space-x-2 text-primary-600 hover:text-primary-700 text-sm"
@@ -519,16 +534,7 @@ const Drives = () => {
 
               {isExpanded && (
                 <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Total applicants: {applications.length}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center mt-1">
-                        <FaUserCheck className="mr-2 text-green-500" />
-                        Selected: {statusCounts.selected || 0}
-                      </p>
-                    </div>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div className="flex items-center space-x-2">
                       <FaFilter className="text-gray-400" />
                       <select

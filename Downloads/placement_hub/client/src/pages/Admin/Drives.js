@@ -486,36 +486,34 @@ const Drives = () => {
           });
 
           return (
-            <div key={drive._id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+          <div key={drive._id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
               <div className="flex justify-between items-start gap-4">
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white">{drive.companyName}</h3>
-                  <p className="text-gray-600 dark:text-gray-400">{drive.role}</p>
-                  <p className="text-gray-600 dark:text-gray-400">Package: {drive.package}</p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Deadline: {new Date(drive.applicationDeadline).toLocaleDateString()}
-                  </p>
-                </div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-white">{drive.companyName}</h3>
+                <p className="text-gray-600 dark:text-gray-400">{drive.role}</p>
+                <p className="text-gray-600 dark:text-gray-400">Package: {drive.package}</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  Deadline: {new Date(drive.applicationDeadline).toLocaleDateString()}
+                </p>
+              </div>
                 <div className="flex flex-col items-end space-y-2">
-                  <span className={`px-3 py-1 rounded-full text-sm ${
-                    drive.status === 'open' ? 'bg-green-100 text-green-800' :
-                    drive.status === 'closed' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {drive.status}
-                  </span>
+                <span className={`px-3 py-1 rounded-full text-sm ${
+                  drive.status === 'open' ? 'bg-green-100 text-green-800' :
+                  drive.status === 'closed' ? 'bg-red-100 text-red-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {drive.status}
+                </span>
                   <button
                     onClick={() => {
-                      if (window.confirm(`Are you sure you want to delete the drive "${drive.companyName}"?`)) {
-                        api.delete(`/drives/${drive._id}`)
-                          .then(() => {
-                            toast.success('Placement drive deleted successfully');
-                            fetchDrives();
-                          })
-                          .catch((error) => {
-                            toast.error(error.response?.data?.message || 'Failed to delete placement drive');
-                          });
-                      }
+                      api.delete(`/drives/${drive._id}`)
+                        .then(() => {
+                          toast.success('Placement drive deleted successfully');
+                          fetchDrives();
+                        })
+                        .catch((error) => {
+                          toast.error(error.response?.data?.message || 'Failed to delete placement drive');
+                        });
                     }}
                     className="flex items-center space-x-1 text-red-600 hover:text-red-700 text-xs"
                   >

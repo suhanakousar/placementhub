@@ -17,7 +17,6 @@ const Profile = ({ studentData, onUpdate }) => {
       leetcode: studentData?.personalInfo?.leetcode || '',
       hackerrank: studentData?.personalInfo?.hackerrank || '',
       codechef: studentData?.personalInfo?.codechef || '',
-      codeforces: studentData?.personalInfo?.codeforces || '',
       geeksforgeeks: studentData?.personalInfo?.geeksforgeeks || ''
     },
     academicInfo: {
@@ -401,19 +400,6 @@ const Profile = ({ studentData, onUpdate }) => {
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 placeholder="https://codechef.com/users/yourusername"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                CodeForces Profile
-              </label>
-              <input
-                type="url"
-                name="codeforces"
-                value={formData.personalInfo.codeforces}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                placeholder="https://codeforces.com/profile/yourusername"
               />
             </div>
             <div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaPlus, FaFilter, FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaEdit, FaTrash, FaUser, FaCalendar, FaVideo, FaClock, FaEnvelope } from 'react-icons/fa';
+import { FaPlus, FaFilter, FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaEdit, FaTrash, FaUser, FaCalendar, FaVideo, FaEnvelope } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import MeetingForm from './MeetingForm';
@@ -154,18 +154,6 @@ const Meetings = () => {
     } catch (error) {
       toast.error('Failed to mark meeting as no-show');
     }
-  };
-
-  const getStatusBadge = (status) => {
-    const badges = {
-      pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400', icon: FaExclamationTriangle },
-      approved: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400', icon: FaCheckCircle },
-      confirmed: { color: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400', icon: FaCheckCircle },
-      completed: { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', icon: FaCheckCircle },
-      cancelled: { color: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400', icon: FaTimesCircle },
-      no_show: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400', icon: FaExclamationTriangle }
-    };
-    return badges[status] || badges.pending;
   };
 
   if (loading) {
@@ -440,16 +428,11 @@ const Meetings = () => {
                 <tr className="border-b border-gray-200 dark:border-gray-700">
                   <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Student</th>
                   <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Title</th>
-                  <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Date & Time</th>
-                  <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Status</th>
                   <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {displayMeetings.map(meeting => {
-                  const badge = getStatusBadge(meeting.status);
-                  const StatusIcon = badge.icon;
-                  const localTime = formatTimeInTimezone(meeting.startTime, meeting.studentTimezone);
                   const isGrouped = meeting.isGrouped || false;
                   
                   return (
@@ -500,18 +483,6 @@ const Meetings = () => {
                             </p>
                           )}
                         </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center space-x-1">
-                          <FaClock className="text-gray-400" />
-                          <span className="text-gray-600 dark:text-gray-400">{localTime}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded text-xs flex items-center space-x-1 w-fit ${badge.color}`}>
-                          <StatusIcon className="text-xs" />
-                          <span>{meeting.status}</span>
-                        </span>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex space-x-2">

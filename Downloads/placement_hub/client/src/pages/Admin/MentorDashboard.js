@@ -322,7 +322,7 @@ const MentorDashboard = () => {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <button
-          onClick={() => window.location.href = '/admin/meetings/create'}
+          onClick={() => window.location.href = '/admin/meetings'}
           className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition text-left"
         >
           <FaPlus className="text-2xl text-primary-600 mb-2" />

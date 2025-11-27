@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaTimes, FaGraduationCap, FaProjectDiagram, FaBriefcase, FaTrophy, FaFilePdf, FaDownload, FaLinkedin, FaGithub, FaGlobe, FaEnvelope, FaUser } from 'react-icons/fa';
+import { FaTimes, FaGraduationCap, FaProjectDiagram, FaBriefcase, FaTrophy, FaFilePdf, FaDownload, FaLinkedin, FaGithub, FaGlobe, FaPhone, FaEnvelope, FaUser } from 'react-icons/fa';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { getDepartmentName } from '../utils/departmentNames';
@@ -107,6 +107,20 @@ const StudentDetailModal = ({ student, isOpen, onClose, onDownloadResume }) => {
                 <p className="font-medium text-gray-800 dark:text-white">
                   {student.userId?.email || 'N/A'}
                 </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
+                  <FaPhone className="mr-1" />
+                  Phone
+                </p>
+                <p className="font-medium text-gray-800 dark:text-white">
+                  {student.personalInfo?.phone || 'N/A'}
+                </p>
+                {student.personalInfo?.alternatePhone && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Alt: {student.personalInfo.alternatePhone}
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Roll Number</p>

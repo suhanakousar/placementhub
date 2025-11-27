@@ -16,7 +16,6 @@ const Profile = ({ studentData, onUpdate }) => {
       website: studentData?.personalInfo?.website || '',
       leetcode: studentData?.personalInfo?.leetcode || '',
       hackerrank: studentData?.personalInfo?.hackerrank || '',
-      codechef: studentData?.personalInfo?.codechef || '',
 
       geeksforgeeks: studentData?.personalInfo?.geeksforgeeks || ''
     },

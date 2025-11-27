@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaCalendar, FaVideo, FaPlus, FaEye } from 'react-icons/fa';
+import { FaCalendar, FaClock, FaVideo, FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaPlus, FaEye } from 'react-icons/fa';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import MeetingRequestForm from '../../components/MeetingRequestForm';
@@ -35,6 +35,28 @@ const Meetings = () => {
     } catch (error) {
       console.error('Error fetching requests:', error);
     }
+  };
+
+  const getStatusBadge = (status) => {
+    const badges = {
+      pending: { color: 'bg-yellow-100 text-yellow-800', icon: FaExclamationTriangle },
+      approved: { color: 'bg-blue-100 text-blue-800', icon: FaCheckCircle },
+      confirmed: { color: 'bg-green-100 text-green-800', icon: FaCheckCircle },
+      completed: { color: 'bg-gray-100 text-gray-800', icon: FaCheckCircle },
+      cancelled: { color: 'bg-red-100 text-red-800', icon: FaTimesCircle },
+      no_show: { color: 'bg-orange-100 text-orange-800', icon: FaExclamationTriangle }
+    };
+    return badges[status] || badges.pending;
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const filteredMeetings = meetings.filter(meeting => {
@@ -108,6 +130,8 @@ const Meetings = () => {
           </div>
         ) : (
           filteredMeetings.map(meeting => {
+            const badge = getStatusBadge(meeting.status);
+            const StatusIcon = badge.icon;
             const isUpcoming = new Date(meeting.startTime) > new Date();
             const isPast = new Date(meeting.endTime) < new Date();
 
@@ -118,9 +142,25 @@ const Meetings = () => {
               >
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
-                      {meeting.title}
-                    </h3>
+                    <div className="flex items-center space-x-2 mb-2">
+                      <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
+                        {meeting.title}
+                      </h3>
+                      <span className={`px-2 py-1 rounded text-xs flex items-center space-x-1 ${badge.color}`}>
+                        <StatusIcon />
+                        <span>{meeting.status.replace('_', ' ').toUpperCase()}</span>
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center space-x-1">
+                        <FaClock />
+                        <span>{formatDate(meeting.startTime)}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <FaCalendar />
+                        <span>Topic: {meeting.topic.replace('_', ' ')}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

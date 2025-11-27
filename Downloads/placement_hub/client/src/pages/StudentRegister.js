@@ -199,6 +199,7 @@ const StudentRegister = () => {
                   <option value="CSIT">Computer Science and Information Technology</option>
                   <option value="AI">Artificial Intelligence & Data Science (AI & DS)</option>
                   <option value="BT">Biotechnology</option>
+                  <option value="IOT">Internet of Things</option>
                 </select>
               </div>
             <div>

@@ -3,6 +3,12 @@ import { FaCalendar, FaClock, FaVideo, FaCheckCircle, FaTimesCircle, FaExclamati
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import { formatTimeInTimezone } from '../../utils/meetingUtils';
+import { useNavigate } from "react-router-dom";
+
+
+
+
+
 
 const MentorDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
@@ -77,7 +83,7 @@ const MentorDashboard = () => {
         </div>
         <div className="flex space-x-2">
           <button
-            onClick={() => window.location.href = '/admin/meetings/create'}
+             onClick={() => navigate('/admin/meetings/create')}
             className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
           >
             <FaPlus />
@@ -321,23 +327,18 @@ const MentorDashboard = () => {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    
         <button
-          onClick={() => window.location.href = '/admin/meetings'}
+          onClick={() => window.location.href = '/admin/meetings/create'}
           className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition text-left"
         >
           <FaPlus className="text-2xl text-primary-600 mb-2" />
           <h4 className="font-semibold text-gray-800 dark:text-white">Schedule Meeting</h4>
+        {/* End of Selection */}
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Create a new meeting with a student</p>
         </button>
 
-        <button
-          onClick={() => window.location.href = '/admin/emails/send'}
-          className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition text-left"
-        >
-          <FaEnvelope className="text-2xl text-blue-600 mb-2" />
-          <h4 className="font-semibold text-gray-800 dark:text-white">Send Email</h4>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Send one-click emails to students</p>
-        </button>
+        
 
         <button
           onClick={() => window.location.href = '/admin/tasks'}

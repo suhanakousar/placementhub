@@ -83,7 +83,7 @@ const MentorDashboard = () => {
         </div>
         <div className="flex space-x-2">
           <button
-             onClick={() => navigate('/admin/meetings/create')}
+            onClick={() => window.location.href = '/admin/meetings/create'}
             className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
           >
             <FaPlus />

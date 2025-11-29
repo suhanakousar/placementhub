@@ -18,28 +18,29 @@ import api from '../../utils/api';
 const CACHE_KEY = 'admin_dashboard_stats';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+// Get cached stats from localStorage (outside component for immediate access)
+function getCachedStats() {
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      const now = Date.now();
+      // Return cached data if it's less than 5 minutes old
+      if (now - timestamp < CACHE_DURATION) {
+        return data;
+      }
+    }
+  } catch (error) {
+    console.error('Error reading cache:', error);
+  }
+  return null;
+}
+
 const AdminDashboard = () => {
   const { user } = useAuth();
-  const [stats, setStats] = useState(null);
+  // Initialize with cached data immediately for instant display
+  const [stats, setStats] = useState(() => getCachedStats() || null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  // Get cached stats from localStorage
-  const getCachedStats = useCallback(() => {
-    try {
-      const cached = localStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        const now = Date.now();
-        // Return cached data if it's less than 5 minutes old
-        if (now - timestamp < CACHE_DURATION) {
-          return data;
-        }
-      }
-    } catch (error) {
-      console.error('Error reading cache:', error);
-    }
-    return null;
-  }, []);
 
   // Save stats to cache
   const saveToCache = useCallback((data) => {
@@ -53,18 +54,8 @@ const AdminDashboard = () => {
     }
   }, []);
 
-  const fetchStats = useCallback(async (useCache = true) => {
-    // Check cache first if useCache is true
-    if (useCache) {
-      const cachedStats = getCachedStats();
-      if (cachedStats) {
-        setStats(cachedStats);
-        // Fetch fresh data in background
-        fetchStats(false);
-        return;
-      }
-    }
-
+  // Actual API fetch function
+  const fetchFromAPI = useCallback(async () => {
     try {
       const response = await api.get('/admin/statistics');
       const statsData = response.data || {};
@@ -72,22 +63,44 @@ const AdminDashboard = () => {
       saveToCache(statsData);
     } catch (error) {
       console.error('Error fetching stats:', error);
-      // Set default empty stats so dashboard still renders
-      const defaultStats = {
-        totalStudents: 0,
-        verifiedResumes: 0,
-        unverifiedResumes: 0,
-        departmentWiseStudents: [],
-        topStudents: [],
-        upcomingDrives: []
-      };
-      setStats(defaultStats);
+      // Only set default if we don't have any stats at all
+      setStats(prevStats => {
+        if (!prevStats || Object.keys(prevStats).length === 0) {
+          return {
+            totalStudents: 0,
+            verifiedResumes: 0,
+            unverifiedResumes: 0,
+            departmentWiseStudents: [],
+            topStudents: [],
+            upcomingDrives: []
+          };
+        }
+        return prevStats;
+      });
     }
-  }, [getCachedStats, saveToCache]);
+  }, [saveToCache]);
+
+  const fetchStats = useCallback(async (skipCache = false) => {
+    // If we have cached data and not skipping cache, show it immediately and fetch fresh in background
+    if (!skipCache) {
+      const cachedStats = getCachedStats();
+      if (cachedStats) {
+        setStats(cachedStats);
+        // Fetch fresh data in background without blocking
+        fetchFromAPI();
+        return;
+      }
+    }
+
+    // No cache or skipping cache - fetch from API
+    await fetchFromAPI();
+  }, [fetchFromAPI]);
 
   useEffect(() => {
-    fetchStats(true);
-  }, [fetchStats]);
+    // Always try to fetch, but show cached data immediately if available
+    fetchStats(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleStatsUpdate = useCallback((newStats) => {
     setStats(newStats);

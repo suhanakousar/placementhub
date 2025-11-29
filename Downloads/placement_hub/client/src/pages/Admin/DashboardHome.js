@@ -25,8 +25,11 @@ function getCachedStats() {
 }
 
 const DashboardHome = ({ stats: initialStats, onStatsUpdate }) => {
-  const [stats, setStats] = useState(initialStats || getCachedStats() || {});
-  const [loading, setLoading] = useState(!initialStats && !getCachedStats());
+  // Initialize with cached data or initialStats for immediate display
+  const cachedData = getCachedStats();
+  const [stats, setStats] = useState(initialStats || cachedData || {});
+  // Only show loading if we have NO data at all (no initial, no cache)
+  const [loading, setLoading] = useState(!initialStats && !cachedData && Object.keys(stats).length === 0);
 
   // Save stats to cache
   const saveToCache = useCallback((data) => {
@@ -40,9 +43,11 @@ const DashboardHome = ({ stats: initialStats, onStatsUpdate }) => {
     }
   }, []);
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (showLoading = false) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       const response = await api.get('/admin/statistics');
       const statsData = response.data || {};
       setStats(statsData);
@@ -53,44 +58,53 @@ const DashboardHome = ({ stats: initialStats, onStatsUpdate }) => {
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
-      // Set default empty stats to prevent rendering issues
-      const defaultStats = {
-        totalStudents: 0,
-        verifiedResumes: 0,
-        unverifiedResumes: 0,
-        departmentWiseStudents: [],
-        topStudents: [],
-        upcomingDrives: []
-      };
-      setStats(defaultStats);
+      // Only set default if we don't have any stats
+      if (Object.keys(stats).length === 0) {
+        const defaultStats = {
+          totalStudents: 0,
+          verifiedResumes: 0,
+          unverifiedResumes: 0,
+          departmentWiseStudents: [],
+          topStudents: [],
+          upcomingDrives: []
+        };
+        setStats(defaultStats);
+      }
     } finally {
       setLoading(false);
     }
-  }, [onStatsUpdate, saveToCache]);
+  }, [onStatsUpdate, saveToCache, stats]);
 
   useEffect(() => {
-    // Only fetch if no initial stats and no valid cache
-    if (!initialStats && !getCachedStats()) {
-      fetchStats();
-    } else if (initialStats) {
-      // Update cache with initial stats
+    // If we have initial stats, use them and update cache
+    if (initialStats && Object.keys(initialStats).length > 0) {
+      setStats(initialStats);
       saveToCache(initialStats);
+      setLoading(false);
+    } else if (!cachedData) {
+      // Only fetch if no initial stats and no cache
+      fetchStats(true);
+    } else {
+      // We have cached data, no need to show loading
+      setLoading(false);
     }
 
     // Set up polling every 30 seconds for real-time updates
-    // Only poll if we have initial stats (meaning parent is managing the data)
     const interval = setInterval(() => {
-      fetchStats();
+      // Background refresh without showing loading
+      fetchStats(false);
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [initialStats, fetchStats, saveToCache]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run on mount
 
   // Update local stats when initialStats prop changes
   useEffect(() => {
-    if (initialStats) {
+    if (initialStats && Object.keys(initialStats).length > 0) {
       setStats(initialStats);
       saveToCache(initialStats);
+      setLoading(false);
     }
   }, [initialStats, saveToCache]);
   const departmentData = useMemo(() => 

@@ -1,48 +1,105 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FaUsers, FaCheckCircle, FaTimesCircle, FaTrophy, FaBriefcase } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import api from '../../utils/api';
 
-const DashboardHome = ({ stats: initialStats }) => {
-  const [stats, setStats] = useState(initialStats || {});
-  const [loading, setLoading] = useState(!initialStats);
+const CACHE_KEY = 'admin_dashboard_stats';
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-  useEffect(() => {
-    // Fetch stats immediately if not provided
-    if (!initialStats) {
-    fetchStats();
+// Get cached stats from localStorage
+function getCachedStats() {
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      const now = Date.now();
+      // Return cached data if it's less than 5 minutes old
+      if (now - timestamp < CACHE_DURATION) {
+        return data;
+      }
     }
+  } catch (error) {
+    console.error('Error reading cache:', error);
+  }
+  return null;
+}
 
-    // Set up polling every 30 seconds for real-time updates
-    const interval = setInterval(fetchStats, 30000);
+const DashboardHome = ({ stats: initialStats, onStatsUpdate }) => {
+  const [stats, setStats] = useState(initialStats || getCachedStats() || {});
+  const [loading, setLoading] = useState(!initialStats && !getCachedStats());
 
-    return () => clearInterval(interval);
+  // Save stats to cache
+  const saveToCache = useCallback((data) => {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        data,
+        timestamp: Date.now()
+      }));
+    } catch (error) {
+      console.error('Error saving cache:', error);
+    }
   }, []);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/admin/statistics');
-      setStats(response.data || {});
+      const statsData = response.data || {};
+      setStats(statsData);
+      saveToCache(statsData);
+      // Notify parent component if callback provided
+      if (onStatsUpdate) {
+        onStatsUpdate(statsData);
+      }
     } catch (error) {
       console.error('Error fetching stats:', error);
       // Set default empty stats to prevent rendering issues
-      setStats({
+      const defaultStats = {
         totalStudents: 0,
         verifiedResumes: 0,
         unverifiedResumes: 0,
         departmentWiseStudents: [],
         topStudents: [],
         upcomingDrives: []
-      });
+      };
+      setStats(defaultStats);
     } finally {
       setLoading(false);
     }
-  };
-  const departmentData = stats?.departmentWiseStudents?.map(dept => ({
-    name: dept.department,
-    count: dept.count
-  })) || [];
+  }, [onStatsUpdate, saveToCache]);
+
+  useEffect(() => {
+    // Only fetch if no initial stats and no valid cache
+    if (!initialStats && !getCachedStats()) {
+      fetchStats();
+    } else if (initialStats) {
+      // Update cache with initial stats
+      saveToCache(initialStats);
+    }
+
+    // Set up polling every 30 seconds for real-time updates
+    // Only poll if we have initial stats (meaning parent is managing the data)
+    const interval = setInterval(() => {
+      fetchStats();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [initialStats, fetchStats, saveToCache]);
+
+  // Update local stats when initialStats prop changes
+  useEffect(() => {
+    if (initialStats) {
+      setStats(initialStats);
+      saveToCache(initialStats);
+    }
+  }, [initialStats, saveToCache]);
+  const departmentData = useMemo(() => 
+    stats?.departmentWiseStudents?.map(dept => ({
+      name: dept.department,
+      count: dept.count
+    })) || [], 
+    [stats?.departmentWiseStudents]
+  );
 
   if (loading) {
     return (

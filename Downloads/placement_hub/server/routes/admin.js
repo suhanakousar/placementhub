@@ -81,50 +81,61 @@ router.get('/students/:id/resume/:resumeId/debug', async (req, res) => {
 // @access  Private (Admin)
 router.get('/statistics', async (req, res) => {
   try {
-    const totalStudents = await Student.countDocuments();
-    const verifiedResumes = await Student.countDocuments({ 'placementStatus.resumeVerified': true });
-    const unverifiedResumes = totalStudents - verifiedResumes;
-
-    // Get department-wise total students count
-    const departmentStats = await Student.aggregate([
-      {
-        $group: {
-          _id: '$academicInfo.department',
-          count: { $sum: 1 }
+    // Execute all queries in parallel for better performance
+    const [
+      totalStudents,
+      verifiedResumes,
+      departmentStats,
+      topStudents,
+      upcomingDrives
+    ] = await Promise.all([
+      // Total students count
+      Student.countDocuments(),
+      // Verified resumes count
+      Student.countDocuments({ 'placementStatus.resumeVerified': true }),
+      // Department-wise statistics
+      Student.aggregate([
+        {
+          $group: {
+            _id: '$academicInfo.department',
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $sort: { count: -1 }
         }
-      },
-      {
-        $sort: { count: -1 }
-      }
+      ]),
+      // Top 5 students by CGPA
+      Student.find()
+        .populate('userId', 'email')
+        .sort({ 'academicInfo.cgpa': -1 })
+        .limit(5)
+        .select('personalInfo academicInfo placementStatus')
+        .lean(), // Use lean() for better performance when we don't need Mongoose documents
+      // Upcoming placement drives
+      PlacementDrive.find({
+        applicationDeadline: { $gte: new Date() },
+        status: 'open'
+      })
+        .sort({ applicationDeadline: 1 })
+        .limit(5)
+        .select('companyName role package applicationDeadline status')
+        .lean() // Use lean() for better performance
     ]);
+
+    const unverifiedResumes = totalStudents - verifiedResumes;
 
     const departmentWiseStudents = departmentStats.map(stat => ({
       department: stat._id || 'Unknown',
       count: stat.count
     }));
 
-    // Get top 5 students by CGPA
-    const topStudents = await Student.find()
-      .populate('userId', 'email')
-      .sort({ 'academicInfo.cgpa': -1 })
-      .limit(5)
-      .select('personalInfo academicInfo placementStatus');
-
-    // Get upcoming placement drives
-    const upcomingDrives = await PlacementDrive.find({
-      applicationDeadline: { $gte: new Date() },
-      status: 'open'
-    })
-      .sort({ applicationDeadline: 1 })
-      .limit(5)
-      .select('companyName role package applicationDeadline status');
-
     res.json({
       totalStudents,
       verifiedResumes,
       unverifiedResumes,
       departmentWiseStudents,
-      topStudents,
+      topStudents: topStudents || [],
       upcomingDrives: upcomingDrives || []
     });
   } catch (error) {

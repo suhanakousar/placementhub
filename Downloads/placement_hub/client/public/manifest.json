@@ -1,0 +1,49 @@
+{
+  "short_name": "Placement Hub",
+  "name": "Placement Hub - PMTS",
+  "description": "Placement Management and Tracking System",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logop-removebg-preview.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logop-removebg-preview.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#2563eb",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["education", "productivity"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Student Dashboard",
+      "short_name": "Dashboard",
+      "description": "Access student dashboard",
+      "url": "/student/dashboard",
+      "icons": [{ "src": "favicon.ico", "sizes": "96x96" }]
+    },
+    {
+      "name": "Admin Dashboard",
+      "short_name": "Admin",
+      "description": "Access admin dashboard",
+      "url": "/admin/dashboard",
+      "icons": [{ "src": "favicon.ico", "sizes": "96x96" }]
+    }
+  ]
+}
+

@@ -25,7 +25,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "serve": "npx serve -s build -l 3000",
+    "serve:https": "npx serve -s build -l 3000 --ssl-cert cert.pem --ssl-key key.pem"
   },
   "eslintConfig": {
     "extends": [

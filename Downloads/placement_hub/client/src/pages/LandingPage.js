@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaGraduationCap, FaChartLine, FaUsers, FaBell, FaCheckCircle } from 'react-icons/fa';
+import InstallButton from '../components/InstallButton';
 
 const LandingPage = () => {
   return (
@@ -12,12 +13,15 @@ const LandingPage = () => {
             <FaGraduationCap className="text-2xl md:text-3xl text-primary-600" />
             <h1 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-white">Placement Hub</h1>
           </div>
-          <Link
-            to="/login"
-            className="px-4 md:px-6 py-1.5 md:py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm md:text-base"
-          >
-            Login
-          </Link>
+          <div className="flex items-center space-x-2">
+            <InstallButton />
+            <Link
+              to="/login"
+              className="px-4 md:px-6 py-1.5 md:py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm md:text-base"
+            >
+              Login
+            </Link>
+          </div>
         </div>
       </header>
 

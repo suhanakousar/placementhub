@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { FaMoon, FaSun, FaBell, FaUserCircle, FaBars, FaTimes } from 'react-icons/fa';
+import InstallButton from '../InstallButton';
 
 const Header = ({ title, user, onMenuToggle, isMenuOpen }) => {
   const { darkMode, toggleDarkMode } = useTheme();
@@ -27,6 +28,7 @@ const Header = ({ title, user, onMenuToggle, isMenuOpen }) => {
           <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">{title}</h1>
         </div>
         <div className="flex items-center space-x-2 md:space-x-4">
+          <InstallButton className="hidden sm:flex" />
           <button
             onClick={toggleDarkMode}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"

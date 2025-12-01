@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FaEnvelope, FaArrowLeft } from 'react-icons/fa';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import InstallButton from '../components/InstallButton';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -35,6 +36,9 @@ const ForgotPassword = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center py-12 px-4">
         <div className="max-w-md w-full space-y-8 bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl">
+          <div className="flex justify-end mb-2">
+            <InstallButton />
+          </div>
           <div className="text-center">
             <FaEnvelope className="mx-auto text-5xl text-green-600" />
             <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">
@@ -63,6 +67,9 @@ const ForgotPassword = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full space-y-8 bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl">
+        <div className="flex justify-end mb-2">
+          <InstallButton />
+        </div>
         <div className="text-center">
           <FaEnvelope className="mx-auto text-5xl text-primary-600" />
           <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">
